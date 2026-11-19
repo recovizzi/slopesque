@@ -9,6 +9,11 @@ import { AccountsService } from '../accounts/accounts.service.js';
 import { CacheService } from '../cache/cache.service.js';
 import { RoomHub, type SocketData } from '../rooms/room-hub.service.js';
 import { RoomsService } from '../rooms/rooms.service.js';
+import { MediaService } from '../media/media.service.js';
+import { GifService } from '../external/gif.service.js';
+import { DB, type Db } from '../db/db.module.js';
+import { accounts } from '../db/schema.js';
+import { eq } from 'drizzle-orm';
 import { UserError } from '../errors.js';
 
 const ipOf = (s: Socket, trust: boolean) => (trust && String(s.handshake.headers['x-forwarded-for'] ?? '').split(',')[0]?.trim()) || s.handshake.address;
@@ -18,7 +23,8 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
   private readonly log = new Logger('Temps réel');
 
   constructor(@Inject(ENV) private readonly env: Env, private readonly accounts: AccountsService, private readonly hub: RoomHub,
-    private readonly rooms: RoomsService, private readonly cache: CacheService) {}
+    private readonly rooms: RoomsService, private readonly cache: CacheService, private readonly media: MediaService,
+    private readonly gifs: GifService, @Inject(DB) private readonly db: Db) {}
 
   afterInit(io: Server) {
     this.hub.io = io;
@@ -125,4 +131,42 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
 
   @SubscribeMessage('host:give')
   giveHost(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('host:give', b, async v => { await this.hub.giveHost(s, v.to); return null; }); }
+
+  // ---------------------------------------------------------------- pictures, stickers, emoji, GIF
+  @SubscribeMessage('media:ticket')
+  ticket(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('media:ticket', b, v => this.media.ticket(this.me(s).id, v.usage)); }
+
+  @SubscribeMessage('chat:media')
+  chatMedia(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {
+    return this.run('chat:media', b, async v => { await this.limit(s, 'messages'); await this.hub.sendPicture(s, 'image', await this.hub.picture(v.mediaId, 'chat'), v.replyTo ?? null); return null; });
+  }
+
+  @SubscribeMessage('chat:gif')
+  chatGif(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('chat:gif', b, async v => { await this.limit(s, 'messages'); await this.hub.sendGif(s, v.gif); return null; }); }
+
+  @SubscribeMessage('sticker:add')
+  stickerAdd(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('sticker:add', b, async v => { await this.hub.addSticker(s, await this.hub.picture(v.mediaId, 'sticker'), v.send); return null; }); }
+
+  @SubscribeMessage('sticker:send')
+  stickerSend(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('sticker:send', b, async v => { await this.limit(s, 'messages'); await this.hub.sendSticker(s, v.id); return null; }); }
+
+  @SubscribeMessage('sticker:remove')
+  stickerRemove(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('sticker:remove', b, async v => { await this.hub.removeSticker(s, v.id); return null; }); }
+
+  @SubscribeMessage('emoji:add')
+  emojiAdd(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('emoji:add', b, async v => { await this.hub.addEmoji(s, v.name, await this.hub.picture(v.mediaId, 'emoji')); return null; }); }
+
+  @SubscribeMessage('photo:set')
+  photo(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('photo:set', b, async v => { await this.hub.setPhoto(s, v.mediaId ? await this.hub.picture(v.mediaId, 'photo') : null); return null; }); }
+
+  @SubscribeMessage('gif:search')
+  gifSearch(@MessageBody() b: unknown) { return this.run('gif:search', b, v => this.gifs.page(v.q, v.page, v.provider)); }
+
+  @SubscribeMessage('gif:trending')
+  gifTrending(@MessageBody() b: unknown) { return this.run('gif:trending', b, v => this.gifs.page(null, v.page, v.provider)); }
+
+  @SubscribeMessage('gif:favorites')
+  gifFavorites(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {
+    return this.run('gif:favorites', b, async v => { await this.db.update(accounts).set({ gifFavorites: v.favorites }).where(eq(accounts.id, this.me(s).id)); return null; });
+  }
 }

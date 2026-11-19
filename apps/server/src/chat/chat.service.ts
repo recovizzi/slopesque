@@ -2,9 +2,10 @@
 // a reply carries its quote (or says the quoted message is gone); reactions toggle.
 import { Inject, Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { and, desc, eq, inArray, lt, sql } from 'drizzle-orm';
-import { HOUR, LIMITS, RETENTION, type ChatPage, type MessageView, type Quote } from '@slopesque/shared';
+import { HOUR, LIMITS, RETENTION, type ChatPage, type GifRef, type LinkPreview, type MediaView, type MessageView, type Quote } from '@slopesque/shared';
 import { DB, type Db } from '../db/db.module.js';
-import { messages, reactions, rooms } from '../db/schema.js';
+import { media, messages, reactions, rooms } from '../db/schema.js';
+import { MediaService, type MediaRow } from '../media/media.service.js';
 
 type Row = typeof messages.$inferSelect;
 
@@ -13,7 +14,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
   private readonly log = new Logger('Chat');
   private timer: NodeJS.Timeout | null = null;
 
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(@Inject(DB) private readonly db: Db, private readonly media: MediaService) {}
 
   onModuleInit() {
     void this.purge();
@@ -50,27 +51,57 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     const replyIds = [...new Set(list.map(m => m.replyTo).filter((x): x is number => x !== null))];
     const quoted = replyIds.length ? await this.db.select().from(messages).where(inArray(messages.id, replyIds)) : [];
     const byId = new Map(quoted.map(q => [q.id, q]));
+    const mediaIds = [...new Set(list.map(m => m.mediaId).filter((x): x is string => !!x))];
+    const pics = new Map((mediaIds.length ? await this.db.select().from(media).where(inArray(media.id, mediaIds)) : []).map(x => [x.id, x]));
     return list.map(m => {
       const r: Record<string, string[]> = {};
       for (const x of reacts) if (x.messageId === m.id) (r[x.emoji] ??= []).push(x.accountId);
-      return this.view(m, r, m.replyTo === null ? null : quote(m.replyTo, byId.get(m.replyTo)));
+      return this.view(m, r, m.replyTo === null ? null : quote(m.replyTo, byId.get(m.replyTo)), m.mediaId ? pics.get(m.mediaId) : undefined);
     });
   }
 
-  view(m: Row, reactions: Record<string, string[]> = {}, reply: Quote | null = null): MessageView {
-    return { id: m.id, from: m.authorId, kind: m.kind as MessageView['kind'], text: m.text, at: m.createdAt.getTime(), reply, reactions, data: m.data ?? null,
-      media: m.mediaKind ? { kind: m.mediaKind as 'image', src: null, w: 0, h: 0 } : null };
+  view(m: Row, reactions: Record<string, string[]> = {}, reply: Quote | null = null, pic?: MediaRow): MessageView {
+    const { preview, ...data } = (m.data ?? {}) as { preview?: LinkPreview };
+    return { id: m.id, from: m.authorId, kind: m.kind as MessageView['kind'], text: m.text, at: m.createdAt.getTime(), reply, reactions,
+      data: Object.keys(data).length ? data : null, preview: preview ?? null, media: this.mediaView(m, pic) };
+  }
+
+  /** A message's picture: a GIF's link, or our stored picture; gone (src null) once deleted, or for a chat image more
+   *  than 7 days after this message (even when the same picture was sent again since). */
+  private mediaView(m: Row, pic?: MediaRow): MediaView | null {
+    if (!m.mediaKind) return null;
+    if (m.mediaKind === 'gif' && m.gif) { const g = m.gif as unknown as GifRef; return { kind: 'gif', src: g.url, w: g.w, h: g.h, gif: g }; }
+    const expired = m.mediaKind === 'image' && Date.now() - m.createdAt.getTime() > RETENTION.chatImages;
+    return pic && !expired ? { kind: m.mediaKind as 'image', src: this.media.url(pic.id), w: pic.width, h: pic.height } : { kind: m.mediaKind as 'image', src: null, w: 0, h: 0 };
+  }
+
+  /** A picture sent in the chat (an image or a sticker), or a GIF (a link to its provider). */
+  async sendMedia(roomId: string, authorId: string, kind: 'image' | 'sticker', pic: MediaRow, replyTo: number | null = null) {
+    const [m] = await this.db.insert(messages).values({ roomId, authorId, kind: 'media', mediaId: pic.id, mediaKind: kind, replyTo }).returning();
+    return this.withQuote(roomId, m!, pic);
+  }
+  async sendGif(roomId: string, authorId: string, gif: GifRef) {
+    const [m] = await this.db.insert(messages).values({ roomId, authorId, kind: 'media', mediaKind: 'gif', gif: gif as unknown as Record<string, unknown> }).returning();
+    return this.withQuote(roomId, m!);
+  }
+  private async withQuote(roomId: string, m: Row, pic?: MediaRow) {
+    await this.db.update(rooms).set({ lastActivityAt: new Date() }).where(eq(rooms.id, roomId));
+    let q: Quote | null = null;
+    if (m.replyTo !== null) { const [t] = await this.db.select().from(messages).where(and(eq(messages.id, m.replyTo), eq(messages.roomId, roomId))); q = quote(m.replyTo, t); }
+    return this.view(m, {}, q, pic);
+  }
+
+  /** The link preview arrived: kept in the message. */
+  async setPreview(id: number, preview: LinkPreview) {
+    const [m] = await this.db.select().from(messages).where(eq(messages.id, id));
+    if (!m) return null;
+    const [u] = await this.db.update(messages).set({ data: { ...(m.data ?? {}), preview } as unknown as Record<string, unknown> }).where(eq(messages.id, id)).returning();
+    return (await this.views([u!]))[0]!;
   }
 
   async send(roomId: string, authorId: string | null, text: string, replyTo: number | null = null, kind: MessageView['kind'] = 'text') {
     const [m] = await this.db.insert(messages).values({ roomId, authorId, text, replyTo, kind }).returning();
-    await this.db.update(rooms).set({ lastActivityAt: new Date() }).where(eq(rooms.id, roomId));
-    let q: Quote | null = null;
-    if (replyTo !== null) {
-      const [target] = await this.db.select().from(messages).where(and(eq(messages.id, replyTo), eq(messages.roomId, roomId)));
-      q = quote(replyTo, target);
-    }
-    return this.view(m!, {}, q);
+    return this.withQuote(roomId, m!);
   }
 
   /** Adds my reaction, or removes it when I had it; the message's reactions after. */

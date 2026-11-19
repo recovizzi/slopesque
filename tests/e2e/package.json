@@ -1,0 +1,13 @@
+{
+  "name": "@slopesque/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "e2e": "node run.mjs"
+  },
+  "devDependencies": {
+    "@slopesque/engines": "workspace:*",
+    "playwright": "1.49.1"
+  }
+}

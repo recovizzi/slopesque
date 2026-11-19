@@ -18,3 +18,5 @@ release/
 web-ext-artifacts/
 test-results/
 playwright-report/
+tests/e2e/shots/
+tests/e2e/.cache/

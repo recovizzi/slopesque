@@ -7,7 +7,7 @@ import { canonicalCode, codeStrength, CODE_MIN_LEN } from '@slopesque/engines';
 import { KEY_ALPHABET, LIMITS, type AccountView, type FatalReason, type SavedRoom } from '@slopesque/shared';
 import { ENV, type Env } from '../config/config.module.js';
 import { DB, type Db } from '../db/db.module.js';
-import { accountNames, accounts, retiredCodes } from '../db/schema.js';
+import { accountNames, accounts, retiredCodes, roomMembers } from '../db/schema.js';
 import { CacheService } from '../cache/cache.service.js';
 import { UserError } from '../errors.js';
 
@@ -39,7 +39,7 @@ export class AccountsService {
 
   async get(id: string) { return (await this.db.query.accounts.findFirst({ where: eq(accounts.id, id) }))!; }
 
-  view(a: Account): AccountView { return { id: a.id, name: a.name, hue: a.hue, quick: a.quick, rooms: a.rooms }; }
+  view(a: Account): AccountView { return { id: a.id, name: a.name, hue: a.hue, quick: a.quick, rooms: a.rooms, gifFavorites: a.gifFavorites as AccountView['gifFavorites'] }; }
 
   /** « Reprendre un compte » / « Repartir de zéro »: does an account have this code (limited like unknown codes)? */
   async find(code: string, ip: string) {
@@ -77,6 +77,7 @@ export class AccountsService {
       await this.db.insert(accountNames).values({ accountId: id, name: me.name });   // the past pseudo, for accounts:find
     }
     if (p.hue !== undefined) changes.hue = p.hue;
+    if (p.hue !== undefined && p.hue !== null) await this.db.update(roomMembers).set({ hue: p.hue }).where(eq(roomMembers.accountId, id));   // my colour in every room
     if (p.quick !== undefined) changes.quick = p.quick;
     if (Object.keys(changes).length) await this.db.update(accounts).set(changes).where(eq(accounts.id, id));
     return this.get(id);

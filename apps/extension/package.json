@@ -1,0 +1,20 @@
+{
+  "name": "@slopesque/extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Slopesque : jeux entre amis (chat, Demi-disque, sondages, roulette, cartes) dans un panneau flottant",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "lint": "web-ext lint --self-hosted --source-dir dist/extension-firefox",
+    "typecheck": "true",
+    "test": "true"
+  },
+  "devDependencies": {
+    "@slopesque/web": "workspace:*",
+    "crx3": "^2.0.0",
+    "esbuild": "^0.28.2",
+    "fflate": "^0.8.3",
+    "web-ext": "^10.8.0"
+  }
+}

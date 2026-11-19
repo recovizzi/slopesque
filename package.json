@@ -20,7 +20,8 @@
     "services:up": "docker compose -f infra/docker-compose.yml up -d --wait",
     "services:down": "docker compose -f infra/docker-compose.yml down",
     "format": "prettier --write .",
-    "prepare": "lefthook install || true"
+    "prepare": "lefthook install || true",
+    "e2e": "pnpm build && pnpm --filter @slopesque/e2e e2e"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",

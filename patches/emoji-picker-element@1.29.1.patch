@@ -1,0 +1,57 @@
+diff --git a/picker.js b/picker.js
+index f3d231d3e312966bc6b9739c862f3fde12f031b7..bbff31673c32e6ee60a0acac4caf9a07f222d0da 100644
+--- a/picker.js
++++ b/picker.js
+@@ -1,8 +1,8 @@
+ import Database from './database.js';
+ 
+ // via https://unpkg.com/browse/emojibase-data@6.0.0/meta/groups.json
++// PATCH (semicirculardisk): the custom emoji come last, after the flags, so the picker opens on the smileys
+ const allGroups = [
+-  [-1, '✨', 'custom'],
+   [0, '😀', 'smileys-emotion'],
+   [1, '👋', 'people-body'],
+   [3, '🐱', 'animals-nature'],
+@@ -11,10 +11,11 @@ const allGroups = [
+   [6, '⚽', 'activities'],
+   [7, '📝', 'objects'],
+   [8, '⛔️', 'symbols'],
+-  [9, '🏁', 'flags']
++  [9, '🏁', 'flags'],
++  [-1, '✨', 'custom']
+ ].map(([id, emoji, name]) => ({ id, emoji, name }));
+ 
+-const groups = allGroups.slice(1);
++const groups = allGroups.slice(0, -1);
+ 
+ const MIN_SEARCH_TEXT_LENGTH = 2;
+ const NUM_SKIN_TONES = 6;
+@@ -1048,9 +1049,11 @@ function createRoot (shadowRoot, props) {
+     ].filter(Boolean)).join(', ')
+   );
+ 
+-  const titleForEmoji = (emoji) => (
+-    emoji.annotation || (emoji.shortcodes || EMPTY_ARRAY).join(', ')
+-  );
++  // PATCH (semicirculardisk): the title shows the emoji's :code:, e.g. "visage riant aux larmes :rire:"
++  const titleForEmoji = (emoji) => {
++    const code = emoji.shortcodes && emoji.shortcodes.length ? `:${emoji.shortcodes[0]}:` : '';
++    return emoji.annotation ? (code ? `${emoji.annotation} ${code}` : emoji.annotation) : code;
++  };
+ 
+   const helpers = {
+     labelWithSkin, titleForEmoji, unicodeWithSkin
+@@ -1153,10 +1156,9 @@ function createRoot (shadowRoot, props) {
+         state.groups = allGroups;
+       }
+     } else if (state.groups !== groups) {
+-      if (state.currentGroupIndex) {
+-        // If the current group is anything other than "custom" (which is first), decrement.
+-        // This fixes the odd case where you set customEmoji, then pick a category, then unset customEmoji
+-        state.currentGroupIndex--;
++      if (state.currentGroupIndex >= groups.length) {
++        // PATCH (semicirculardisk): "custom" is last; it was open and no longer exists
++        state.currentGroupIndex = 0;
+       }
+       state.groups = groups;
+     }

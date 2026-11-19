@@ -2,6 +2,7 @@
 import 'reflect-metadata';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { raw } from 'express';
 import { AppModule } from './app.module.js';
 import { SlopesqueIoAdapter } from './realtime/io-adapter.js';
 import { isInsecureUrl } from '@slopesque/shared';
@@ -12,6 +13,8 @@ const app = await NestFactory.create(AppModule, { logger: [...levels[(process.en
 const env = app.get<Env>(ENV);
 app.enableShutdownHooks();
 app.useWebSocketAdapter(new SlopesqueIoAdapter(app, env.ALLOWED_ORIGINS));
+// an upload is the picture itself as the body (15 MB at most), with its ticket in X-Ticket
+app.use('/api/media', raw({ type: () => true, limit: '16mb' }));
 // the extension's pages (and the dev app on :5173) call the API from another origin
 app.enableCors({ origin: env.ALLOWED_ORIGINS.length ? env.ALLOWED_ORIGINS : true });
 await app.listen(env.PORT, '0.0.0.0');

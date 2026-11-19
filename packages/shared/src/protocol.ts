@@ -15,6 +15,7 @@ export type FatalReason = 'protocol' | 'code' | 'retired' | 'limited' | 'replace
 export interface AccountView {
   id: string;
   name: string;
+  gifFavorites: GifRef[];
   hue: number | null;
   quick: string | null;
   rooms: SavedRoom[];
@@ -45,9 +46,17 @@ export interface MessageView {
   at: number;
   reply: Quote | null;
   reactions: Record<string, string[]>;
-  media?: { kind: 'image' | 'sticker' | 'gif'; src: string | null; w: number; h: number } | null;   // src null: gone
+  media?: MediaView | null;
+  preview?: LinkPreview | null;    // the first link's preview, read by the server (arrives after the message)
   data?: Record<string, unknown> | null;
 }
+/** A picture in a message: src null once it is gone (a chat image after 7 days, a sticker removed). A GIF is a link
+ *  to its provider (not stored): `gif` says which. */
+export interface MediaView { kind: 'image' | 'sticker' | 'gif'; src: string | null; w: number; h: number; gif?: GifRef | null }
+export interface GifRef { id: string; provider: string; url: string; w: number; h: number; title: string }
+export interface LinkPreview { kind: 'card' | 'video'; url: string; site: string; title: string; text?: string; image?: string | null; embed?: string | null }
+export interface StickerView { id: string; src: string; w: number; h: number }
+export interface EmojiView { name: string; url: string; by: string | null }
 export interface ChatPage {
   messages: MessageView[];
   hasMore: boolean;
@@ -62,6 +71,8 @@ export interface RoomState {
   hostId: string | null;
   members: MemberView[];
   chat: ChatPage;
+  stickers: StickerView[];
+  emoji: EmojiView[];
   serverTime: number;
 }
 
@@ -73,7 +84,10 @@ export type RoomEvent =
   | { type: 'message-removed'; id: number }
   | { type: 'reactions'; id: number; reactions: Record<string, string[]> }
   | { type: 'member'; member: MemberView }
-  | { type: 'host'; hostId: string | null };
+  | { type: 'host'; hostId: string | null }
+  | { type: 'message-updated'; message: MessageView }
+  | { type: 'stickers'; stickers: StickerView[] }
+  | { type: 'emoji'; emoji: EmojiView[] };
 export type SequencedEvent = RoomEvent & { seq: number };
 
 // ------------------------------------------------------------------ intents (client → server), with their answers
@@ -90,6 +104,17 @@ export const intents = {
   'account:find': z.object({ code: z.string().max(64) }),
   'account:renew': z.object({ code: z.string().max(64) }),
   'host:give': z.object({ to: z.string().uuid() }),
+  'media:ticket': z.object({ usage: z.enum(['chat', 'sticker', 'emoji', 'photo', 'poll', 'trump']) }),
+  'chat:media': z.object({ mediaId: z.string().uuid(), replyTo: z.number().int().positive().nullable().optional() }),
+  'chat:gif': z.object({ gif: z.object({ id: z.string().max(64), provider: z.string().max(16), url: z.url(), w: z.number().int(), h: z.number().int(), title: z.string().max(200) }) }),
+  'sticker:add': z.object({ mediaId: z.string().uuid(), send: z.boolean() }),
+  'sticker:send': z.object({ id: z.string().uuid() }),
+  'sticker:remove': z.object({ id: z.string().uuid() }),
+  'emoji:add': z.object({ name: z.string().regex(/^[a-z0-9_]{2,24}$/), mediaId: z.string().uuid() }),
+  'photo:set': z.object({ mediaId: z.string().uuid().nullable() }),
+  'gif:search': z.object({ q: z.string().trim().min(1).max(60), page: z.number().int().min(0).max(20), provider: z.string().max(16).nullable().optional() }),
+  'gif:trending': z.object({ page: z.number().int().min(0).max(20), provider: z.string().max(16).nullable().optional() }),
+  'gif:favorites': z.object({ favorites: z.array(z.object({ id: z.string().max(64), provider: z.string().max(16), url: z.url(), w: z.number().int(), h: z.number().int(), title: z.string().max(200) })).max(200) }),
 } as const;
 export type IntentName = keyof typeof intents;
 export type Intent<N extends IntentName> = z.infer<(typeof intents)[N]>;
@@ -109,4 +134,21 @@ export interface IntentResults {
   'account:find': { exists: boolean; retired: boolean; name: string | null };
   'account:renew': null;
   'host:give': null;
+  'media:ticket': { ticket: string; url: string };
+  'chat:media': null;
+  'chat:gif': null;
+  'sticker:add': null;
+  'sticker:send': null;
+  'sticker:remove': null;
+  'emoji:add': null;
+  'photo:set': null;
+  'gif:search': GifPage;
+  'gif:trending': GifPage;
+  'gif:favorites': null;
 }
+
+/** GIF results: the provider that answered, or why there is none (no key, key refused, no answer). */
+export interface GifPage { items: GifRef[]; next: number | null; provider: string | null; error: 'no-key' | 'refused' | 'down' | null }
+
+/** What an upload answers (POST /api/media). */
+export type UploadResult = Ack<{ id: string; url: string; w: number; h: number }>;

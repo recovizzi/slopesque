@@ -1,8 +1,11 @@
 packages:
   - apps/*
   - packages/*
+  - tests/*
 onlyBuiltDependencies:
   - sharp
   - esbuild
   - lefthook
   - '@nestjs/core'
+patchedDependencies:
+  emoji-picker-element@1.29.1: patches/emoji-picker-element@1.29.1.patch
