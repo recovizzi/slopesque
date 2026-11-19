@@ -12,6 +12,7 @@ import { Avatar, Html, Icon } from './ui/common';
 import { KeyBadge, RoomList, RoomPage } from './ui/Rooms';
 import { DiskSettings, DiskStage, Ranking } from './ui/DiskStage';
 import { PollSettings, PollStage, WheelStage } from './ui/PollWheel';
+import { CardsStage } from './ui/CardsStage';
 import { READY_ACTIVITIES } from '@slopesque/shared';
 
 const EMBED = new URLSearchParams(location.search).has('embed');
@@ -40,6 +41,7 @@ export function App() {
     b.toggle('activity-chat', !room || room.activity.activity === 'chat');
     b.toggle('activity-poll', room?.activity.activity === 'poll');
     b.toggle('activity-wheel', room?.activity.activity === 'wheel');
+    b.toggle('activity-cards', room?.activity.activity === 'cards');
     b.toggle('left-open', leftOpen);
     b.toggle('right-open', rightOpen);
     b.toggle('room-blocked', blocked);
@@ -93,13 +95,14 @@ export function App() {
           <button className={`tab ${leftTab === 'chat' ? 'on' : ''}`} type="button" onClick={() => setLeftTab('chat')} title="Chat"><Icon name="chat" /><span className="tab-label">Chat</span></button>
           <button className={`tab ${leftTab === 'ranking' ? 'on' : ''}`} type="button" onClick={() => setLeftTab('ranking')} title="Classement"><Icon name="trophy" /><span className="tab-label">Classement</span></button>
           <button className="icon-btn" type="button" onClick={() => setLeftOpen(false)} title="Fermer" aria-label="Fermer le panneau"><Icon name="close" /></button></div>
-        {leftTab === 'chat' ? !blocked && <Chat pop={pop} /> : act === 'disk' ? <Ranking onGiveHost={giveHost} /> : <People onGiveHost={giveHost} />}</>)}</aside>
+        {leftTab === 'chat' ? !blocked && <Chat pop={pop} /> : act === 'disk' || act === 'cards' ? <Ranking onGiveHost={giveHost} /> : <People onGiveHost={giveHost} />}</>)}</aside>
       <main className="stage">
         <div className="room-page">{page}</div>
         <div className="chat-stage">{!blocked && act === 'chat' && <Chat pop={pop} />}</div>
         {!blocked && act === 'disk' && <DiskStage />}
         {!blocked && act === 'poll' && <PollStage />}
         {!blocked && act === 'wheel' && <WheelStage />}
+        {!blocked && act === 'cards' && <CardsStage />}
       </main>
       <div className="backdrop" onClick={() => setRightOpen(false)} />
       <aside className="drawer drawer-right">{!first && <>

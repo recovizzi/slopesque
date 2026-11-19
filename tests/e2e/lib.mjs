@@ -13,7 +13,7 @@ export const OUT = path.join(ROOT, 'tests/e2e/shots');
 export const STACK = process.env.E2E_STACK === '1';
 export const PORT = STACK ? 8080 : 3198, SERVER = `http://localhost:${PORT}`;
 const compose = ['compose', '-f', path.resolve(import.meta.dirname, '../../infra/docker-compose.prod.yml'), '--env-file', path.resolve(import.meta.dirname, '../../infra/.env')];
-const env = { ...process.env, PORT: String(PORT), PUBLIC_URL: SERVER, LOG_LEVEL: 'warn', CODE_ATTEMPTS_PER_MINUTE: '1000' };
+const env = { ...process.env, PORT: String(PORT), PUBLIC_URL: SERVER, LOG_LEVEL: 'warn', CODE_ATTEMPTS_PER_MINUTE: '1000', ROBOT_DELAY_MS: '60' };
 const serverDir = path.join(ROOT, 'apps/server');
 
 let failed = 0;

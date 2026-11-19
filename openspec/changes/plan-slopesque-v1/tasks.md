@@ -69,10 +69,10 @@ chaque jalon, les tâches sont groupées par partie du monorepo (`[racine]`, `[i
 
 ## 7. Jalon 7 : Cartes, Trou du cul
 
-- [ ] 7.1 [engines] Trou du cul (règles, places, points au dernier occupant, robots), vue par joueur, tests (licence du moteur repris : décision 16)
-- [ ] 7.2 [server] Table : places, rejoindre / quitter, robots, exclusion à 30 s, fin de manche, points
-- [ ] 7.3 [web] Table, main en éventail, Trou du cul, règles
-- [ ] 7.4 [e2e] Une manche à deux joueurs et deux robots ; aucune main adverse dans le trafic
+- [x] 7.1 [engines] Trou du cul (règles, places, points au dernier occupant, robots), vue par joueur, tests (licence du moteur repris : décision 16)
+- [x] 7.2 [server] Table : places, rejoindre / quitter, robots, exclusion à 30 s, fin de manche, points
+- [x] 7.3 [web] Table, main en éventail, Trou du cul, règles
+- [x] 7.4 [e2e] Une manche à deux joueurs et deux robots ; aucune main adverse dans le trafic
 
 ## 8. Jalon 8 : Tarot
 

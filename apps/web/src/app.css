@@ -6,3 +6,5 @@
 .tag.insecure svg { width: 12px; height: 12px; }
 .chat-start { text-align: center; opacity: .8; }
 .reply-ref.is-gone { cursor: default; }
+.cards-holder { display: contents; }
+.cards-note { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); z-index: 3; }

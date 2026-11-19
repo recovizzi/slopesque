@@ -184,6 +184,21 @@ check(await until(async () => (await a.frame.getByText('La roue tourne…').coun
 check(await until(async () => /Pizza|Sushi/.test(await a.frame.locator('[data-winner]').textContent().catch(() => '')), 12000), 'wheel: the same winner shown after the spin');
 check((await a.frame.locator('[data-winner]').textContent()) === (await b.frame.locator('[data-winner]').textContent()), 'wheel: A and B see the same result');
 await shot(a.page, '12-wheel-result');
+// ---- jalon 7: the Trou du cul (A plays, robots on the free seats)
+await say(b.frame, '/activity');
+await b.frame.locator('.act-tile', { hasText: 'Cartes' }).click();
+await b.frame.locator('.act-format', { hasText: 'Trou du cul' }).click();
+await b.frame.getByRole('button', { name: 'Distribuer' }).click();
+check(await until(async () => (await a.frame.locator('.cg-hand .in-hand').count()) >= 17, 8000), 'cards: A sees his hand in a fan');
+check(await a.frame.locator('.cg-seat').count() === 2 && (await a.frame.locator('.cg-seat .seat-bot').count()) === 2, 'cards: two robots on the free seats');
+check(await b.frame.locator('.cg-hand').count() === 0, 'cards: B (not seated) sees no hand');
+await shot(a.page, '13-cards');
+await a.frame.getByRole('button', { name: 'Quitter la table' }).click();
+check(await until(async () => (await a.frame.locator('.cg-results').count()) === 1, 30000), 'cards: A left, the robots finished the round');
+check(await until(async () => (await a.frame.locator('.cg-results li', { hasText: 'Toi' }).count()) === 1), 'cards: the round\'s points stay A\'s (last player of his seat)');
+await shot(a.page, '14-cards-results');
+await a.frame.locator('[data-action="table-join"]').click();
+check(await until(async () => (await b.frame.locator('.msg.sys', { hasText: 'reprend sa place' }).count()) >= 1 || (await b.frame.locator('.msg.sys', { hasText: 'prend la place' }).count()) >= 1, 8000), 'cards: A takes a seat back');
 await say(b.frame, '/activity');
 await b.frame.locator('.act-tile', { hasText: 'Chat' }).click();
 check(await until(async () => (await a.frame.locator('.chat-stage .chat').isVisible())), 'back to the Chat activity');
