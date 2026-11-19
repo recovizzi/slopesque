@@ -55,10 +55,10 @@ chaque jalon, les tâches sont groupées par partie du monorepo (`[racine]`, `[i
 
 ## 5. Jalon 5 : Demi-disque et Amphithéâtre
 
-- [ ] 5.1 [engines] Demi-disque et Amphithéâtre (barème, colonnes, sièges) portés de la maquette, avec tests
-- [ ] 5.2 [server] Tours (mot, placement, révélation sans fuite du rayon de l'hôte), scores, palmarès, réglages de l'onglet Partie
-- [ ] 5.3 [web] Demi-disque et Amphithéâtre (SVG repris de `disk.ts` et `amphi.ts`), classement, podium, palmarès
-- [ ] 5.4 [e2e] Un tour complet à trois joueurs ; le rayon de l'hôte absent du trafic avant la révélation
+- [x] 5.1 [engines] Demi-disque et Amphithéâtre (barème, colonnes, sièges) portés de la maquette, avec tests
+- [x] 5.2 [server] Tours (mot, placement, révélation sans fuite du rayon de l'hôte), scores, palmarès, réglages de l'onglet Partie
+- [x] 5.3 [web] Demi-disque et Amphithéâtre (SVG repris de `disk.ts` et `amphi.ts`), classement, podium, palmarès
+- [x] 5.4 [e2e] Un tour complet à trois joueurs ; le rayon de l'hôte absent du trafic avant la révélation
 
 ## 6. Jalon 6 : Sondage et Roulette
 

@@ -2,7 +2,7 @@
 // right drawer (Profil, Extension, Partie). Before any code: the first launch. A refused code: its page.
 import { useEffect, useRef, useState } from 'react';
 import { MIN_HUE_GAP, RAINBOW, hueColor, hueDistance, newCode } from '@slopesque/engines';
-import { isInsecureUrl, type MemberView } from '@slopesque/shared';
+import { isInsecureUrl, type ActivityChoice, type MemberView } from '@slopesque/shared';
 import { EmojiPop, emojiHtml } from './lib/emoji';
 import { connect, request, upload } from './net';
 import { useStore } from './store';
@@ -10,6 +10,8 @@ import { AccountSection, CodeModal, Welcome, type CodeMode } from './ui/Account'
 import { Chat, People } from './ui/Chat';
 import { Avatar, Html, Icon } from './ui/common';
 import { KeyBadge, RoomList, RoomPage } from './ui/Rooms';
+import { DiskSettings, DiskStage, Ranking } from './ui/DiskStage';
+import { READY_ACTIVITIES } from '@slopesque/shared';
 
 const EMBED = new URLSearchParams(location.search).has('embed');
 const RELEASES = 'https://github.com/recovizzi/slopesque/releases/latest';
@@ -20,6 +22,7 @@ export function App() {
   const [leftOpen, setLeftOpen] = useState(innerWidth >= 640);
   const [rightOpen, setRightOpen] = useState(false);
   const [tab, setTab] = useState<RightTab>('profile');
+  const [leftTab, setLeftTab] = useState<'chat' | 'ranking'>('chat');
   const [codeModal, setCodeModal] = useState<{ first: boolean; start: CodeMode | null } | null>(null);
   const [welcomeCode] = useState(() => newCode());   // drawn at the first launch; kept only after « Continuer »
   const popHost = useRef<HTMLDivElement>(null);
@@ -33,12 +36,13 @@ export function App() {
   const blocked = first || !!fatal || roomStatus !== 'ok' || !room || !account;
   useEffect(() => {
     const b = document.body.classList;
-    b.toggle('activity-chat', true);
+    b.toggle('activity-chat', !room || room.activity.activity === 'chat');
     b.toggle('left-open', leftOpen);
     b.toggle('right-open', rightOpen);
     b.toggle('room-blocked', blocked);
     b.toggle('is-welcome', first);
-  }, [leftOpen, rightOpen, blocked, first]);
+  }, [leftOpen, rightOpen, blocked, first, room?.activity.activity]);
+  const act = room?.activity.activity ?? 'chat';
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
@@ -78,13 +82,19 @@ export function App() {
       {EMBED && <button className="icon-btn" type="button" onClick={() => parent.postMessage({ scd: 'close' }, '*')} title="Fermer" aria-label="Fermer"><Icon name="close" /></button>}
     </header>
     <div className="main">
-      <aside className="drawer drawer-left">{room && account && <>
+      <aside className="drawer drawer-left">{room && account && (act === 'chat' ? <>
         <div className="tabs"><span className="tab on static"><Icon name="users" />Joueurs</span>
           <button className="icon-btn" type="button" onClick={() => setLeftOpen(false)} title="Fermer" aria-label="Fermer le panneau"><Icon name="close" /></button></div>
-        <People onGiveHost={giveHost} /></>}</aside>
+        <People onGiveHost={giveHost} /></> : <>
+        <div className="tabs">
+          <button className={`tab ${leftTab === 'chat' ? 'on' : ''}`} type="button" onClick={() => setLeftTab('chat')} title="Chat"><Icon name="chat" /><span className="tab-label">Chat</span></button>
+          <button className={`tab ${leftTab === 'ranking' ? 'on' : ''}`} type="button" onClick={() => setLeftTab('ranking')} title="Classement"><Icon name="trophy" /><span className="tab-label">Classement</span></button>
+          <button className="icon-btn" type="button" onClick={() => setLeftOpen(false)} title="Fermer" aria-label="Fermer le panneau"><Icon name="close" /></button></div>
+        {leftTab === 'chat' ? !blocked && <Chat pop={pop} /> : <Ranking onGiveHost={giveHost} />}</>)}</aside>
       <main className="stage">
         <div className="room-page">{page}</div>
-        <div className="chat-stage">{!blocked && <Chat pop={pop} />}</div>
+        <div className="chat-stage">{!blocked && act === 'chat' && <Chat pop={pop} />}</div>
+        {!blocked && act === 'disk' && <DiskStage />}
       </main>
       <div className="backdrop" onClick={() => setRightOpen(false)} />
       <aside className="drawer drawer-right">{!first && <>
@@ -93,7 +103,7 @@ export function App() {
           <button className="icon-btn" type="button" onClick={() => setRightOpen(false)} title="Fermer" aria-label="Fermer"><Icon name="close" /></button></div>
         <div className="drawer-body">{tab === 'profile' ? <Profile pop={pop} onCode={() => setCodeModal({ first: false, start: null })} />
           : tab === 'extension' ? <ExtensionTab setDevice={setDevice} />
-          : <p className="note">Activité : Chat. Les jeux arrivent avec les jalons suivants.</p>}</div></>}</aside>
+          : <GameTab />}</div></>}</aside>
     </div>
     {codeModal && <CodeModal first={codeModal.first} start={codeModal.start} onClose={() => setCodeModal(null)} onDone={() => setCodeModal(null)} />}
     <div ref={popHost} />
@@ -176,6 +186,22 @@ function PhotoField() {
       <button className="btn ghost sm" type="button" disabled={busy} onClick={() => file.current?.click()}><Icon name="camera" />{busy ? 'Envoi…' : me.photo ? 'Changer de photo' : 'Ajouter une photo'}</button></div>
     <input ref={file} type="file" accept="image/*" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void choose(f); }} />
     <p className="note">{note ? <b>{note}</b> : 'Propre à ce salon : chaque salon a la sienne. Coupée en carré, au milieu de l\'image ; l\'ancienne est supprimée.'}</p></div>;
+}
+
+/** Partie: the activity first (the host changes it, the others see it), then its settings. */
+function GameTab() {
+  const room = useStore(s => s.room), me = useStore(s => s.account)?.id, set = useStore(s => s.set);
+  if (!room) return <p className="note">Entre dans un salon pour voir sa partie.</p>;
+  const host = room.hostId === me, act = room.activity.activity;
+  const names: Record<string, string> = { chat: 'Chat', disk: 'Demi-disque', poll: 'Sondage', wheel: 'Roulette', cards: 'Cartes', lowtide: 'Low Tide' };
+  const choose = async (a: ActivityChoice['activity']) => { const r = await request('activity:choose', { choice: { activity: a } }); if (!r.ok) set({ note: r.error }); };
+  return <>
+    <label className="field"><span>Activité</span><select value={act} disabled={!host} onChange={e => void choose(e.target.value as ActivityChoice['activity'])}>
+      {Object.entries(names).map(([k, n]) => <option key={k} value={k} disabled={!READY_ACTIVITIES.includes(k as ActivityChoice['activity'])}>{n}{READY_ACTIVITIES.includes(k as ActivityChoice['activity']) ? '' : ' (bientôt)'}</option>)}</select></label>
+    {!host && <p className="note">Seul l'hôte change l'activité ; les autres la proposent au vote avec /activity.</p>}
+    <hr />
+    {act === 'disk' ? <DiskSettings /> : <p className="note">Rien à régler : le chat prend toute la place, la liste des joueurs est à gauche. Les scores ne bougent pas.</p>}
+  </>;
 }
 
 /** The server refused my code, or this version of the extension. */

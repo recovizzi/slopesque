@@ -134,6 +134,35 @@ await a.frame.locator('.act-picker [aria-label="Fermer"]').click();
 await say(a.frame, '/nimporte');
 check(await until(async () => (await a.frame.locator('.chat-note').textContent().catch(() => '')).includes('Commande inconnue')), 'an unknown command: said to me only');
 
+// ---- jalon 5: the Demi-disque (B is the host since the /hote vote)
+const clickBoard = async (page, frame, fx, fy) => { const box = await frame.locator('.board:not([hidden])').boundingBox(); await page.mouse.click(box.x + box.width * fx, box.y + box.height * fy); };
+await say(b.frame, '/activity');
+await b.frame.locator('.act-tile', { hasText: 'Demi-disque' }).click();
+await b.frame.locator('.act-format', { hasText: 'Rayon libre' }).click();
+check(await until(async () => (await a.frame.locator('.board:not([hidden])').count()) === 1, 8000), 'the host chose the Demi-disque: the disk for everyone');
+await a.frame.getByRole('button', { name: 'Participer' }).click();
+check(await until(async () => (await b.frame.locator('.msg.sys', { hasText: 'rejoint la partie' }).count()) >= 1), 'A joins the game (« Participer »)');
+await b.frame.locator('[name="word"]').fill('La France');
+await clickBoard(b.page, b.frame, 0.3, 0.5);
+await b.frame.getByRole('button', { name: 'Lancer le tour' }).click();
+check(await until(async () => (await a.frame.locator('.word').textContent().catch(() => '')).includes('La France'), 8000), 'round: A sees the word');
+check(await a.frame.locator('.disk-rays [data-kind="target"], .ray-target').count() === 0, 'round: the host\'s ray hidden from A');
+check(await a.frame.locator('.timer').count() === 1, 'round: the answer time runs');
+await shot(a.page, '09-disk-guess');
+await clickBoard(a.page, a.frame, 0.32, 0.5);
+await a.frame.getByRole('button', { name: 'Valider mon rayon' }).click();
+check(await until(async () => (await a.frame.locator('.results .result').count()) >= 2, 8000), 'every candidate validated: the results at once');
+check(await until(async () => (await b.frame.locator('.results .perfect, .results .result b').count()) >= 1), 'the host sees the results');
+await shot(a.page, '10-disk-reveal');
+await a.frame.locator('.drawer-left .tab', { hasText: 'Classement' }).click();
+check(await until(async () => Number(await a.frame.locator('.rank-row.is-me .rank-score').textContent()) > 0), 'A\'s score counts in the ranking');
+await a.frame.locator('.drawer-left .tab', { hasText: 'Chat' }).click();
+await b.frame.getByRole('button', { name: 'Tour suivant' }).click();
+check(await until(async () => (await b.frame.locator('[name="word"]').count()) === 1), 'next round: the host writes a new word');
+await say(b.frame, '/activity');
+await b.frame.locator('.act-tile', { hasText: 'Chat' }).click();
+check(await until(async () => (await a.frame.locator('.chat-stage .chat').isVisible())), 'back to the Chat activity');
+
 // the server restarts: the panels say « Reconnexion… », then come back with the chat kept
 await stopServer();
 check(await until(async () => (await a.frame.getByText('Reconnexion…').count()) === 1, 8000), 'server down: « Reconnexion… » in the header');
