@@ -47,9 +47,18 @@ describe.skipIf(!up)('Trou du cul', () => {
     expect(end.paid[mine.id]).toBe(me);
     expect(Object.values(end.tdc!.roles).sort()).toEqual(['neutre', 'president', 'tdc']);
     expect(end.seats.find(s => s.id === mine.id)?.credit).toBeNull();
-    const score = async () => ((await ask<RoomState>(a, 'room:join', { key: keyOf })) as { value: RoomState }).value.members.find(m => m.id === me)!.score;
+    const score = async () => ((await ask<RoomState>(a, 'room:join', { key: keyOf })) as { value: RoomState }).value.members.find(m => m.id === me)!.scores;
     const before = await score();
     expect(await ask(a, 'table:join')).toMatchObject({ ok: true, value: 'ok' });
-    expect(await score()).toBe(before);   // taking a seat after the round doesn't count its points again
+    expect(await score()).toEqual(before);   // taking a seat after the round doesn't count its points again
+
+    // « Réinitialiser la partie »: the Trou du cul's ranking back to zero, the Palmarès kept
+    await ask(host, 'activity:choose', { choice: { activity: 'cards', cardGame: 'tdc' } });
+    const kept = (await ask<unknown[]>(a, 'palmares:get')) as { value: unknown[] };
+    expect(kept.value.length).toBeGreaterThan(0);
+    expect((await ask(a, 'game:reset')).ok).toBe(false);   // the host only
+    expect((await ask(host, 'game:reset')).ok).toBe(true);
+    expect((await score()).tdc).toBeUndefined();
+    expect(((await ask<unknown[]>(a, 'palmares:get')) as { value: unknown[] }).value).toHaveLength(kept.value.length);
   }, 30_000);
 });

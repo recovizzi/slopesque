@@ -8,6 +8,20 @@
       "when": 1795092323486,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1795121706408,
+      "tag": "0001_scores_per_game",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795121707236,
+      "tag": "0002_drop_single_score",
+      "breakpoints": true
     }
   ]
 }

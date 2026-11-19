@@ -63,7 +63,7 @@ export const roomMembers = pgTable('room_members', {
   roomId: uuid('room_id').notNull().references(() => rooms.id, { onDelete: 'cascade' }),
   accountId: uuid('account_id').notNull().references(() => accounts.id, { onDelete: 'cascade' }),
   hue: integer('hue').notNull(),
-  score: integer('score').notNull().default(0),
+  scores: jsonb('scores').$type<Record<string, number>>().notNull().default({}),   // the ranking of each game (disk, tdc, tarot), reset one by one
   credit: integer('credit').notNull().default(0),
   photoId: uuid('photo_id').references(() => media.id, { onDelete: 'set null' }),
   playing: boolean('playing').notNull().default(false),

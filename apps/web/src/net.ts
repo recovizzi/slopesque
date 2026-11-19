@@ -93,14 +93,16 @@ export async function upload(usage: Usage, file: Blob): Promise<UploadResult> {
 export class ServerGifs {
   requests = 0;
   private provider: string | null = null;
+  private cursor = 0;   // the server's cursor of the next page (a provider's page, or more: KLIPY with ads fills its pages)
   async trending(page: number) { return this.get('gif:trending', { page }); }
   async search(q: string, page: number) { return this.get('gif:search', { q, page }); }
   private async get(name: 'gif:search' | 'gif:trending', body: { page: number; q?: string }) {
-    if (body.page === 0) this.provider = null;
+    if (body.page === 0) { this.provider = null; this.cursor = 0; }
     this.requests++;
-    const r = await request(name, { ...body, provider: this.provider });
+    const r = await request(name, { ...body, page: this.cursor, provider: this.provider });
     if (!r.ok) return { items: [], hasNext: false, provider: null, error: 'down' as const };
     this.provider = r.value.provider;
+    this.cursor = r.value.next ?? this.cursor;
     return { items: r.value.items, hasNext: r.value.next !== null, provider: r.value.provider, error: r.value.error };
   }
 }

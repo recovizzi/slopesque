@@ -31,7 +31,7 @@ export interface MemberView {
   presence: Presence;
   awaySince: number | null;
   playing: boolean;
-  score: number;
+  scores: Record<string, number>;   // the ranking of each game: disk, tdc, tarot (scoreKey)
   credit: number;
   joinedAt: number;
 }
@@ -135,6 +135,9 @@ export interface CardsView {
   late: { seat: string; user: string; secs: number } | null;   // a player's turn has lasted 30 s: /kick possible
 }
 export const READY_CARD_GAMES = ['tdc', 'tarot'];
+/** The ranking an activity shows (and resets): each game its own; null: an activity without points. */
+export const scoreKey = (a: { activity: string; cardGame?: string }) => (a.activity === 'disk' ? 'disk' : a.activity === 'cards' ? (a.cardGame === 'tarot' ? 'tarot' : 'tdc') : null);
+export const SCORE_NAMES: Record<string, string> = { disk: 'du Demi-disque', tdc: 'du Trou du cul', tarot: 'du Tarot' };
 /** One player's result in one round (the Palmarès, kept with the room). */
 export interface PalmaresEvent { at: number; game: 'disk' | 'tdc' | 'tarot'; id: string; name: string; hue: number; won: boolean; pts?: number; perfect?: boolean; role?: string; taker?: boolean; partner?: boolean }
 
@@ -210,8 +213,8 @@ export const intents = {
   'sticker:remove': z.object({ id: z.string().uuid() }),
   'emoji:add': z.object({ name: z.string().regex(/^[a-z0-9_]{2,24}$/), mediaId: z.string().uuid() }),
   'photo:set': z.object({ mediaId: z.string().uuid().nullable() }),
-  'gif:search': z.object({ q: z.string().trim().min(1).max(60), page: z.number().int().min(0).max(20), provider: z.string().max(16).nullable().optional() }),
-  'gif:trending': z.object({ page: z.number().int().min(0).max(20), provider: z.string().max(16).nullable().optional() }),
+  'gif:search': z.object({ q: z.string().trim().min(1).max(60), page: z.number().int().min(0).max(100_000), provider: z.string().max(16).nullable().optional() }),
+  'gif:trending': z.object({ page: z.number().int().min(0).max(100_000), provider: z.string().max(16).nullable().optional() }),
   'vote:cast': z.object({ id: z.number().int().positive(), yes: z.boolean() }),
   'host:ask': z.object({}),
   'activity:choose': z.object({ choice: activityChoice }),
@@ -223,7 +226,7 @@ export const intents = {
   'disk:start': z.object({ word: z.string().trim().min(1).max(40), target: z.number() }),
   'disk:guess': z.object({ value: z.number() }),
   'disk:next': z.object({}),
-  'disk:reset': z.object({}),
+  'game:reset': z.object({}),
   'poll:settings': z.object({ seconds: z.union([z.literal(180), z.literal(300), z.literal(900), z.literal(1800), z.literal(3600), z.literal(10800)]).optional(), secret: z.boolean().optional() }),
   'poll:publish': z.object({ kind: z.enum(['choices', 'free', 'gradient']), question: z.string().trim().min(1).max(120), choices: z.array(z.string().trim().max(40)).max(8),
     pics: z.array(z.object({ mediaId: z.string().uuid().optional(), stickerId: z.string().uuid().optional(),
@@ -287,7 +290,7 @@ export interface IntentResults {
   'disk:start': null;
   'disk:guess': null;
   'disk:next': null;
-  'disk:reset': null;
+  'game:reset': null;
   'poll:settings': null;
   'poll:publish': null;
   'poll:answer': null;

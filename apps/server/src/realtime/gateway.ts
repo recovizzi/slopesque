@@ -197,8 +197,8 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
   diskGuess(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('disk:guess', b, async v => { await this.hub.diskGuess(s, v.value); return null; }); }
   @SubscribeMessage('disk:next')
   diskNext(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('disk:next', b, async () => { await this.hub.diskNext(s); return null; }); }
-  @SubscribeMessage('disk:reset')
-  diskReset(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('disk:reset', b, async () => { await this.hub.diskReset(s); return null; }); }
+  @SubscribeMessage('game:reset')
+  gameReset(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('game:reset', b, async () => { await this.hub.gameReset(s); return null; }); }
 
   // ---------------------------------------------------------------- Sondage, Roulette
   @SubscribeMessage('poll:settings')

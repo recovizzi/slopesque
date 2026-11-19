@@ -107,13 +107,14 @@ chaque jalon, les tâches sont groupées par partie du monorepo (`[racine]`, `[i
 - [x] 10b.5 [web] GIF gardés sur l'appareil de chaque joueur (Cache API, 300 au plus), jamais par le serveur
 - [x] 10b.6 [web] Chat : bulle de citation au survol, info-bulle des noms (réactions, résultats du Sondage), emoji inséré au curseur, Échap / clic dehors ferment le menu +, les stickers, l'envoi d'image ; le chat s'ouvre quand un vote commence ; code `:nom:` et refus expliqué dans le champ des réactions rapides
 - [x] 10b.7 [web] Échap global dans l'ordre de la maquette (code, /activity, /credit-social, réponse, fenêtres des salons, règles, fenêtres, menus du Sondage, panneaux du chat, tiroir) ; copie de clé de secours (`execCommand`)
-- [x] 10b.8 [web] Joueurs : onglet « Joueurs » (sans points) avec sa note, icônes d'absence dans le classement ; Low Tide : l'onglet montre les joueurs, pas le chat — reste à confirmer : le rôle d'hôte proposé aux seuls joueurs
-- [ ] 10b.9 [web+server] Amphithéâtre : « Ce siège vient d'être pris. » dès qu'il l'est (fait) — à confirmer : le lobby du Demi-disque et « Commencer la partie »
+- [x] 10b.8 [web] Joueurs : onglet « Joueurs » (sans points) avec sa note, icônes d'absence dans le classement ; Low Tide : l'onglet montre les joueurs, pas le chat (le rôle d'hôte reste proposé à tous : décidé)
+- [x] 10b.9 [web+server] Amphithéâtre : « Ce siège vient d'être pris. » dès qu'il l'est (le lobby du Demi-disque : non, décidé)
 - [x] 10b.10 [web+server] Sondage : déposer une image sur un choix, Entrée valide la réponse libre, note des résultats secrets selon le réglage, Échap / clic dehors ; GIF (lien) et emoji (dans le texte) des choix
-- [ ] 10b.11 [web+server] Roulette : numéro du tirage (fait) — à confirmer : « Participer » pour un spectateur
-- [ ] 10b.12 [web+server] Partie : titre et aide de l'activité, description du jeu de cartes, note sur le tour en cours (fait) — à confirmer : « Réinitialiser la partie » partout, résumé en lecture seule pour qui n'est pas l'hôte
+- [x] 10b.11 [web+server] Roulette : numéro du tirage (pas de « Participer » : seul l'hôte agit sur la roue tant qu'il n'y a pas de réactions en direct)
+- [x] 10b.12 [web+server] Partie : titre et aide de l'activité, description du jeu de cartes, note sur le tour en cours ; un classement par jeu, « Réinitialiser la partie » dans chaque activité à classement (ce jeu seulement, palmarès gardé) ; résumé en lecture seule pour qui n'est pas l'hôte
 - [x] 10b.13 [web] Palmarès : ouvert sur le jeu de cartes choisi, rafraîchi après une donne de Tarot
 - [ ] 10b.14 [web] Tarot : images des atouts du salon (= 8.3)
+- [x] 10b.16 [web+server] Palmarès aussi en activité Chat ; pubs KLIPY cachées quand elles sont marquées, pages complétées
 - [x] 10b.15 [web+server] Retours du 2026-11-19 : pseudo affiché dès l'ouverture du Profil ; la table montrée à tous quand on prend ou quitte une place avant la donne ; `/activity cartes tarot`, `/credit-social Léa +100` et leur complétion ; chat ouvert en bas, bouton pour y revenir, chargement par morceaux gardé sur l'appareil (seuls les nouveaux messages demandés)
 
 ## 11. Jalon 11 : releases et déploiement

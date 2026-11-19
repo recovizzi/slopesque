@@ -24,7 +24,11 @@ utilisateur et bouton rouge pour en changer), Extension
 ou Sondage ou Roulette ou Chat ou une intégration comme Low Tide), puis un séparateur horizontal, puis les paramètres propres à cette activité (Demi-disque :
 sujet, extrémités, mode de scrutin, temps de réponse ; Sondage : temps de réponse, résultats secrets ; Roulette : un
 rappel que la roue se règle dans la zone de jeu ; Chat : rien à régler ; intégration : son adresse, vérifiée). Seul l'hôte MUST
-pouvoir les changer et réinitialiser la partie ; les autres joueurs les voient en lecture seule.
+pouvoir les changer et réinitialiser la partie ; les autres joueurs MUST voir toute la configuration en **lecture seule**
+(un résumé : activité, jeu, joueurs, temps, réglages ; aucun contrôle grisé), avec le nom de l'hôte.
+Chaque jeu à points a **son propre classement** (Demi-disque, Trou du cul, Tarot) : « Réinitialiser la partie », proposé
+à l'hôte dans les activités à classement, MUST remettre à zéro le classement du jeu en cours seulement (les autres jeux
+gardent le leur) ; le palmarès MUST n'être jamais effacé.
 
 #### Scenario: Paramètres liés à l'activité
 - **WHEN** l'hôte choisit l'activité « Sondage » dans l'onglet Partie
@@ -35,8 +39,8 @@ pouvoir les changer et réinitialiser la partie ; les autres joueurs les voient 
 - **THEN** il voit le sujet et les extrémités sans pouvoir les modifier
 
 #### Scenario: L'hôte réinitialise
-- **WHEN** l'hôte clique « Réinitialiser la partie »
-- **THEN** les scores repassent à zéro et la partie revient au lobby
+- **WHEN** l'hôte clique « Réinitialiser la partie » pendant le Tarot
+- **THEN** le classement du Tarot repasse à zéro ; ceux du Demi-disque et du Trou du cul, et le palmarès, restent
 
 ### Requirement: Couleur par joueur
 Chaque joueur MUST avoir une couleur, distincte de celles des autres joueurs de la partie, utilisée partout où il

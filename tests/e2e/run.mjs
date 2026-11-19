@@ -275,6 +275,16 @@ if (await list.evaluate(el => el.scrollHeight > el.clientHeight + 100)) {
   check(await until(async () => (await a.frame.locator('.chat-stage .to-bottom').count()) === 0), 'chat: back at the bottom, the button gone');
 } else check(false, 'chat: too short to scroll (the test needs more messages)');
 
+// the Palmarès in the Chat activity too; the Partie tab, read only for a player who isn't the host
+if (!(await a.frame.evaluate(() => document.body.classList.contains('left-open')))) await a.frame.locator('.bar [aria-label="Joueurs"]').click();
+await a.frame.locator('.drawer-left .tab', { hasText: 'Palmarès' }).click();
+check(await until(async () => (await a.frame.locator('.drawer-left .pal, .drawer-left [data-pal]').count()) > 0), 'Chat activity: the Palmarès can be read');
+await a.frame.locator('.drawer-left .tab', { hasText: 'Joueurs' }).click();
+await a.frame.locator('.bar .avatar').click();
+await a.frame.locator('.drawer-right .tab', { hasText: 'Partie' }).click();
+check(await until(async () => (await a.frame.locator('.drawer-right .game-info').textContent().catch(() => '')).includes('Chat')) && (await a.frame.locator('.drawer-right select').count()) === 0,
+  'Partie: read only for a player who isn\'t the host (the settings, no control)');
+await a.frame.locator('.drawer-right [aria-label="Fermer"]').click();
 // ---- jalon 9: the shortcut, shown in the Extension tab; « Rester ouvert sur toutes les pages » off by default
 check((await A.sw.evaluate(() => chrome.commands.getAll())).some(c => c.name === 'toggle-panel'), 'extension: the « toggle-panel » command exists');
 await a.frame.locator('.bar .avatar').click();

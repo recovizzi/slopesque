@@ -3,7 +3,7 @@
 // lib/amphi.ts (persistent, updated by effects); the server decides, the panel only shows and sends intents.
 import { useEffect, useRef, useState } from 'react';
 import { COLS, hueColor, TOLERANCE } from '@slopesque/engines';
-import type { DiskView, MemberView } from '@slopesque/shared';
+import { scoreKey, type DiskView, type MemberView } from '@slopesque/shared';
 import { Amphi, type ColumnMark, type SeatMark } from '../lib/amphi';
 import { Disk, type Ray } from '../lib/disk';
 import { request } from '../net';
@@ -137,23 +137,22 @@ export function DiskSettings() {
     <label className="field"><span>Temps de réponse</span><select value={r.roundSeconds} onChange={e => void save({ roundSeconds: Number(e.target.value) })}>
       {[15, 30, 60].map(v => <option key={v} value={v}>{v} secondes</option>)}</select></label>
     {note && <p className="note pending">{note}</p>}
-    <hr /><button className="btn danger" type="button" onClick={() => void request('disk:reset')}>Réinitialiser la partie</button>
-    <p className="note">Les scores repassent à zéro ; le palmarès est gardé.</p>
   </>;
 }
 
 /** The ranking (left drawer, Demi-disque): the podium, then everyone with his score. */
 export function Ranking({ onGiveHost }: { onGiveHost: (m: MemberView) => void }) {
   const room = useStore(s => s.room)!, me = useStore(s => s.account)!.id;
-  const ranked = [...room.members].sort((a, b) => b.score - a.score);
+  const key = scoreKey(room.activity) ?? 'disk', pts = (p: MemberView) => p.scores[key] ?? 0;   // this game's ranking
+  const ranked = [...room.members].sort((a, b) => pts(b) - pts(a));
   const podium = [ranked[1], ranked[0], ranked[2]].filter(Boolean) as MemberView[];
   return <><div className="podium">{podium.map(p => { const rank = ranked.indexOf(p) + 1; return <div key={p.id} className={`step step-${rank}`}>
     <span className="avatar sm" style={{ '--c': hueColor(p.hue) } as React.CSSProperties}>{p.photo ? <img src={p.photo} alt="" /> : p.name.slice(0, 1)}</span>
-    <span className="step-name">{p.name}</span><span className="step-score">{p.score}</span><div className="step-block" style={{ '--c': hueColor(p.hue) } as React.CSSProperties}>{rank}</div></div>; })}</div>
+    <span className="step-name">{p.name}</span><span className="step-score">{pts(p)}</span><div className="step-block" style={{ '--c': hueColor(p.hue) } as React.CSSProperties}>{rank}</div></div>; })}</div>
     <ol className="ranking">{ranked.map((p, i) => <li key={p.id} className={`rank-row ${p.id === me ? 'is-me' : ''}`}>
       <span className="rank-n">{i + 1}</span><span className="dot" style={{ '--c': hueColor(p.hue) } as React.CSSProperties} />
       <span className="rank-name">{p.name}<PresenceIcon m={p} host={p.id === room.hostId} />{p.id === room.hostId && <> <span className="crown" title="Hôte"><Icon name="crown" /></span></>}{!p.playing && p.id !== room.hostId && <> <i>(spectateur)</i></>}</span>
-      <span className="rank-score">{p.score}</span>
+      <span className="rank-score">{pts(p)}</span>
       {room.hostId === me && p.id !== me && <button className="icon-btn sm" type="button" onClick={() => onGiveHost(p)} title={`Donner le rôle d'hôte à ${p.name}`} aria-label="Donner le rôle d'hôte"><Icon name="crown" /></button>}</li>)}</ol></>;
 }
 

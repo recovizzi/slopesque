@@ -409,9 +409,10 @@ flottant arrondi injecté dans l'onglet courant), avec un design propre au proje
     passent-elles par une modération ? Le palmarès d'un ancien compte (après « repartir de zéro ») reste-t-il visible
     sous son dernier pseudo ? Aperçus de lien : quels sites en oEmbed, et faut-il pouvoir retirer l'aperçu de son
     message ? [à décider ; non ; non ; oui ; la liste de la spec ; non]
-22. **Pubs KLIPY** (clé `KLIPY_API_KEY_WITH_AD`, dernier recours) : leur format n'a pas encore été vu (aucune pub
-    renvoyée le 2026-11-19) et la CSP de l'extension bloque les scripts tiers. Les montrer dans un cadre isolé de la
-    fenêtre GIF, ou renoncer à cette clé ? [pubs demandées, journalisées, pas montrées]
+22. ~~**Pubs KLIPY**~~ → décidé le 2026-11-19 : la clé avec pub reste le dernier recours (après KLIPY et GIPHY sans
+    pub) ; les résultats marqués pub (`type: "ad"`) sont cachés et la page complétée par les suivants (plus de
+    requêtes s'il le faut) ; un résultat non marqué ne se distingue pas : il est montré. Essai du jour : mêmes
+    résultats, dans le même ordre, avec et sans pub (aucune pub envoyée pour l'instant).
 
 ## Risks / Trade-offs
 

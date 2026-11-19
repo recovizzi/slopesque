@@ -7,7 +7,7 @@ import type postgres from 'postgres';
 import { castVote, closeVote, creditWord, defaultHue, startVote, tierOf, type Vote } from '@slopesque/engines';
 import * as D from '@slopesque/engines';
 import { Poll, Table, Tarot, Tdc, Wheel, KICK_AFTER_MS } from '@slopesque/engines';
-import { CARD_PLAYERS, PRESENCE, READY_ACTIVITIES, READY_CARD_GAMES, type CardsView, type PollAnswer, type PollView, type WheelView, type PollPicView, type ActivityChoice, type EmojiView, type GifRef, type MemberView, type RoomEvent, type RoomState, type StickerView } from '@slopesque/shared';
+import { CARD_PLAYERS, PRESENCE, SCORE_NAMES, scoreKey, READY_ACTIVITIES, READY_CARD_GAMES, type CardsView, type PollAnswer, type PollView, type WheelView, type PollPicView, type ActivityChoice, type EmojiView, type GifRef, type MemberView, type RoomEvent, type RoomState, type StickerView } from '@slopesque/shared';
 import { DB, SQL, type Db } from '../db/db.module.js';
 import { ENV, type Env } from '../config/config.module.js';
 import { accounts, customEmoji, media, messages, palmares, roomMembers, rooms, stickers } from '../db/schema.js';
@@ -127,7 +127,7 @@ export class RoomHub implements OnModuleInit {
       const live = rt.members.get(a.id), here = !!live && (live.sockets.size > 0 || live.grace !== null);
       const awaySince = here ? null : live?.awaySince ?? m.lastSeenAt.getTime();
       const presence = here ? 'here' : Date.now() - awaySince! >= PRESENCE.goneMs ? 'gone' : 'away';
-      return { id: a.id, name: a.name, hue: m.hue, photo: m.photoId && known.has(m.photoId) ? this.media.url(m.photoId) : null, presence, awaySince, playing: m.playing, score: m.score, credit: m.credit, joinedAt: m.joinedAt.getTime() };
+      return { id: a.id, name: a.name, hue: m.hue, photo: m.photoId && known.has(m.photoId) ? this.media.url(m.photoId) : null, presence, awaySince, playing: m.playing, scores: m.scores, credit: m.credit, joinedAt: m.joinedAt.getTime() };
     });
   }
 
@@ -435,7 +435,7 @@ export class RoomHub implements OnModuleInit {
     if (rt.diskTimer) { clearTimeout(rt.diskTimer); rt.diskTimer = null; }
     const r = D.reveal(rt.disk);
     rt.disk = r.state;
-    for (const [id, pts] of Object.entries(r.points)) if (pts) await this.db.update(roomMembers).set({ score: sql`${roomMembers.score} + ${pts}` }).where(and(eq(roomMembers.roomId, rt.room.id), eq(roomMembers.accountId, id)));
+    for (const [id, pts] of Object.entries(r.points)) if (pts) await this.addScore(rt, id, 'disk', pts);
     const top = Math.max(0, ...Object.values(r.state.results).map(x => x.points));
     for (const [id, x] of Object.entries(r.state.results)) await this.db.insert(palmares).values({ roomId: rt.room.id, game: 'disk', data: { account: id, won: x.points === top && top > 0, pts: x.points, perfect: x.perfect } });
     await this.saveDisk(rt);
@@ -453,16 +453,28 @@ export class RoomHub implements OnModuleInit {
     await this.emitDisk(rt);
   }
 
-  async diskReset(socket: Socket) {
+  /** A player's points in one game's ranking (disk, tdc, tarot). */
+  private async addScore(rt: RoomRt, user: string, game: string, pts: number) {
+    await this.db.update(roomMembers).set({ scores: sql`jsonb_set(${roomMembers.scores}, ${`{${game}}`}::text[], to_jsonb(coalesce((${roomMembers.scores}->>${game})::int, 0) + ${pts}::int))` })
+      .where(and(eq(roomMembers.roomId, rt.room.id), eq(roomMembers.accountId, user)));
+  }
+
+  /** « Réinitialiser la partie »: the ranking of the game being played back to zero (the others, and the Palmarès, kept);
+   *  the Demi-disque also starts again from its first round. */
+  async gameReset(socket: Socket) {
     const rt = this.roomOf(socket);
     this.hostOnly(rt, socket);
-    if (rt.diskTimer) { clearTimeout(rt.diskTimer); rt.diskTimer = null; }
-    await this.db.update(roomMembers).set({ score: 0 }).where(eq(roomMembers.roomId, rt.room.id));
-    rt.disk = { ...D.newDisk(rt.disk.rules), round: 1 };
-    await this.saveDisk(rt);
-    await this.emitDisk(rt);
-    for (const id of rt.members.keys()) await this.emitMember(rt, id);
-    await this.say(rt, null, 'La partie a été réinitialisée.');
+    const key = scoreKey(this.activity(rt));
+    if (!key) throw new UserError('Cette activité n\'a pas de classement.');
+    await this.db.update(roomMembers).set({ scores: sql`${roomMembers.scores} - ${key}::text` }).where(eq(roomMembers.roomId, rt.room.id));
+    if (key === 'disk') {
+      if (rt.diskTimer) { clearTimeout(rt.diskTimer); rt.diskTimer = null; }
+      rt.disk = { ...D.newDisk(rt.disk.rules), round: 1 };
+      await this.saveDisk(rt);
+      await this.emitDisk(rt);
+    }
+    for (const m of await this.members(rt)) await this.emitMember(rt, m.id);   // the absent ones too
+    await this.say(rt, null, `Le classement ${SCORE_NAMES[key]} est remis à zéro (le palmarès est gardé).`);
   }
 
   // ---------------------------------------------------------------- Sondage
@@ -708,7 +720,7 @@ export class RoomHub implements OnModuleInit {
         const uid = c.seats.find(s => s.id === sid)?.credit ?? null, role = t.roles[sid]!;
         c.paid[sid] = uid;
         if (!uid) continue;
-        await this.db.update(roomMembers).set({ score: sql`${roomMembers.score} + ${Tdc.ROLES[role].points}` }).where(and(eq(roomMembers.roomId, rt.room.id), eq(roomMembers.accountId, uid)));
+        await this.addScore(rt, uid, 'tdc', Tdc.ROLES[role].points);
         await this.db.insert(palmares).values({ roomId: rt.room.id, game: 'tdc', data: { account: uid, won: role === 'president', role } });
         await this.emitMember(rt, uid);
       }
@@ -836,7 +848,7 @@ export class RoomHub implements OnModuleInit {
         const uid = c.seats.find(s => s.id === sid)?.credit ?? null, mark = r.marks[sid] ?? 0;
         c.paid[sid] = uid;
         if (!uid) continue;
-        await this.db.update(roomMembers).set({ score: sql`${roomMembers.score} + ${mark}` }).where(and(eq(roomMembers.roomId, rt.room.id), eq(roomMembers.accountId, uid)));
+        await this.addScore(rt, uid, 'tarot', mark);
         await this.db.insert(palmares).values({ roomId: rt.room.id, game: 'tarot', data: { account: uid, won: mark > 0, pts: mark, taker: sid === r.taker, partner: sid === r.partner } });
         await this.emitMember(rt, uid);
       }

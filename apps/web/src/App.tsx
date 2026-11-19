@@ -17,7 +17,7 @@ import { PollSettings, PollStage, WheelStage } from './ui/PollWheel';
 import { CardsStage } from './ui/CardsStage';
 import { Palmares } from './ui/Palmares';
 import { WebSettings, WebStage } from './ui/WebStage';
-import { CARD_PLAYERS, READY_ACTIVITIES } from '@slopesque/shared';
+import { CARD_PLAYERS, READY_ACTIVITIES, SCORE_NAMES, scoreKey } from '@slopesque/shared';
 
 const EMBED = new URLSearchParams(location.search).has('embed');
 const RELEASES = 'https://github.com/recovizzi/slopesque/releases/latest';
@@ -102,9 +102,11 @@ export function App() {
     </header>
     <div className="main">
       <aside className="drawer drawer-left">{room && account && (act === 'chat' ? <>
-        <div className="tabs"><span className="tab on static"><Icon name="users" />Joueurs</span>
+        <div className="tabs">   {/* the Chat activity: its players, and the Palmarès kept for every game */}
+          <button className={`tab ${leftTab !== 'palmares' ? 'on' : ''}`} type="button" onClick={() => setLeftTab('ranking')} title="Joueurs"><Icon name="users" /><span className="tab-label">Joueurs</span></button>
+          <button className={`tab ${leftTab === 'palmares' ? 'on' : ''}`} type="button" onClick={() => setLeftTab('palmares')} title="Palmarès : victoires et taux de victoire, gardés dans le temps"><Icon name="chart" /><span className="tab-label">Palmarès</span></button>
           <button className="icon-btn" type="button" onClick={() => setLeftOpen(false)} title="Fermer" aria-label="Fermer le panneau"><Icon name="close" /></button></div>
-        <People onGiveHost={giveHost} /></> : <>
+        {leftTab === 'palmares' ? <Palmares /> : <People onGiveHost={giveHost} />}</> : <>
         <div className="tabs">
           <button className={`tab ${leftTab === 'chat' ? 'on' : ''}`} type="button" onClick={() => setLeftTab('chat')} title="Chat"><Icon name="chat" /><span className="tab-label">Chat</span></button>
           <button className={`tab ${leftTab === 'ranking' ? 'on' : ''}`} type="button" onClick={() => setLeftTab('ranking')} title={scored ? 'Classement' : 'Joueurs'}>{scored ? <><Icon name="trophy" /><span className="tab-label">Classement</span></> : <><Icon name="users" /><span className="tab-label">Joueurs</span></>}</button>
@@ -235,15 +237,38 @@ function GameTab() {
   const host = room.hostId === me, act = room.activity.activity;
   const names: Record<string, string> = { chat: 'Chat', disk: 'Demi-disque', poll: 'Sondage', wheel: 'Roulette', cards: 'Cartes', lowtide: 'Low Tide' };
   const choose = async (a: ActivityChoice['activity']) => { const r = await request('activity:choose', { choice: { activity: a } }); if (!r.ok) set({ note: r.error }); };
+  const key = scoreKey(room.activity);
+  if (!host) return <GameInfo />;
   return <>
-    <label className="field"><span>Activité</span><select value={act} disabled={!host} onChange={e => void choose(e.target.value as ActivityChoice['activity'])}>
+    <label className="field"><span>Activité</span><select value={act} onChange={e => void choose(e.target.value as ActivityChoice['activity'])}>
       {Object.entries(names).map(([k, n]) => <option key={k} value={k} disabled={!READY_ACTIVITIES.includes(k as ActivityChoice['activity'])}>{n}{READY_ACTIVITIES.includes(k as ActivityChoice['activity']) ? '' : ' (bientôt)'}</option>)}</select></label>
     <p className="note">{ACT_HELP[act]}</p>
-    {!host && <p className="note">Seul l'hôte change l'activité ; les autres la proposent au vote avec /activity.</p>}
     <hr className="sep" />
     <h3 className="section">{{ disk: 'Paramètres du demi-disque', poll: 'Paramètres du sondage', wheel: 'Paramètres de la roulette', chat: 'Paramètres du chat', lowtide: 'Paramètres de Low Tide', cards: 'Paramètres des cartes' }[act]}</h3>
     {act === 'disk' ? <DiskSettings /> : act === 'poll' ? <PollSettings /> : act === 'lowtide' ? <WebSettings /> : act === 'cards' ? <CardsSettings /> : act === 'wheel' ? <p className="note">Les propositions et leurs poids se règlent dans la zone de jeu : tout le monde voit la roue se construire.</p> : <p className="note">Rien à régler : le chat prend toute la place, la liste des joueurs est à gauche. Les scores ne bougent pas.</p>}
     {(act === 'disk' || act === 'poll' || act === 'cards') && <p className="note">Les changements faits pendant un tour en cours s'appliquent à sa fin.</p>}
+    {key && <><hr /><button className="btn danger" type="button" onClick={async () => { const r = await request('game:reset'); if (!r.ok) set({ note: r.error }); }}><Icon name="reset" />Réinitialiser la partie</button>
+      <p className="note">Remet le classement {SCORE_NAMES[key]} à zéro (les autres jeux gardent le leur). Le palmarès est toujours gardé.</p></>}
+  </>;
+}
+
+const ACT_NAMES: Record<string, string> = { chat: 'Chat', disk: 'Demi-disque', poll: 'Sondage', wheel: 'Roulette', cards: 'Cartes', lowtide: 'Low Tide' };
+const fmtDur = (s: number) => (s < 3600 ? `${s / 60} min` : `${s / 3600} h`);
+/** Partie, for the players who aren't the host: the game's settings, read only. */
+function GameInfo() {
+  const room = useStore(s => s.room)!, act = room.activity.activity, host = room.members.find(m => m.id === room.hostId);
+  const d = { ...room.disk.rules, ...room.disk.pending }, game = room.activity.cardGame === 'tarot' ? 'tarot' : 'tdc';
+  const rows: [string, React.ReactNode][] = act === 'disk' ? [['Sujet', d.topic], ['Extrémités', `${d.left} ↔ ${d.right}`], ['Mode', d.mode === 'amphi' ? 'Amphithéâtre' : 'Rayon libre'], ['Temps de réponse', `${d.roundSeconds} s`]]
+    : act === 'poll' ? [['Temps de réponse', fmtDur(room.poll.seconds)], ['Résultats', room.poll.secret ? 'secrets : personne ne voit qui a répondu quoi' : 'nominatifs : survoler un résultat montre qui l\'a donné']]
+    : act === 'wheel' ? [['Propositions', String(room.wheel.items.filter(i => i.label.trim()).length)], ['Tirage', String(room.wheel.round)]]
+    : act === 'cards' ? [['Jeu', game === 'tarot' ? 'Tarot' : 'Trou du cul'], ['Joueurs', `${room.cards.settings[game]}${game === 'tarot' && room.cards.settings.tarot === 5 ? ' (le preneur appelle un Roi)' : ''}`],
+      ...(game === 'tarot' ? [['Revoir les plis gagnés', room.cards.showTricks ? 'oui (au survol)' : 'non'] as [string, string]] : [])]
+    : act === 'lowtide' ? [['Adresse', Object.values(room.web)[0] ?? '—']] : [];
+  return <>
+    <p className="note">Seul l'hôte ({host?.name ?? '—'}) peut modifier la partie ; les autres proposent une activité au vote avec /activity.</p>
+    <dl className="game-info"><dt>Activité</dt><dd>{ACT_NAMES[act]}</dd>{rows.flatMap(([k, v]) => [<dt key={`${k}-t`}>{k}</dt>, <dd key={`${k}-d`}>{v}</dd>])}</dl>
+    <p className="note">{ACT_HELP[act]}</p>
+    {act === 'cards' && <p className="note">{GAME_HELP[game]}</p>}
   </>;
 }
 

@@ -1,7 +1,8 @@
 ## ADDED Requirements
 
 ### Requirement: Onglet Palmarès
-Le tiroir de gauche MUST avoir, en plus du Chat et du Classement (ou des Joueurs), un onglet « Palmarès » : la liste de
+Le tiroir de gauche MUST avoir, en plus du Chat et du Classement (ou des Joueurs), un onglet « Palmarès », y compris
+en activité Chat (à côté des Joueurs) pour le consulter hors de tout jeu : la liste de
 tous ceux qui ont déjà joué dans le salon, y compris ceux qui l'ont quitté (marqués « parti »), avec leurs parties
 jouées, gagnées et leur taux de victoire, pour se comparer dans le temps. L'onglet actif MUST montrer son nom, les
 autres leur icône (leur nom au survol), pour tenir dans le tiroir.
