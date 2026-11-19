@@ -215,7 +215,7 @@ function GameTab() {
       {Object.entries(names).map(([k, n]) => <option key={k} value={k} disabled={!READY_ACTIVITIES.includes(k as ActivityChoice['activity'])}>{n}{READY_ACTIVITIES.includes(k as ActivityChoice['activity']) ? '' : ' (bientôt)'}</option>)}</select></label>
     {!host && <p className="note">Seul l'hôte change l'activité ; les autres la proposent au vote avec /activity.</p>}
     <hr />
-    {act === 'disk' ? <DiskSettings /> : act === 'poll' ? <PollSettings /> : act === 'lowtide' ? <WebSettings /> : act === 'wheel' ? <p className="note">Les propositions et leurs poids se règlent dans la zone de jeu : tout le monde voit la roue se construire.</p> : <p className="note">Rien à régler : le chat prend toute la place, la liste des joueurs est à gauche. Les scores ne bougent pas.</p>}
+    {act === 'disk' ? <DiskSettings /> : act === 'poll' ? <PollSettings /> : act === 'lowtide' ? <WebSettings /> : act === 'cards' ? <CardsSettings /> : act === 'wheel' ? <p className="note">Les propositions et leurs poids se règlent dans la zone de jeu : tout le monde voit la roue se construire.</p> : <p className="note">Rien à régler : le chat prend toute la place, la liste des joueurs est à gauche. Les scores ne bougent pas.</p>}
   </>;
 }
 
@@ -237,6 +237,21 @@ function ExtensionOptions() {
       <span>Rester ouvert sur toutes les pages</span></label>
     <p className="note">Le panneau se rouvre sur chaque page, à la même place ; le fermer le ferme partout. Le navigateur demande l'accès à tous les sites à l'activation.</p>
     {note && <p className="alert" role="alert">{note}</p>}
+  </>;
+}
+
+/** Partie (cards): the game (Trou du cul, Tarot at 4 or 5), the Tarot's won tricks shown or not. */
+function CardsSettings() {
+  const room = useStore(s => s.room)!, me = useStore(s => s.account)?.id, set = useStore(s => s.set), host = room.hostId === me;
+  const a = room.activity, v = a.cardGame === 'tarot' ? `tarot${a.tarotPlayers ?? 4}` : 'tdc';
+  const choose = async (x: string) => { const r = await request('activity:choose', { choice: x === 'tdc' ? { activity: 'cards', cardGame: 'tdc' } : { activity: 'cards', cardGame: 'tarot', tarotPlayers: x === 'tarot5' ? 5 : 4 } }); if (!r.ok) set({ note: r.error }); };
+  return <>
+    <label className="field"><span>Jeu</span><select value={v} disabled={!host} onChange={e => void choose(e.target.value)}>
+      <option value="tdc">Trou du cul</option><option value="tarot4">Tarot à 4</option><option value="tarot5">Tarot à 5 (le preneur appelle un Roi)</option>
+      <option disabled>Texas Hold'em (bientôt)</option><option disabled>Coinche (bientôt)</option></select></label>
+    <p className="note">À partir de la donne suivante ; des robots prennent les places libres. Les règles se lisent avec le bouton « i » de la table.</p>
+    {a.cardGame === 'tarot' && <><label className="check"><input type="checkbox" checked={room.cards.showTricks} disabled={!host} onChange={e => void request('tarot:tricks', { show: e.target.checked })} /><span>Revoir les plis gagnés (au survol)</span></label>
+      <p className="note">Décoché, la partie est plus dure : personne ne peut revoir les plis déjà joués.</p></>}
   </>;
 }
 

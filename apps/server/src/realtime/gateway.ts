@@ -229,6 +229,14 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
   cardsPlay(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('cards:play', b, async v => { await this.hub.cardsMove(s, { play: v.cards }); return null; }); }
   @SubscribeMessage('cards:pass')
   cardsPass(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('cards:pass', b, async () => { await this.hub.cardsMove(s, { pass: true }); return null; }); }
+  @SubscribeMessage('tarot:bid')
+  tarotBid(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('tarot:bid', b, async v => { await this.hub.tarotDo(s, { bid: v.bid }); return null; }); }
+  @SubscribeMessage('tarot:call')
+  tarotCall(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('tarot:call', b, async v => { await this.hub.tarotDo(s, { call: v.card }); return null; }); }
+  @SubscribeMessage('tarot:discard')
+  tarotDiscard(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('tarot:discard', b, async v => { await this.hub.tarotDo(s, { discard: v.cards }); return null; }); }
+  @SubscribeMessage('tarot:tricks')
+  tarotTricks(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('tarot:tricks', b, async v => { await this.hub.tarotTricks(s, v.show); return null; }); }
   @SubscribeMessage('table:join')
   tableJoin(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('table:join', b, () => this.hub.tableJoin(s)); }
   @SubscribeMessage('table:leave')

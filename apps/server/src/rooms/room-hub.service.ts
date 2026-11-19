@@ -6,7 +6,7 @@ import type { Server, Socket } from 'socket.io';
 import type postgres from 'postgres';
 import { castVote, closeVote, creditWord, defaultHue, startVote, tierOf, type Vote } from '@slopesque/engines';
 import * as D from '@slopesque/engines';
-import { Poll, Table, Tdc, Wheel, KICK_AFTER_MS } from '@slopesque/engines';
+import { Poll, Table, Tarot, Tdc, Wheel, KICK_AFTER_MS } from '@slopesque/engines';
 import { PRESENCE, READY_ACTIVITIES, READY_CARD_GAMES, type CardsView, type PollAnswer, type PollView, type WheelView, type PollPicView, type ActivityChoice, type EmojiView, type GifRef, type MemberView, type RoomEvent, type RoomState, type StickerView } from '@slopesque/shared';
 import { DB, SQL, type Db } from '../db/db.module.js';
 import { ENV, type Env } from '../config/config.module.js';
@@ -22,7 +22,7 @@ import type { Account } from '../accounts/accounts.service.js';
 interface MemberRt { sockets: Set<string>; awaySince: number | null; grace: NodeJS.Timeout | null }
 interface PollRt { phase: PollView['phase']; round: number; seconds: number; secret: boolean; poll: PollView['poll']; answers: Record<string, PollAnswer>; host: string | null; deadline: number | null; timer: NodeJS.Timeout | null }
 interface WheelRt { phase: WheelView['phase']; items: WheelView['items']; spin: WheelView['spin']; needle: number; timer: NodeJS.Timeout | null }
-interface CardsRt { settled: boolean; seats: Table.CardSeat[]; tdc: Tdc.Tdc | null; paid: Record<string, string | null>; turnSince: number; robot: NodeJS.Timeout | null; late: NodeJS.Timeout | null }
+interface CardsRt { game: 'tdc' | 'tarot'; players: 4 | 5; showTricks: boolean; tarot: Tarot.Tarot | null; settled: boolean; seats: Table.CardSeat[]; tdc: Tdc.Tdc | null; paid: Record<string, string | null>; turnSince: number; robot: NodeJS.Timeout | null; late: NodeJS.Timeout | null }
 interface RoomRt { cards: CardsRt; room: Room; seq: number; members: Map<string, MemberRt>; vote: { id: number; v: Vote; timer: NodeJS.Timeout } | null; disk: D.DiskState; diskTimer: NodeJS.Timeout | null; poll: PollRt; wheel: WheelRt }
 export interface SocketData { account: Account; ip: string; roomId: string | null }
 
@@ -47,7 +47,7 @@ export class RoomHub implements OnModuleInit {
     const disk = { ...D.newDisk({ ...D.DEFAULT_RULES, ...saved.rules }), round: saved.round ?? 1, phase: (saved.round ?? 1) > 1 ? 'writing' as const : 'lobby' as const };
     const ps = (room.rules.poll ?? {}) as { seconds?: number; secret?: boolean; round?: number };
     const ws = (room.rules.wheel ?? {}) as { items?: WheelView['items']; needle?: number };
-    const rt: RoomRt = { cards: { settled: false, seats: [], tdc: null, paid: {}, turnSince: 0, robot: null, late: null }, room, seq: 0, members: new Map(), vote: null, disk, diskTimer: null,
+    const rt: RoomRt = { cards: { game: 'tdc', players: 4, showTricks: true, tarot: null, settled: false, seats: [], tdc: null, paid: {}, turnSince: 0, robot: null, late: null }, room, seq: 0, members: new Map(), vote: null, disk, diskTimer: null,
       poll: { phase: 'writing', round: ps.round ?? 1, seconds: ps.seconds ?? 300, secret: ps.secret ?? false, poll: null, answers: {}, host: null, deadline: null, timer: null },
       wheel: { phase: 'writing', items: ws.items ?? [{ label: '', weight: '' }, { label: '', weight: '' }], spin: null, needle: ws.needle ?? 0, timer: null } };
     if (saved.guessing) { await this.saveDisk(rt); await this.chat.send(room.id, null, 'Le serveur a redémarré : tour annulé.', null, 'system'); }
@@ -623,7 +623,8 @@ export class RoomHub implements OnModuleInit {
   /** What a player sees: the seats, his own hand (the others' as backs), the last round's points, the late seat. */
   private cardsView(rt: RoomRt, me: string): CardsView {
     const c = rt.cards, mine = Table.seatOfUser(c.seats, me)?.id ?? null;
-    return { game: 'tdc', seats: c.seats, tdc: c.tdc ? Tdc.tdcView(c.tdc, mine) : null, paid: c.paid, turnSince: c.turnSince, late: this.lateSeat(rt) };
+    return { game: c.game, players: c.players, showTricks: c.showTricks, seats: c.seats, tdc: c.tdc ? Tdc.tdcView(c.tdc, mine) : null,
+      tarot: c.tarot ? Tarot.tarotView(c.tarot, mine) : null, paid: c.paid, turnSince: c.turnSince, late: this.lateSeat(rt) };
   }
   private async emitCards(rt: RoomRt) {
     rt.seq++;
@@ -636,7 +637,7 @@ export class RoomHub implements OnModuleInit {
   }
   /** The player whose turn has lasted 30 s or more (a player, not a robot): /kick may propose to make him leave. */
   private lateSeat(rt: RoomRt) {
-    const t = rt.cards.tdc, s = t && t.turn !== null ? rt.cards.seats.find(x => x.id === t.turn) : null;
+    const t = rt.cards.game === 'tarot' ? rt.cards.tarot : rt.cards.tdc, s = t && t.turn !== null ? rt.cards.seats.find(x => x.id === t.turn) : null;
     if (!s?.user || Date.now() - rt.cards.turnSince < KICK_AFTER_MS) return null;
     return { seat: s.id, user: s.user, secs: Math.floor((Date.now() - rt.cards.turnSince) / 1000) };
   }
@@ -645,6 +646,9 @@ export class RoomHub implements OnModuleInit {
   async cardsDeal(socket: Socket) {
     const rt = this.roomOf(socket);
     this.hostOnly(rt, socket);
+    const choice = this.activity(rt);
+    if (choice.cardGame === 'tarot') return this.tarotDeal(rt, choice.tarotPlayers ?? 4);
+    if (rt.cards.game !== 'tdc') { rt.cards = { ...rt.cards, game: 'tdc', seats: [], tdc: null, tarot: null }; }
     const c = rt.cards;
     if (c.tdc && c.tdc.turn !== null) throw new UserError('Une manche est en cours.');
     const fresh = !c.seats.length;
@@ -664,6 +668,7 @@ export class RoomHub implements OnModuleInit {
   }
 
   async cardsMove(socket: Socket, move: { play: string[] } | { pass: true }) {
+    if (this.roomOf(socket).cards.game === 'tarot') return 'play' in move ? this.tarotDo(socket, { play: move.play[0]! }) : undefined;
     const rt = this.roomOf(socket), c = rt.cards, t = c.tdc, me = (socket.data as SocketData).account.id;
     const seat = Table.seatOfUser(c.seats, me);
     if (!t || !seat) throw new UserError('Tu n\'es pas à la table.');
@@ -675,6 +680,7 @@ export class RoomHub implements OnModuleInit {
 
   /** After a move: the clock of the turn, the end of the round (points to the last player of each seat), the robots. */
   private async afterMove(rt: RoomRt, before: string | null = null) {
+    if (rt.cards.game === 'tarot') return this.afterTarot(rt, before);
     const c = rt.cards, t = c.tdc;
     if (!t) return;
     if (t.turn !== before) c.turnSince = Date.now();
@@ -719,9 +725,9 @@ export class RoomHub implements OnModuleInit {
     if (r === 'seated') return 'ok';
     if (r === 'full') return 'full';
     rt.cards.seats = r.seats;
-    const inRound = !!rt.cards.tdc && rt.cards.tdc.turn !== null;
+    const inRound = this.inRound(rt);
     await this.say(rt, null, r.was.owner === me.id ? `${me.name} reprend sa place.` : `${me.name} prend la place de ${r.was.name}${inRound ? ' et joue sa main en cours : les points de la manche seront les siens' : ''}.`);
-    await this.afterMove(rt, rt.cards.tdc?.turn ?? null);
+    await this.afterMove(rt, this.turnOf(rt));
     return 'ok';
   }
 
@@ -729,23 +735,116 @@ export class RoomHub implements OnModuleInit {
 
   private async tableLeaveOf(rt: RoomRt, user: string) {
     if (!Table.seatOfUser(rt.cards.seats, user)) return;
-    const inRound = !!rt.cards.tdc && rt.cards.tdc.turn !== null;
+    const inRound = this.inRound(rt);
     rt.cards.seats = Table.leave(rt.cards.seats, user, inRound);
     const [m] = await this.members(rt, user);
     await this.say(rt, null, inRound ? `${m?.name ?? '?'} quitte la table : un robot finit la manche à sa place (les points de la manche restent les siens).` : `${m?.name ?? '?'} quitte la table : un robot prend sa place.`);
-    await this.afterMove(rt, rt.cards.tdc?.turn ?? null);
+    await this.afterMove(rt, this.turnOf(rt));
   }
 
   /** /kick (or the button on his seat): a vote to make the late player leave the table. */
   async askKick(socket: Socket, name?: string): Promise<'vote'> {
     const rt = this.roomOf(socket), me = (socket.data as SocketData).account.id;
-    if (this.activity(rt).activity !== 'cards' || !rt.cards.tdc || rt.cards.tdc.turn === null) throw new UserError('/kick sert pendant une partie de cartes.');
+    if (this.activity(rt).activity !== 'cards' || !this.inRound(rt)) throw new UserError('/kick sert pendant une partie de cartes.');
     const late = this.lateSeat(rt);
     const lateName = late ? (await this.members(rt, late.user))[0]?.name ?? '?' : '';
     if (name && (!late || lateName.toLowerCase() !== name.toLowerCase())) throw new UserError(`${name} ne fait pas attendre la table : seul le joueur dont le tour dure depuis 30 s peut être exclu.`);
     if (!late) throw new UserError('Personne ne fait attendre la table : /kick vise le joueur dont le tour dure depuis 30 s.');
     await this.launch(rt, { kind: 'kick', by: me, target: late.user, label: `propose d'exclure ${lateName} de la table : son tour dure depuis ${late.secs} s` });
     return 'vote';
+  }
+
+  // ---------------------------------------------------------------- Cartes: the Tarot
+  private inRound(rt: RoomRt) { const c = rt.cards; return c.game === 'tarot' ? !!c.tarot && c.tarot.phase !== 'done' : !!c.tdc && c.tdc.turn !== null; }
+  private turnOf(rt: RoomRt) { const c = rt.cards; return (c.game === 'tarot' ? c.tarot?.turn : c.tdc?.turn) ?? null; }
+
+  /** A new deal at 4 or 5: the same seats while the number holds; robots take the free ones. */
+  private async tarotDeal(rt: RoomRt, n: 4 | 5) {
+    const c = rt.cards;
+    if (c.game === 'tarot' && c.tarot && c.tarot.phase !== 'done') throw new UserError('Une donne est en cours.');
+    if (c.game !== 'tarot' || c.players !== n || c.seats.length !== n) {
+      c.seats = Table.seatTable([...(await this.playingIds(rt))].filter(id => rt.members.has(id)).slice(0, n), n).slice(0, n);
+      c.tarot = null;
+    }
+    c.game = 'tarot'; c.players = n; c.tdc = null;
+    c.seats = c.seats.map(s => ({ ...s, credit: s.user }));
+    c.paid = {}; c.settled = false;
+    c.tarot = Tarot.deal(c.seats.map(s => s.id), c.tarot);
+    c.turnSince = Date.now();
+    const names = [];
+    for (const s of c.tarot.seats) names.push(await this.seatName(rt, s));
+    await this.say(rt, null, `Tarot à ${n}, donne ${c.tarot.deal} : ${names.join(', ')}.`);
+    await this.afterTarot(rt);
+  }
+
+  /** A player's bid, call, écart or card (checked by the rules), then what follows. */
+  async tarotDo(socket: Socket, act: { bid: Tarot.Bid } | { call: string } | { discard: string[] } | { play: string }) {
+    const rt = this.roomOf(socket), c = rt.cards, t = c.tarot, me = (socket.data as SocketData).account.id;
+    const seat = Table.seatOfUser(c.seats, me);
+    if (!t || !seat || c.game !== 'tarot') throw new UserError('Tu n\'es pas à la table.');
+    const hand = t.hands[seat.id] ?? [];
+    await this.tarotApply(rt, seat.id, 'bid' in act ? act : 'call' in act ? act
+      : 'discard' in act ? { discard: hand.filter(x => act.discard.includes(x.id)) } : { play: hand.find(x => x.id === act.play)! });
+  }
+
+  private async tarotApply(rt: RoomRt, seat: string, act: { bid: Tarot.Bid } | { call: string } | { discard: Tarot.TCard[] } | { play: Tarot.TCard }) {
+    const t = rt.cards.tarot!, before = t.phase, revealed = t.revealed, turn = t.turn;
+    const ok = 'bid' in act ? Tarot.bid(t, seat, act.bid) : 'call' in act ? Tarot.call(t, seat, act.call)
+      : 'discard' in act ? (seat === t.taker && Tarot.discard(t, act.discard)) : !!act.play && Tarot.play(t, seat, act.play);
+    if (!ok) throw new UserError('bid' in act ? 'Enchère impossible.' : 'call' in act ? 'Carte impossible à appeler.' : 'discard' in act ? `Écart impossible : ${Tarot.ecartSize(t)} cartes, ni Roi ni bout.` : 'Carte impossible : fournis la couleur, sinon coupe (en montant si tu peux).');
+    const name = (id: string) => this.seatName(rt, id);
+    if (before === 'bid' && t.phase !== 'bid') await this.say(rt, null, t.taker ? `${await name(t.taker)} prend : ${Tarot.BIDS[t.bid!].name}.` : t.note);
+    if ('call' in act && t.called) await this.say(rt, null, `${await name(seat)} appelle ${Tarot.cardName(t.called)}.`);
+    if (!revealed && t.revealed && t.partner) await this.say(rt, null, `${await name(t.partner)} joue ${Tarot.cardName(t.called!)} : ${t.partner === t.taker ? 'seul contre 4' : `partenaire de ${await name(t.taker!)}`}.`);
+    await this.afterTarot(rt, turn);
+  }
+
+  /** After a step: the deal's end (each mark to the last player of each seat), the robots (on their seat's view). */
+  private async afterTarot(rt: RoomRt, before: string | null = null) {
+    const c = rt.cards, t = c.tarot;
+    if (!t) return;
+    if (t.turn !== before) c.turnSince = Date.now();
+    if (c.robot) { clearTimeout(c.robot); c.robot = null; }
+    if (c.late) { clearTimeout(c.late); c.late = null; }
+    if (t.phase === 'done' && t.result && !c.settled) {
+      c.settled = true;
+      const r = t.result;
+      for (const sid of t.seats) {
+        const uid = c.seats.find(s => s.id === sid)?.credit ?? null, mark = r.marks[sid] ?? 0;
+        c.paid[sid] = uid;
+        if (!uid) continue;
+        await this.db.update(roomMembers).set({ score: sql`${roomMembers.score} + ${mark}` }).where(and(eq(roomMembers.roomId, rt.room.id), eq(roomMembers.accountId, uid)));
+        await this.db.insert(palmares).values({ roomId: rt.room.id, game: 'tarot', data: { account: uid, won: mark > 0, pts: mark, taker: sid === r.taker, partner: sid === r.partner } });
+        await this.emitMember(rt, uid);
+      }
+      await this.say(rt, null, `${await this.seatName(rt, r.taker)} ${r.won ? 'gagne' : 'chute'} sa ${Tarot.BIDS[r.bid].name} (${String(r.made).replace('.', ',')} points pour ${r.need}) : ${(r.marks[r.taker] ?? 0) > 0 ? '+' : ''}${r.marks[r.taker] ?? 0}.`);
+      const settled = Table.settle(c.seats);
+      c.seats = settled.seats;
+    } else if (t.phase === 'done' && !t.result) {   // everyone passed: a new deal, the same seats
+      c.robot = setTimeout(() => { if (rt.cards.tarot === t) void this.tarotDeal(rt, c.players).catch(() => {}); }, Math.max(1500, this.env.ROBOT_DELAY_MS));
+    } else if (t.phase !== 'done' && t.turn !== null) {
+      const who = t.phase === 'dog' ? t.taker : t.turn, s = c.seats.find(x => x.id === who);
+      if (who && !s?.user) c.robot = setTimeout(() => void this.tarotRobot(rt), Math.max(this.env.ROBOT_DELAY_MS, t.phase === 'dog' ? this.env.ROBOT_DELAY_MS * 2 : 0));
+      else if (s?.user) c.late = setTimeout(() => void this.emitCards(rt), KICK_AFTER_MS + 200);
+    }
+    await this.emitCards(rt);
+  }
+
+  private async tarotRobot(rt: RoomRt) {
+    const t = rt.cards.tarot;
+    if (!t || t.phase === 'done') return;
+    const seat = t.phase === 'dog' ? t.taker! : t.turn!;
+    if (rt.cards.seats.find(s => s.id === seat)?.user) return;
+    const view = Tarot.tarotView(t, seat);   // a robot plays on what its seat may see
+    await this.tarotApply(rt, seat, t.phase === 'bid' ? { bid: Tarot.botBid(view, seat) } : t.phase === 'call' ? { call: Tarot.botCall(view) }
+      : t.phase === 'dog' ? { discard: Tarot.botDiscard(view) } : { play: Tarot.botPlay(view, seat) }).catch(() => { /* a robot never makes an illegal move */ });
+  }
+
+  async tarotTricks(socket: Socket, show: boolean) {
+    const rt = this.roomOf(socket);
+    this.hostOnly(rt, socket);
+    rt.cards.showTricks = show;
+    await this.emitCards(rt);
   }
 
   // ---------------------------------------------------------------- the console's notices

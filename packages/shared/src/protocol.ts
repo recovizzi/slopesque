@@ -108,15 +108,27 @@ export interface TdcRoundView {
   seats: string[]; hands: Record<string, PlayingCard[]>; trick: { by: string; cards: PlayingCard[] }[]; lastTrick: { by: string; cards: PlayingCard[] }[];
   turn: string | null; passed: string[]; out: string[]; roles: Record<string, 'president' | 'vice' | 'neutre' | 'vtdc' | 'tdc'>; round: number; startedAt: number; exchanges: string[];
 }
+export interface TarotCardView { id: string; kind: 'suit' | 'trump' | 'excuse'; r: number; s?: 'S' | 'H' | 'D' | 'C' }
+/** The Tarot's deal as a seat sees it (engines' tarotView: the others' hands as backs, the partner once revealed). */
+export interface TarotDealView {
+  seats: string[]; hands: Record<string, TarotCardView[]>; chien: TarotCardView[]; phase: 'bid' | 'call' | 'dog' | 'play' | 'done';
+  called: TarotCardView | null; partner: string | null; revealed: boolean; bids: Record<string, string>; turn: string | null; taker: string | null;
+  bid: string | null; ecart: TarotCardView[]; trick: { by: string; card: TarotCardView }[]; lastTrick: { by: string; card: TarotCardView }[];
+  won: Record<string, TarotCardView[]>; tricks: Record<string, { by: string; card: TarotCardView }[][]>; lastWinner: string | null; deal: number; startedAt: number;
+  result: { taker: string; partner: string | null; bid: string; bouts: number; need: number; made: number; won: boolean; score: number; marks: Record<string, number> } | null; note: string;
+}
 export interface CardsView {
   game: 'tdc' | 'tarot';
+  players: 4 | 5;                        // Tarot: at 4 or 5
+  showTricks: boolean;                   // Tarot: the won tricks can be looked at
   seats: CardSeatView[];
   tdc: TdcRoundView | null;
+  tarot: TarotDealView | null;
   paid: Record<string, string | null>;   // the last round: who got each seat's points (null: a robot)
   turnSince: number;
   late: { seat: string; user: string; secs: number } | null;   // a player's turn has lasted 30 s: /kick possible
 }
-export const READY_CARD_GAMES = ['tdc'];
+export const READY_CARD_GAMES = ['tdc', 'tarot'];
 /** One player's result in one round (the Palmarès, kept with the room). */
 export interface PalmaresEvent { at: number; game: 'disk' | 'tdc' | 'tarot'; id: string; name: string; hue: number; won: boolean; pts?: number; perfect?: boolean; role?: string; taker?: boolean; partner?: boolean }
 
@@ -220,6 +232,10 @@ export const intents = {
   'cards:deal': z.object({}),
   'cards:play': z.object({ cards: z.array(z.string().max(4)).min(1).max(4) }),
   'cards:pass': z.object({}),
+  'tarot:bid': z.object({ bid: z.enum(['pass', 'prise', 'garde', 'sans', 'contre']) }),
+  'tarot:call': z.object({ card: z.string().max(4) }),
+  'tarot:discard': z.object({ cards: z.array(z.string().max(4)).max(6) }),
+  'tarot:tricks': z.object({ show: z.boolean() }),
   'table:join': z.object({}),
   'table:leave': z.object({}),
   'gif:favorites': z.object({ favorites: z.array(z.object({ id: z.string().max(64), provider: z.string().max(16), url: z.url(), w: z.number().int(), h: z.number().int(), title: z.string().max(200) })).max(200) }),
@@ -277,6 +293,10 @@ export interface IntentResults {
   'cards:deal': null;
   'cards:play': null;
   'cards:pass': null;
+  'tarot:bid': null;
+  'tarot:call': null;
+  'tarot:discard': null;
+  'tarot:tricks': null;
   'table:join': 'ok' | 'full';
   'table:leave': null;
 }

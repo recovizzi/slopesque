@@ -201,6 +201,19 @@ check(await until(async () => (await a.frame.locator('.cg-results').count()) ===
 check(await until(async () => (await a.frame.locator('.cg-results li', { hasText: 'Toi' }).count()) === 1), 'cards: the round\'s points stay A\'s (last player of his seat)');
 await shot(a.page, '14-cards-results');
 await a.frame.locator('[data-action="table-join"]').click();
+// the Tarot at 5: A plays his own hand (bids, cards), robots on the four other seats
+await say(b.frame, '/activity');
+await b.frame.locator('.act-tile', { hasText: 'Cartes' }).click();
+await b.frame.locator('.act-format', { hasText: 'Tarot à 5' }).click();
+await b.frame.getByRole('button', { name: 'Distribuer' }).click();
+check(await until(async () => (await a.frame.locator('.cg-hand .in-hand').count()) === 15, 8000), 'Tarot à 5: A sees his 15 cards');
+await shot(a.page, '14b-tarot');
+await a.frame.getByRole('button', { name: 'Quitter la table' }).click();
+check(await until(async () => (await a.frame.locator('.cg-results').count()) === 1, 40000), 'Tarot à 5: the robots finish the deal (honest: on what their seat may see)');
+await shot(a.page, '14c-tarot-done');
+await say(b.frame, '/activity');
+await b.frame.locator('.act-tile', { hasText: 'Cartes' }).click();
+await b.frame.locator('.act-format', { hasText: 'Trou du cul' }).click();
 check(await until(async () => (await b.frame.locator('.msg.sys', { hasText: 'reprend sa place' }).count()) >= 1 || (await b.frame.locator('.msg.sys', { hasText: 'prend la place' }).count()) >= 1, 8000), 'cards: A takes a seat back');
 // ---- jalon 9: Low Tide, its address checked by the host
 await say(b.frame, '/activity');

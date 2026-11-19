@@ -4,6 +4,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { hueColor } from '@slopesque/engines';
 import type { CardsView, MemberView } from '@slopesque/shared';
 import * as K from '../lib/cards';
+import * as TV from '../lib/tarot-view';
+import { Tarot as TA } from '@slopesque/engines';
 import { request } from '../net';
 import { useStore } from '../store';
 import { LiveHtml } from './LiveHtml';
@@ -20,12 +22,14 @@ const fmtClock = (ms: number) => { const s = Math.floor(ms / 1000), h = Math.flo
 
 export function CardsStage() {
   const room = useStore(s => s.room)!, me = useStore(s => s.account)!.id;
-  const c: CardsView = room.cards, t = c.tdc;
+  const c: CardsView = room.cards, want = room.activity.cardGame ?? 'tdc';   // the game the host chose (the table may still hold the other)
+  const t = c.game === 'tdc' && want === 'tdc' ? c.tdc : null, tarot = c.game === 'tarot' && want === 'tarot' && c.players === (room.activity.tarotPlayers ?? 4) ? c.tarot : null;
+  const [wonView, setWonView] = useState<string | null>(null);
   const members = new Map(room.members.map(m => [m.id, m]));
   const [sel, setSel] = useState<Set<string>>(new Set()), [rules, setRules] = useState(false), [full, setFull] = useState(false), [note, setNote] = useState('');
   const box = useRef<HTMLDivElement>(null);
   const mySeat = c.seats.find(s => s.user === me)?.id ?? '';
-  useEffect(() => { setSel(new Set()); }, [t?.round, t?.turn]);
+  useEffect(() => { setSel(new Set()); }, [t?.round, t?.turn, tarot?.deal, tarot?.phase]);
 
   const who = (id: string) => {
     const s = c.seats.find(x => x.id === id), uid = s ? s.user ?? s.credit : null, m: MemberView | undefined = uid ? members.get(uid) : undefined;
@@ -33,11 +37,13 @@ export function CardsStage() {
   };
   const free = c.seats.filter(s => !s.user), mine = free.find(s => s.credit === me);
   const late = c.late ? { seat: c.late.seat, secs: c.late.secs, vote: room.chat.messages.some(m => m.kind === 'vote' && !(m.data?.vote as { result?: string } | undefined)?.result) } : null;
-  const html = t ? K.tableHtml({ t: t as unknown as K.TableCtx['t'], me: mySeat, playing: !!mySeat, host: room.hostId === me, selected: sel, fan: fan(t.hands[mySeat]?.length ?? 0, box.current),
+  const html = tarot ? TV.tarotTableHtml({ t: tarot as unknown as TA.Tarot, me: mySeat, playing: !!mySeat, host: room.hostId === me, selected: sel,
+      fan: fan((tarot.hands[mySeat]?.length ?? 0), box.current), who, art: {}, showLast: false, wonView, showTricks: c.showTricks })
+    : t ? K.tableHtml({ t: t as unknown as K.TableCtx['t'], me: mySeat, playing: !!mySeat, host: room.hostId === me, selected: sel, fan: fan(t.hands[mySeat]?.length ?? 0, box.current),
     who, elapsed: '', late: late && late.seat !== mySeat ? late : null,
     seats: { free: free.length, total: c.seats.length, mine: !!mine, takes: free[0] ? who(free[0].id).name : '', full,
       paid: id => { const u = c.paid[id]; const m = u ? members.get(u) : undefined; return u ? { name: u === me ? 'Toi' : m?.name ?? '?', color: m ? hueColor(m.hue) : '#8a8f98', bot: false } : { ...who(id), bot: true }; } } })
-    : `<div class="cards-game"><header class="cg-head"><b class="cg-title">Trou du cul</b><span class="cg-info">${room.hostId === me ? 'Distribue quand les joueurs ont cliqué « Participer » : des robots prennent les places libres (3 au moins).' : "L'hôte distribue les cartes…"}</span></header>
+    : `<div class="cards-game"><header class="cg-head"><b class="cg-title">${room.activity.cardGame === 'tarot' ? `Tarot à ${room.activity.tarotPlayers ?? 4}` : 'Trou du cul'}</b><span class="cg-info">${room.hostId === me ? 'Distribue quand les joueurs ont cliqué « Participer » : des robots prennent les places libres (3 au moins).' : "L'hôte distribue les cartes…"}</span></header>
       <div class="cg-table"><div class="cg-pile">${room.hostId === me ? '<button class="btn big" type="button" data-action="cards-deal">Distribuer</button>' : ''}</div></div>
       <div class="cg-me">${room.members.find(m => m.id === me)?.playing || room.hostId === me ? '' : '<div class="cg-watch"><button class="btn" type="button" data-action="join-game">Participer</button></div>'}</div></div>`;
 
@@ -49,13 +55,28 @@ export function CardsStage() {
     cards.forEach((el, i) => el.style.setProperty('--a', `${((i - (n - 1) / 2) * step).toFixed(4)}rad`));
   });
   useEffect(() => {   // the clock of the game
-    const id = setInterval(() => { const el = box.current?.querySelector('[data-card-clock]'); if (el && t) el.textContent = fmtClock(Date.now() - t.startedAt); }, 1000);
+    const start = (tarot ?? t)?.startedAt;
+    const id = setInterval(() => { const el = box.current?.querySelector('[data-card-clock]'); if (el && start) el.textContent = fmtClock(Date.now() - start); }, 1000);
     return () => clearInterval(id);
-  }, [t]);
+  }, [t, tarot]);
 
   const ack = (r: { ok: boolean; error?: string }) => setNote(r.ok ? '' : r.error ?? '');
   const onAction = async (a: string, el: HTMLElement) => {
-    if (a === 'card-pick' && t) {
+    if (a === 'card-pick' && tarot) {
+      const hand = tarot.hands[mySeat] ?? [], card = hand.find(x => x.id === el.dataset.card) as TA.TCard | undefined;
+      if (!card) return;
+      const full = tarot as unknown as TA.Tarot, next = new Set(sel);
+      if (tarot.phase === 'dog' && tarot.taker === mySeat) {
+        if (next.has(card.id)) next.delete(card.id); else if (TA.canDiscard(full, card) && next.size < TA.ecartSize(full)) next.add(card.id);
+        setSel(next);
+      } else if (tarot.phase === 'play' && tarot.turn === mySeat && TA.legal(full, mySeat).some(x => x.id === card.id)) {
+        if (next.has(card.id)) { ack(await request('cards:play', { cards: [card.id] })); return; }   // clicked again: played
+        setSel(new Set([card.id]));
+      }
+    } else if (a === 'tarot-bid') ack(await request('tarot:bid', { bid: el.dataset.v }));
+    else if (a === 'tarot-call') ack(await request('tarot:call', { card: el.dataset.v }));
+    else if (a === 'tarot-ecart') ack(await request('tarot:discard', { cards: [...sel] }));
+    else if (a === 'card-pick' && t) {
       const hand = t.hands[mySeat] ?? [], card = hand.find(x => x.id === el.dataset.card);
       if (!card) return;
       const next = new Set(sel);
@@ -72,9 +93,11 @@ export function CardsStage() {
     else if (a === 'cards-rules') setRules(true);
     else if (a === 'rules-close') setRules(false);
   };
-  return <div className="cards-stage" ref={box}>
+  return <div className="cards-stage" ref={box}
+    onMouseOver={e => { const w = (e.target as Element).closest<HTMLElement>('[data-won]')?.dataset.won ?? null; if (w !== wonView) setWonView(w); }}
+    onMouseLeave={() => setWonView(null)}>
     <LiveHtml className="cards-holder" html={html} onAction={(a, el) => void onAction(a, el)} />
     {note && <p className="alert cards-note" role="alert">{note}</p>}
-    {rules && <LiveHtml html={K.rulesHtml()} onAction={(a, el) => void onAction(a, el)} />}
+    {rules && <LiveHtml html={c.game === 'tarot' ? TV.tarotRulesHtml({}) : K.rulesHtml()} onAction={(a, el) => void onAction(a, el)} />}
   </div>;
 }

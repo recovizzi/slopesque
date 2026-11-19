@@ -76,11 +76,11 @@ chaque jalon, les tâches sont groupées par partie du monorepo (`[racine]`, `[i
 
 ## 8. Jalon 8 : Tarot
 
-- [ ] 8.1 [engines] Tarot à 4 (enchères, écart, plis, décompte), vue par joueur, tests
-- [ ] 8.2 [engines] Tarot à 5 (Roi appelé, robots honnêtes), tests de non-fuite
-- [ ] 8.3 [server] Tarot à 4 et 5, réglage des plis visibles, images des atouts du salon
-- [ ] 8.4 [web] Tarot (enchères, appel, écart, plis, atouts habillés)
-- [ ] 8.5 [e2e] Une donne à 5 ; l'écart et les mains cachés
+- [x] 8.1 [engines] Tarot à 4 (enchères, écart, plis, décompte), vue par joueur, tests
+- [x] 8.2 [engines] Tarot à 5 (Roi appelé, robots honnêtes), tests de non-fuite
+- [ ] 8.3 [server] Tarot à 4 et 5, réglage des plis visibles, images des atouts du salon — fait sauf les images des atouts (les atouts gardent leurs dessins par défaut)
+- [x] 8.4 [web] Tarot (enchères, appel, écart, plis, atouts habillés)
+- [x] 8.5 [e2e] Une donne à 5 ; l'écart et les mains cachés
 
 ## 9. Jalon 9 : intégrations et extension complète
 
