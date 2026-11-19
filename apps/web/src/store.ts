@@ -45,7 +45,7 @@ export const useStore = create<State>((set, get) => ({
     else if (e.type === 'message-updated') next.chat = { ...room.chat, messages: mapMessage(room.chat.messages, e.message.id, () => e.message) };
     else if (e.type === 'stickers') next.stickers = e.stickers;
     else if (e.type === 'emoji') next.emoji = e.emoji;
-    else if (e.type === 'activity') next.activity = e.activity;
+    else if (e.type === 'activity') { next.activity = e.activity; next.scope = e.scope; }
     else if (e.type === 'disk') next.disk = e.disk;
     else if (e.type === 'poll') next.poll = e.poll;
     else if (e.type === 'wheel') next.wheel = e.wheel;

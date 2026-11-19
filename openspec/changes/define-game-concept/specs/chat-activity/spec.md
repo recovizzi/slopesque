@@ -6,6 +6,15 @@ place au chat seul, qui occupe toute la largeur disponible et s'adapte à l'ouve
 gauche ; le tiroir gauche MUST ne montrer que la liste des joueurs. Il n'y a ni tour ni point. Le Chat MUST être
 l'**activité par défaut** : un salon s'ouvre sur le chat, et l'hôte lance un jeu depuis l'onglet Partie.
 
+Les lignes du salon propres à un jeu (une donne, une manche, un tour, un sondage, la roue…) MUST appartenir à la
+**session** de l'activité où elles sont dites : visibles pendant celle-ci, plus montrées une fois qu'on passe à une
+autre activité ou au Chat (pas d'inondation du chat). Les messages des joueurs, les votes, le crédit social et les
+lignes générales (arrivées, hôte, changement d'activité, nouvel emoji) restent toujours.
+
+#### Scenario: Retour au chat après une partie de cartes
+- **WHEN** l'hôte repasse au Chat après trois donnes de Tarot
+- **THEN** les lignes des donnes ne sont plus affichées ; « bien joué » écrit par Léa pendant la partie reste
+
 #### Scenario: Passer au chat
 - **WHEN** l'hôte choisit l'activité « Chat »
 - **THEN** le chat remplit la zone de jeu et le tiroir gauche liste les joueurs, sans onglet Chat ni Classement
@@ -40,6 +49,7 @@ commandes :
 Pendant qu'une commande s'écrit, la liste au-dessus du champ MUST proposer la suite possible (les activités puis leurs
 formats ; les joueurs puis des valeurs) ; Tab ou Entrée prend la proposition, Entrée envoie une commande complète.
 - **/kick** (ou /kick Léa) : faire quitter la table au joueur qui la fait attendre (voir card-games).
+- **/effet** : un effet visuel chez tous (voir « Effets visuels »).
 
 #### Scenario: Passer au Tarot à 5 sans être l'hôte
 - **WHEN** j'écris /activity, je choisis Cartes puis Tarot à 5
@@ -74,6 +84,35 @@ recharger à chaque page ni à chaque ouverture.
 #### Scenario: Changer de page
 - **WHEN** le panneau reste ouvert et que je change de page
 - **THEN** le chat réapparaît en bas, et seuls les messages arrivés entre-temps sont demandés au serveur
+
+### Requirement: Effets visuels (/effet)
+La commande **/effet** MUST jouer un effet visuel chez **tous** les joueurs du salon, sur la zone de jeu (ou le chat en
+activité Chat), comme réaction ou message direct ; rien n'est gardé (ni message, ni fichier). Les effets :
+- **/effet firework** : la zone devient noire (en fondu), une fusée part de chacun des deux angles du bas avec une
+  traînée de lumière vers le centre, puis explose ; chaque explosion tire au hasard une forme (pivoine, anneau, double
+  anneau, saule, cœur, palmier, étoile, crépitement) et des couleurs parmi une liste.
+- **/effet confetti** (ou confeti) : des confettis de toutes les couleurs jaillissent des deux côtés de la zone ;
+  **/effet confetti Léa** : tous de la couleur de Léa.
+- **/effet hit Léa** : la photo de Léa (ou son rond à sa lettre) apparaît, un poing fermé la frappe, elle est éjectée,
+  puis tout disparaît.
+- **/effet tomato Léa** : une tomate lancée en cloche s'écrase sur la photo et y laisse une tache rouge qui coule.
+- **/effet hammer Léa** : un marteau tombe sur la photo et l'écrase en hauteur, puis elle reprend sa forme.
+- **/effet screamer** : ouvre le choix d'une image, d'un sticker, d'un GIF ou d'un emoji, montré **1 s** au premier
+  plan au centre de la zone de tous ; une image envoyée n'est **pas gardée** (envoi unique, jamais stockée).
+Sur une photo : au centre de la zone, en grand ; si l'activité est un jeu de cartes et que la personne visée est à
+table, l'effet MUST se jouer en petit **sur sa place**, en suivant sa position (fenêtre redimensionnée). Feux
+d'artifice et confettis : jusqu'à **3 à la fois** chacun (plusieurs joueurs en même temps), le fond restant noir tant
+qu'un feu d'artifice est en cours (pas de clignotement) ; les effets sur une photo et le screamer : **un à la fois**.
+Ce qui ne peut pas se jouer MUST l'expliquer sous le chat, à moi seul. Avec « animations réduites » demandé par le
+système, l'effet MUST se résumer à son emoji, sans mouvement.
+
+#### Scenario: Deux feux d'artifice
+- **WHEN** Léa puis Hugo écrivent /effet firework à une seconde d'écart
+- **THEN** quatre fusées partent, le fond reste noir jusqu'à la fin de la dernière explosion
+
+#### Scenario: Tomate à table
+- **WHEN** pendant une donne de Tarot, j'écris /effet tomato Hugo et Hugo est à table
+- **THEN** la tomate s'écrase sur sa place à la table, chez tous
 
 ### Requirement: Crédit social
 Chaque joueur d'un salon MUST avoir un **crédit social** : une valeur à part, sans rapport avec les scores des jeux et

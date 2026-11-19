@@ -76,7 +76,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
   view(m: Row, reactions: Record<string, string[]> = {}, reply: Quote | null = null, pic?: MediaRow): MessageView {
     const { preview, ...data } = (m.data ?? {}) as { preview?: LinkPreview };
     return { id: m.id, from: m.authorId, kind: m.kind as MessageView['kind'], text: m.text, at: m.createdAt.getTime(), reply, reactions,
-      data: Object.keys(data).length ? data : null, preview: preview ?? null, media: this.mediaView(m, pic) };
+      data: Object.keys(data).length ? data : null, preview: preview ?? null, media: this.mediaView(m, pic), scope: m.scope };
   }
 
   /** A message's picture: a GIF's link, or our stored picture; gone (src null) once deleted, or for a chat image more
@@ -112,8 +112,8 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     return (await this.views([u!]))[0]!;
   }
 
-  async send(roomId: string, authorId: string | null, text: string, replyTo: number | null = null, kind: MessageView['kind'] = 'text') {
-    const [m] = await this.db.insert(messages).values({ roomId, authorId, text, replyTo, kind }).returning();
+  async send(roomId: string, authorId: string | null, text: string, replyTo: number | null = null, kind: MessageView['kind'] = 'text', scope: string | null = null) {
+    const [m] = await this.db.insert(messages).values({ roomId, authorId, text, replyTo, kind, scope }).returning();
     return this.withQuote(roomId, m!);
   }
 

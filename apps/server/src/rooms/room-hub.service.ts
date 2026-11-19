@@ -1,5 +1,6 @@
 // The rooms being played, in memory (openspec: realtime-sync, design decision 4): who is connected, presence with a
 // 15 s grace (a page change doesn't make a player blink away), the host, numbered events. Durable facts go to Postgres.
+import { randomUUID } from 'node:crypto';
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { Server, Socket } from 'socket.io';
@@ -7,7 +8,7 @@ import type postgres from 'postgres';
 import { castVote, closeVote, creditWord, defaultHue, startVote, tierOf, type Vote } from '@slopesque/engines';
 import * as D from '@slopesque/engines';
 import { Poll, Table, Tarot, Tdc, Wheel, KICK_AFTER_MS } from '@slopesque/engines';
-import { CARD_PLAYERS, PRESENCE, SCORE_NAMES, scoreKey, READY_ACTIVITIES, READY_CARD_GAMES, type CardsView, type PollAnswer, type PollView, type WheelView, type PollPicView, type ActivityChoice, type EmojiView, type GifRef, type MemberView, type RoomEvent, type RoomState, type StickerView } from '@slopesque/shared';
+import { CARD_PLAYERS, EFFECT_MS, EFFECT_PARALLEL, ON_PHOTO, PRESENCE, SCORE_NAMES, scoreKey, type EffectKind, type EffectView, READY_ACTIVITIES, READY_CARD_GAMES, type CardsView, type PollAnswer, type PollView, type WheelView, type PollPicView, type ActivityChoice, type EmojiView, type GifRef, type MemberView, type RoomEvent, type RoomState, type StickerView } from '@slopesque/shared';
 import { DB, SQL, type Db } from '../db/db.module.js';
 import { ENV, type Env } from '../config/config.module.js';
 import { accounts, customEmoji, media, messages, palmares, roomMembers, rooms, stickers, trumpArt } from '../db/schema.js';
@@ -23,7 +24,7 @@ interface MemberRt { sockets: Set<string>; awaySince: number | null; grace: Node
 interface PollRt { phase: PollView['phase']; round: number; seconds: number; secret: boolean; poll: PollView['poll']; answers: Record<string, PollAnswer>; host: string | null; deadline: number | null; timer: NodeJS.Timeout | null }
 interface WheelRt { phase: WheelView['phase']; items: WheelView['items']; spin: WheelView['spin']; needle: number; round: number; timer: NodeJS.Timeout | null }
 interface CardsRt { game: 'tdc' | 'tarot'; players: number; settings: { tdc: number; tarot: number }; showTricks: boolean; tarot: Tarot.Tarot | null; settled: boolean; seats: Table.CardSeat[]; tdc: Tdc.Tdc | null; paid: Record<string, string | null>; turnSince: number; robot: NodeJS.Timeout | null; late: NodeJS.Timeout | null; art: Record<string, string> }
-interface RoomRt { cards: CardsRt; room: Room; seq: number; members: Map<string, MemberRt>; vote: { id: number; v: Vote; timer: NodeJS.Timeout } | null; disk: D.DiskState; diskTimer: NodeJS.Timeout | null; poll: PollRt; wheel: WheelRt }
+interface RoomRt { cards: CardsRt; room: Room; seq: number; members: Map<string, MemberRt>; vote: { id: number; v: Vote; timer: NodeJS.Timeout } | null; disk: D.DiskState; diskTimer: NodeJS.Timeout | null; poll: PollRt; wheel: WheelRt; fx: Record<string, number[]> }
 export interface SocketData { account: Account; ip: string; roomId: string | null }
 
 @Injectable()
@@ -49,7 +50,7 @@ export class RoomHub implements OnModuleInit {
     const ws = (room.rules.wheel ?? {}) as { items?: WheelView['items']; needle?: number; round?: number };
     const rt: RoomRt = { cards: { game: 'tdc', players: 4, settings: { tdc: 4, tarot: 4, ...((room.rules.cards as object | undefined) ?? {}) }, showTricks: true, tarot: null, settled: false, seats: [], tdc: null, paid: {}, turnSince: 0, robot: null, late: null, art: {} }, room, seq: 0, members: new Map(), vote: null, disk, diskTimer: null,
       poll: { phase: 'writing', round: ps.round ?? 1, seconds: ps.seconds ?? 300, secret: ps.secret ?? false, poll: null, answers: {}, host: null, deadline: null, timer: null },
-      wheel: { phase: 'writing', items: ws.items ?? [{ label: '', weight: '' }, { label: '', weight: '' }], spin: null, needle: ws.needle ?? 0, round: ws.round ?? 1, timer: null } };
+      wheel: { phase: 'writing', items: ws.items ?? [{ label: '', weight: '' }, { label: '', weight: '' }], spin: null, needle: ws.needle ?? 0, round: ws.round ?? 1, timer: null }, fx: {} };
     for (const a of await this.db.select().from(trumpArt).where(eq(trumpArt.roomId, room.id))) rt.cards.art[a.card] = a.mediaId;   // the trumps' pictures
     if (saved.guessing) { await this.saveDisk(rt); await this.chat.send(room.id, null, 'Le serveur a redémarré : tour annulé.', null, 'system'); }
     return rt;
@@ -83,7 +84,7 @@ export class RoomHub implements OnModuleInit {
     m.awaySince = null;
     data.roomId = room.id;
     await socket.join(`room:${room.id}`);
-    if (!existing) await this.say(rt, null, `${data.account.name} rejoint le salon.`);
+    if (!existing) await this.say(rt, null, `${data.account.name} rejoint le salon.`, null, true);
     if (!wasHere || !existing) await this.emitMember(rt, me);
     return this.state(rt, me, after);
   }
@@ -114,7 +115,7 @@ export class RoomHub implements OnModuleInit {
   async state(rt: RoomRt, me: string, after?: number): Promise<RoomState> {
     return { seq: rt.seq, room: { key: rt.room.key, name: rt.room.name, createdAt: rt.room.createdAt.getTime() }, me, hostId: rt.room.hostId,
       members: await this.members(rt), chat: after ? await this.chat.since(rt.room.id, rt.room.createdAt, after) : await this.chat.page(rt.room.id, rt.room.createdAt), serverTime: Date.now(),
-      stickers: await this.stickerViews(rt), emoji: await this.emojiViews(rt), activity: this.activity(rt), disk: D.diskView(rt.disk, me),
+      stickers: await this.stickerViews(rt), emoji: await this.emojiViews(rt), activity: this.activity(rt), scope: this.scope(rt), disk: D.diskView(rt.disk, me),
       poll: this.pollView(rt, me), wheel: this.wheelView(rt), cards: this.cardsView(rt, me), web: (rt.room.rules.web as Record<string, string> | undefined) ?? {} };
   }
 
@@ -147,8 +148,9 @@ export class RoomHub implements OnModuleInit {
     const [member] = await this.members(rt, id);
     if (member) this.emit(rt, { type: 'member', member });
   }
-  async say(rt: RoomRt, from: string | null, text: string, replyTo: number | null = null) {
-    const message = await this.chat.send(rt.room.id, from, text, replyTo, from ? 'text' : 'system');
+  /** A message; from the room (null), it belongs to the activity being played (shown during it only) unless general. */
+  async say(rt: RoomRt, from: string | null, text: string, replyTo: number | null = null, general = false) {
+    const message = await this.chat.send(rt.room.id, from, text, replyTo, from ? 'text' : 'system', from || general ? null : this.scope(rt));
     this.emit(rt, { type: 'message', message });
     if (from) void this.previews.forText(text).then(async p => {   // the first link's preview, when its site gives one
       if (!p) return;
@@ -221,7 +223,7 @@ export class RoomHub implements OnModuleInit {
     const [row] = await this.db.insert(customEmoji).values({ roomId: rt.room.id, name, mediaId: pic.id, addedBy: a.id }).onConflictDoNothing().returning();
     if (!row) throw new UserError(`:${name}: existe déjà dans le salon.`);
     this.emit(rt, { type: 'emoji', emoji: await this.emojiViews(rt) });
-    await this.say(rt, null, `${a.name} a ajouté l'emoji :${name}: pour tout le salon.`);
+    await this.say(rt, null, `${a.name} a ajouté l'emoji :${name}: pour tout le salon.`, null, true);
   }
 
   /** My photo in this room (null: removed); the old one is deleted at once. */
@@ -246,11 +248,13 @@ export class RoomHub implements OnModuleInit {
     await this.db.update(rooms).set({ hostId: to }).where(eq(rooms.id, rt.room.id));
     rt.room = { ...rt.room, hostId: to };
     this.emit(rt, { type: 'host', hostId: to });
-    await this.say(rt, null, `${target.name} devient l'hôte.`);
+    await this.say(rt, null, `${target.name} devient l'hôte.`, null, true);
   }
 
   // ---------------------------------------------------------------- activity, votes, host, social credit
   activity(rt: RoomRt): ActivityChoice { return (rt.room.rules.activity as ActivityChoice | undefined) ?? { activity: 'chat' }; }
+  /** The session of the activity: a new one each time an activity is chosen. */
+  scope(rt: RoomRt) { return `${this.activity(rt).activity}#${(rt.room.rules.scope as number | undefined) ?? 0}`; }
 
   private async setActivity(rt: RoomRt, choice: ActivityChoice) {
     if (choice.cardGame === 'tarot' && choice.tarotPlayers) rt.cards.settings = { ...rt.cards.settings, tarot: choice.tarotPlayers };
@@ -260,10 +264,10 @@ export class RoomHub implements OnModuleInit {
       await this.saveDisk(rt);
       await this.emitDisk(rt);
     }
-    const rules = { ...rt.room.rules, activity: choice };
+    const rules = { ...rt.room.rules, activity: choice, scope: ((rt.room.rules.scope as number | undefined) ?? 0) + 1 };   // a new session
     await this.db.update(rooms).set({ rules }).where(eq(rooms.id, rt.room.id));
     rt.room = { ...rt.room, rules };
-    this.emit(rt, { type: 'activity', activity: choice });
+    this.emit(rt, { type: 'activity', activity: choice, scope: this.scope(rt) });
     if (choice.activity === 'cards') await this.emitCards(rt);
   }
 
@@ -322,7 +326,7 @@ export class RoomHub implements OnModuleInit {
     if (v.kind === 'host' && v.target) {
       await this.setHost(rt, v.target);
       const [m] = await this.members(rt, v.target);
-      await this.say(rt, null, `${m?.name ?? '?'} devient l'hôte (vote accepté).`);
+      await this.say(rt, null, `${m?.name ?? '?'} devient l'hôte (vote accepté).`, null, true);
     } else if (v.kind === 'activity' && v.choice) await this.setActivity(rt, v.choice as ActivityChoice);
     else if (v.kind === 'kick' && v.target) {
       const [m] = await this.members(rt, v.target);
@@ -348,7 +352,7 @@ export class RoomHub implements OnModuleInit {
     if (!host || host.presence === 'gone') {
       await this.setHost(rt, me.id);
       const mins = host?.awaySince ? Math.floor((Date.now() - host.awaySince) / 60_000) : 0;
-      await this.say(rt, null, `${me.name} devient l'hôte : ${host ? `${host.name} n'était plus là depuis ${mins} min` : 'l\'hôte avait quitté le salon'}.`);
+      await this.say(rt, null, `${me.name} devient l'hôte : ${host ? `${host.name} n'était plus là depuis ${mins} min` : 'l\'hôte avait quitté le salon'}.`, null, true);
       return 'taken';
     }
     await this.launch(rt, { kind: 'host', by: me.id, target: me.id, label: `demande à devenir l'hôte, à la place de ${host.name}` });
@@ -361,7 +365,7 @@ export class RoomHub implements OnModuleInit {
     if (!READY_ACTIVITIES.includes(choice.activity) || (choice.activity === 'cards' && !READY_CARD_GAMES.includes(choice.cardGame ?? 'tdc'))) throw new UserError('Cette activité arrive bientôt.');
     if (rt.room.hostId === me.id) {
       await this.setActivity(rt, choice);
-      await this.say(rt, null, `${me.name} passe à ${label}.`);
+      await this.say(rt, null, `${me.name} passe à ${label}.`, null, true);
       return 'applied';
     }
     await this.launch(rt, { kind: 'activity', by: me.id, choice, label: `propose de passer à ${label}` });
@@ -892,6 +896,48 @@ export class RoomHub implements OnModuleInit {
     if (!this.inRound(rt)) this.prepareTable(rt, game);
     await this.say(rt, null, `${game === 'tarot' ? 'Tarot' : 'Trou du cul'} à ${players} joueurs${this.inRound(rt) ? ', à partir de la donne suivante' : ''} : des robots complètent les places libres.`);
     await this.emitCards(rt);
+  }
+
+  // ---------------------------------------------------------------- /effet (openspec: chat-activity, Effets visuels)
+  /** An effect for everyone, now: checked (who, how many at once), its picture resolved (a screamer's image is relayed,
+   *  never stored), sent on the « fx » channel. */
+  async playEffect(socket: Socket, v: { kind: EffectKind; target?: string | null; pic?: { kind: 'image' | 'sticker' | 'gif' | 'emoji'; value: string } }) {
+    const rt = this.roomOf(socket), me = (socket.data as SocketData).account.id, now = Date.now();
+    const photo = ON_PHOTO.includes(v.kind), group = photo ? 'photo' : v.kind;
+    const target = v.target ? (await this.members(rt, v.target))[0] : null;
+    if (v.target && !target) throw new UserError('Ce joueur n\'est pas dans le salon.');
+    if (photo && !target) throw new UserError(`/effet ${v.kind} vise un joueur : par exemple /effet ${v.kind} Léa.`);
+    const running = (rt.fx[group] ?? []).filter(end => end > now), max = EFFECT_PARALLEL[v.kind] ?? 1;
+    if (running.length >= max) throw new UserError(photo ? 'Un effet est déjà en cours sur une photo : attends sa fin.' : v.kind === 'screamer' ? 'Un screamer est déjà affiché : attends sa fin.'
+      : `${max} ${v.kind === 'firework' ? 'feux d\'artifice' : 'salves de confettis'} sont déjà en cours : attends un instant.`);
+    let pic: EffectView['pic'] = null;
+    if (v.kind === 'screamer') {
+      const p = v.pic;
+      if (!p) throw new UserError('Choisis une image, un sticker, un GIF ou un emoji.');
+      if (p.kind === 'image') {
+        if (!/^data:image\/(webp|png|jpeg|gif);base64,[A-Za-z0-9+/=]+$/.test(p.value) || p.value.length > 700_000) throw new UserError('Image refusée : trop lourde ou d\'un format inconnu.');
+        pic = { kind: 'image', src: p.value };   // relayed once, never stored
+      } else if (p.kind === 'sticker') {
+        const lib = await this.stickerViews(rt), st = lib.find(x => x.id === p.value);
+        if (!st) throw new UserError('Ce sticker n\'est plus dans le salon.');
+        pic = { kind: 'image', src: st.src };
+      } else if (p.kind === 'gif') {
+        let host = '';
+        try { const u = new URL(p.value); host = u.protocol === 'https:' ? u.hostname : ''; } catch { /* not an address */ }
+        if (!/(^|\.)(klipy\.com|giphy\.com)$/.test(host)) throw new UserError('GIF refusé : il doit venir de KLIPY ou GIPHY.');
+        pic = { kind: 'image', src: p.value };
+      } else if (p.value.startsWith(':')) {
+        const e = (await this.emojiViews(rt)).find(x => `:${x.name}:` === p.value);
+        if (!e) throw new UserError('Cet emoji n\'existe pas dans le salon.');
+        pic = { kind: 'image', src: e.url };
+      } else {
+        if (p.value.length > 32 || /[<>&"]/.test(p.value)) throw new UserError('Emoji refusé.');
+        pic = { kind: 'emoji', src: p.value };
+      }
+    }
+    rt.fx[group] = [...running, now + EFFECT_MS[v.kind]];
+    const effect: EffectView = { id: randomUUID(), kind: v.kind, by: me, target: target?.id ?? null, hue: target?.hue ?? null, pic };
+    this.io.to(`room:${rt.room.id}`).emit('fx', effect);
   }
 
   /** The host dresses a trump with a picture (its « trump » format), or gives it back its default look (null). */

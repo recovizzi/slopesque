@@ -49,6 +49,7 @@ export interface MessageView {
   media?: MediaView | null;
   preview?: LinkPreview | null;    // the first link's preview, read by the server (arrives after the message)
   data?: Record<string, unknown> | null;
+  scope?: string | null;           // a game's system line: shown only during that activity's session (RoomState.scope)
 }
 /** A picture in a message: src null once it is gone (a chat image after 7 days, a sticker removed). A GIF is a link
  *  to its provider (not stored): `gif` says which. */
@@ -77,6 +78,7 @@ export interface RoomState {
   stickers: StickerView[];
   emoji: EmojiView[];
   activity: ActivityChoice;
+  scope: string;                   // the activity's session (« cards#12 »): its system lines are shown during it only
   disk: DiskView;
   poll: PollView;
   wheel: WheelView;
@@ -97,7 +99,7 @@ export type RoomEvent =
   | { type: 'message-updated'; message: MessageView }
   | { type: 'stickers'; stickers: StickerView[] }
   | { type: 'emoji'; emoji: EmojiView[] }
-  | { type: 'activity'; activity: ActivityChoice }
+  | { type: 'activity'; activity: ActivityChoice; scope: string }
   | { type: 'disk'; disk: DiskView }
   | { type: 'poll'; poll: PollView }
   | { type: 'wheel'; wheel: WheelView }
@@ -136,6 +138,15 @@ export interface CardsView {
   art: Record<string, string>;           // Tarot: the room's pictures of the trumps (« 0 » the Excuse … « 21 »), their address
 }
 export const READY_CARD_GAMES = ['tdc', 'tarot'];
+/** /effet: a visual effect on everyone's screen (not kept). On a player's photo: hit, tomato, hammer. */
+export const EFFECTS = ['firework', 'confetti', 'hit', 'tomato', 'hammer', 'screamer'] as const;
+export type EffectKind = typeof EFFECTS[number];
+export const ON_PHOTO: readonly EffectKind[] = ['hit', 'tomato', 'hammer'];
+/** How long each effect plays (ms): the server counts the ones running; 3 at a time for these two, else 1. */
+export const EFFECT_MS: Record<EffectKind, number> = { firework: 4200, confetti: 3800, hit: 2300, tomato: 2900, hammer: 2900, screamer: 1300 };
+export const EFFECT_PARALLEL: Partial<Record<EffectKind, number>> = { firework: 3, confetti: 3 };
+/** An effect sent to the room's players (the « fx » channel, outside the numbered events: a missed one is not replayed). */
+export interface EffectView { id: string; kind: EffectKind; by: string; target: string | null; hue: number | null; pic: { kind: 'image' | 'emoji'; src: string } | null }
 /** The ranking an activity shows (and resets): each game its own; null: an activity without points. */
 export const scoreKey = (a: { activity: string; cardGame?: string }) => (a.activity === 'disk' ? 'disk' : a.activity === 'cards' ? (a.cardGame === 'tarot' ? 'tarot' : 'tdc') : null);
 export const SCORE_NAMES: Record<string, string> = { disk: 'du Demi-disque', tdc: 'du Trou du cul', tarot: 'du Tarot' };
@@ -249,6 +260,8 @@ export const intents = {
   'tarot:tricks': z.object({ show: z.boolean() }),
   'tarot:art': z.object({ card: z.number().int().min(0).max(21), mediaId: z.string().uuid().nullable() }),
   'tarot:art-reset': z.object({}),
+  'effect:play': z.object({ kind: z.enum(EFFECTS), target: z.string().uuid().nullable().optional(),
+    pic: z.object({ kind: z.enum(['image', 'sticker', 'gif', 'emoji']), value: z.string().min(1).max(700_000) }).optional() }),
   'cards:players': z.object({ game: z.enum(['tdc', 'tarot']), players: z.number().int().min(3).max(8) }),
   'table:join': z.object({}),
   'table:leave': z.object({}),
@@ -313,6 +326,7 @@ export interface IntentResults {
   'tarot:tricks': null;
   'tarot:art': null;
   'tarot:art-reset': null;
+  'effect:play': null;
   'cards:players': null;
   'table:join': 'ok' | 'full';
   'table:leave': null;

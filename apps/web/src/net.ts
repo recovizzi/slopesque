@@ -1,8 +1,9 @@
 // The connection to the server (openspec: realtime-sync): Socket.IO with my code in `auth`, reconnection from 0.5 s to
 // 10 s, the room joined again after each reconnection (full state), events applied in order.
 import { io, type Socket } from 'socket.io-client';
-import { PROTOCOL_VERSION, type Ack, type UploadResult, type FatalReason, type GifRef, type Hello, type IntentName, type IntentResults, type RoomState, type SequencedEvent } from '@slopesque/shared';
+import { PROTOCOL_VERSION, type Ack, type UploadResult, type EffectView, type FatalReason, type GifRef, type Hello, type IntentName, type IntentResults, type RoomState, type SequencedEvent } from '@slopesque/shared';
 import { useStore } from './store';
+import { playEffect } from './fx';
 import { loadChat, mergeChat, saveChat } from './lib/chat-cache';
 
 let socket: Socket | null = null;
@@ -32,6 +33,7 @@ export function connect() {
   s.on('disconnect', () => { if (useStore.getState().conn === 'ok') set({ conn: 'reconnecting' }); });
   s.on('fatal', (f: { reason: FatalReason }) => { s.close(); set({ conn: 'idle', fatal: f.reason }); });
   s.on('event', (e: SequencedEvent) => { if (useStore.getState().apply(e) === 'gap') void join(useStore.getState().device.roomKey, true); });
+  s.on('fx', (e: EffectView) => playEffect(e));   // /effet: played at once, not kept
   s.on('room-gone', () => set({ room: null, roomStatus: 'unknown' }));
   s.on('state', (st: RoomState) => { const had = useStore.getState().room; set({ room: { ...st, chat: mergeChat(had?.room.key === st.room.key ? had.chat : null, st.chat) }, roomStatus: 'ok' }); });   // the console changed the room: its full state again
 }

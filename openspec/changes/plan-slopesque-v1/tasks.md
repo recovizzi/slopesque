@@ -118,6 +118,14 @@ chaque jalon, les tâches sont groupées par partie du monorepo (`[racine]`, `[i
 - [x] 10b.17 [web+server] Partie en lecture seule : une ligne par réglage (le réglage et ce qu'il fait, le choix de l'hôte) ; le format choisi avec /activity (Amphithéâtre) appliqué au mode de scrutin ; Entrée envoie une commande déjà complète
 - [x] 10b.15 [web+server] Retours du 2026-11-19 : pseudo affiché dès l'ouverture du Profil ; la table montrée à tous quand on prend ou quitte une place avant la donne ; `/activity cartes tarot`, `/credit-social Léa +100` et leur complétion ; chat ouvert en bas, bouton pour y revenir, chargement par morceaux gardé sur l'appareil (seuls les nouveaux messages demandés)
 
+## 10 ter. Réactions en direct : /effet
+
+- [x] 10t.1 [web+server] Lignes de jeu du salon rattachées à la session de l'activité (colonne `scope`), cachées une fois l'activité quittée ; messages des joueurs, votes, crédit et lignes générales gardés ; anciennes lignes système effacées par la migration
+- [x] 10t.2 [web] Absence : seulement le temps exact au survol
+- [x] 10t.3 [server] `/effet` : canal `fx` hors des événements numérotés, rien de gardé ; 3 feux d'artifice et 3 salves de confettis à la fois, un effet sur une photo et un screamer à la fois ; image du screamer relayée une fois (data URL ≤ 700 ko), sticker du salon, GIF KLIPY / GIPHY, emoji
+- [x] 10t.4 [web] Couche d'effets `src/fx/` (au-dessus de la zone de jeu, fond sombre compté, un seul canvas de particules, une place de photo qui suit la table) : firework (8 formes, 9 palettes), confetti (aux couleurs d'un joueur), hit, tomato, hammer, screamer ; « animations réduites » : l'emoji seul ; complétion de /effet
+- [x] 10t.5 [e2e] Effets vus par l'autre joueur, limites, screamer, effet sur la place à table ; tests serveur `effects.test.ts`
+
 ## 11. Jalon 11 : releases et déploiement
 
 - [x] 11.1 [ci] Release sur tag (méthode `jethub`) : zip, `.crx` et `.xpi` non listé si leurs secrets existent (sinon sautés avec la raison), notes d'installation

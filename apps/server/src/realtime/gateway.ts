@@ -63,9 +63,9 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
     }
   }
   private me(s: Socket) { return (s.data as SocketData).account; }
-  private async limit(s: Socket, what: 'messages' | 'reactions') {
+  private async limit(s: Socket, what: 'messages' | 'reactions' | 'effects') {
     const l = LIMITS[what];
-    if (!(await this.cache.allow(`${what}:${this.me(s).id}`, l.count, l.perMs))) throw new UserError(what === 'messages' ? 'Doucement : trop de messages.' : 'Doucement : trop de réactions.');
+    if (!(await this.cache.allow(`${what}:${this.me(s).id}`, l.count, l.perMs))) throw new UserError({ messages: 'Doucement : trop de messages.', reactions: 'Doucement : trop de réactions.', effects: 'Doucement : trop d\'effets.' }[what]);
   }
 
   @SubscribeMessage('room:check')
@@ -235,6 +235,9 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
   tarotCall(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('tarot:call', b, async v => { await this.hub.tarotDo(s, { call: v.card }); return null; }); }
   @SubscribeMessage('tarot:discard')
   tarotDiscard(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('tarot:discard', b, async v => { await this.hub.tarotDo(s, { discard: v.cards }); return null; }); }
+  @SubscribeMessage('effect:play')
+  effectPlay(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('effect:play', b, async v => { await this.limit(s, 'effects'); await this.hub.playEffect(s, v); return null; }); }
+
   @SubscribeMessage('tarot:art')
   tarotArt(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('tarot:art', b, async v => { await this.hub.tarotArt(s, v.card, v.mediaId); return null; }); }
 

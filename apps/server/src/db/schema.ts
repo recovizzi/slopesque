@@ -83,6 +83,7 @@ export const messages = pgTable('messages', {
   gif: jsonb('gif').$type<Record<string, unknown>>(),   // a GIF: a link to the provider, not stored
   replyTo: bigint('reply_to', { mode: 'number' }),      // no foreign key: the quoted message may be gone (30 days)
   data: jsonb('data').$type<Record<string, unknown>>(),
+  scope: text('scope'),                     // a game's system line: the activity's session (« cards#12 »), shown only during it
   createdAt: at('created_at'),
 }, t => [index('messages_room').on(t.roomId, t.id), index('messages_created').on(t.createdAt)]);
 

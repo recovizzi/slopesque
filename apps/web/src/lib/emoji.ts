@@ -65,6 +65,7 @@ export const COMMANDS: Suggestion[] = [
   { code: 'hote', cmd: 'devenir l\'hôte (vote ; direct s\'il est absent depuis 5 min)' },
   { code: 'credit-social', cmd: 'donner ou retirer du crédit social à un joueur (/credit-social Léa +100)' },
   { code: 'kick', cmd: 'faire quitter la table au joueur qui ne joue plus depuis 30 s (vote)' },
+  { code: 'effet', cmd: 'un effet chez tous : firework, confetti, hit, tomato, hammer, screamer' },
 ];
 /** Emoji whose code starts with (then contains) what is typed after ":", the game's first; one line per emoji. */
 export function suggest(q: string, custom: CustomEmoji[], limit = 6): Suggestion[] {

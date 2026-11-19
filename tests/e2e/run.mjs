@@ -119,7 +119,7 @@ await shot(b.page, '06-pictures-dark');
 // ---- jalon 4: commands, votes, social credit
 const say = async (frame, text) => { await frame.locator('[name="text"]').fill(text); await frame.locator('[name="text"]').press('Enter'); };
 await b.frame.locator('[name="text"]').fill('/');
-check(await until(async () => (await b.frame.locator('.emoji-suggest li').count()) === 4), 'commands: « / » lists /activity, /hote, /credit-social, /kick');
+check(await until(async () => (await b.frame.locator('.emoji-suggest li').count()) === 5), 'commands: « / » lists /activity, /hote, /credit-social, /kick, /effet');
 await b.frame.locator('[name="text"]').fill('');
 await say(b.frame, '/hote');
 const vote = a.frame.locator('.msg.vote.is-open');
@@ -218,12 +218,16 @@ await b.frame.getByRole('button', { name: 'Distribuer' }).click();
 check(await until(async () => (await a.frame.locator('.cg-hand .in-hand').count()) >= 17, 8000), 'cards: A sees his hand in a fan');
 check(await a.frame.locator('.cg-seat').count() === 2 && (await a.frame.locator('.cg-seat .seat-bot').count()) === 2, 'cards: two robots on the free seats');
 check(await b.frame.locator('.cg-hand').count() === 0, 'cards: B (not seated) sees no hand');
+await say(b.frame, '/effet hammer Léa');
+check(await until(async () => (await b.frame.locator('.fx-spot.on-seat').count()) === 1, 3000), '/effet hammer Léa: on Léa\'s place at the table (B watches)');
+await b.page.waitForTimeout(3200);
 await shot(a.page, '13-cards');
 await a.frame.getByRole('button', { name: 'Quitter la table' }).click();
 check(await until(async () => (await a.frame.locator('.cg-results').count()) === 1, 30000), 'cards: A left, the robots finished the round');
 check(await until(async () => (await a.frame.locator('.cg-results li', { hasText: 'Toi' }).count()) === 1), 'cards: the round\'s points stay A\'s (last player of his seat)');
 await shot(a.page, '14-cards-results');
 await a.frame.locator('[data-action="table-join"]').click();
+check(await until(async () => (await b.frame.locator('.msg.sys', { hasText: 'reprend sa place' }).count()) >= 1 || (await b.frame.locator('.msg.sys', { hasText: 'prend la place' }).count()) >= 1, 8000), 'cards: A takes a seat back');
 // the Tarot at 5: A plays his own hand (bids, cards), robots on the four other seats
 await say(b.frame, '/activity');
 await b.frame.locator('.act-tile', { hasText: 'Cartes' }).click();
@@ -255,7 +259,7 @@ await shot(a.page, '14c-tarot-done');
 await say(b.frame, '/activity');
 await b.frame.locator('.act-tile', { hasText: 'Cartes' }).click();
 await b.frame.locator('.act-format', { hasText: 'Trou du cul' }).click();
-check(await until(async () => (await b.frame.locator('.msg.sys', { hasText: 'reprend sa place' }).count()) >= 1 || (await b.frame.locator('.msg.sys', { hasText: 'prend la place' }).count()) >= 1, 8000), 'cards: A takes a seat back');
+check(await until(async () => (await b.frame.locator('.msg.sys', { hasText: 'Manche 1 :' }).count()) === 0), 'chat: a new card session, the lines of the earlier ones no longer shown');
 // ---- jalon 9: Low Tide, its address checked by the host
 await say(b.frame, '/activity');
 await b.frame.locator('.act-tile', { hasText: 'Jeux web' }).click();
@@ -285,6 +289,25 @@ if (await list.evaluate(el => el.scrollHeight > el.clientHeight + 100)) {
   await a.frame.locator('.chat-stage .to-bottom').click();
   check(await until(async () => (await a.frame.locator('.chat-stage .to-bottom').count()) === 0), 'chat: back at the bottom, the button gone');
 } else check(false, 'chat: too short to scroll (the test needs more messages)');
+
+// /effet: on everyone's screen, nothing kept
+await a.frame.locator('[name="text"]').fill('/effet ');
+check(await until(async () => (await a.frame.locator('.emoji-suggest li').count()) === 6), '/effet: the six effects suggested');
+await say(a.frame, '/effet firework');
+check(await until(async () => (await b.frame.locator('.fx-dim.on').count()) === 1 && (await b.frame.locator('.fx-layer canvas').count()) === 2), '/effet firework: B\'s area goes dark, the rockets in its sky');
+await shot(b.page, '16c-firework');
+await say(a.frame, '/effet tomato Hugo');
+check(await until(async () => (await b.frame.locator('.fx-spot.in-middle .fx-stain').count()) === 1, 3000), '/effet tomato Hugo: the tomato bursts on Hugo\'s photo, for B');
+await shot(b.page, '16d-tomato');
+await say(a.frame, '/effet hammer Hugo');
+check(await until(async () => (await a.frame.locator('.chat-note').textContent().catch(() => '')).includes('Un effet est déjà en cours sur une photo')), '/effet: one effect on a photo at a time (said to A)');
+await b.page.waitForTimeout(3000);
+await say(a.frame, '/effet screamer');
+const scream = a.page.waitForEvent('filechooser');
+await a.frame.locator('.screamer-modal .choice', { hasText: 'Image' }).click();
+await (await scream).setFiles([{ name: 'bou.png', mimeType: 'image/png', buffer: await png(a.frame, 600, 400, '#7b2cbf') }]);
+check(await until(async () => ((await b.frame.locator('.fx-screamer img').getAttribute('src').catch(() => '')) ?? '').startsWith('data:image/webp'), 4000), '/effet screamer: A\'s image a second on B\'s screen, sent once (not stored)');
+check(await until(async () => (await b.frame.locator('.fx-screamer').count()) === 0, 4000), '/effet screamer: gone after its second');
 
 // the Palmarès in the Chat activity too; the Partie tab, read only for a player who isn't the host
 if (!(await a.frame.evaluate(() => document.body.classList.contains('left-open')))) await a.frame.locator('.bar [aria-label="Joueurs"]').click();

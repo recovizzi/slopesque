@@ -8,7 +8,8 @@ import { COMMANDS, DEFAULT_REACTIONS, emojiHtml, expandCodes, loadCodes, NAME, p
 import { GifPop, useGif } from '../lib/gif';
 import { localGif } from '../lib/gif-cache';
 import { wireQuotes } from './hover';
-import { argSuggestions, isComplete, parseActivity, parseCredit } from '../lib/commands';
+import { argSuggestions, isComplete, parseActivity, parseCredit, parseEffect } from '../lib/commands';
+import { ScreamerModal } from './Screamer';
 import { linkify, previewHtml, type Preview } from '../lib/links';
 import { request, ServerGifs, toggleGifFavorite, upload } from '../net';
 import { useStore } from '../store';
@@ -62,7 +63,7 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
   const [playing, setPlaying] = useState<number | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [menu, setMenu] = useState(false);
-  const [modal, setModal] = useState<{ kind: 'activity'; at: string | null } | { kind: 'credit'; to?: string } | null>(null);
+  const [modal, setModal] = useState<{ kind: 'activity'; at: string | null } | { kind: 'credit'; to?: string } | { kind: 'screamer' } | null>(null);
   const [showStickers, setShowStickers] = useState(false);
   const [picked, setPicked] = useState<Picked | 'loading' | null>(null);
   const [naming, setNaming] = useState<string | null>(null), [nameError, setNameError] = useState('');
@@ -84,7 +85,7 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
   useLayoutEffect(() => {
     const el = listRef.current;
     if (el && (atBottom.current || last?.from === account.id)) el.scrollTop = el.scrollHeight;
-    else if (last && lastSeen.current && last.id > lastSeen.current) { const fresh = room.chat.messages.filter(m => m.id > lastSeen.current).length; setUnread(n => n + fresh); }
+    else if (last && lastSeen.current && last.id > lastSeen.current) { const fresh = room.chat.messages.filter(m => m.id > lastSeen.current && (!m.scope || m.scope === room.scope)).length; setUnread(n => n + fresh); }
     if (last) lastSeen.current = last.id;
   }, [count, last?.id, account.id]);
   useEffect(() => {   // shown (a drawer opening), resized, a picture loaded: still at the bottom if it was
@@ -189,13 +190,20 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
       if (c.delta === null || c.delta === 0) { setModal({ kind: 'credit', to: c.to.id }); return; }
       const r = await request('credit:give', { to: c.to.id, delta: c.delta });
       if (!r.ok) set({ note: r.error });
+    } else if (cmd === 'effet' || cmd === 'effect' || cmd === 'effets') {
+      if (!arg) { set({ note: 'Effets : /effet firework, /effet confetti (ou confetti Léa), /effet hit Léa, /effet tomato Léa, /effet hammer Léa, /effet screamer.' }); return; }
+      const e = parseEffect(arg, room.members);
+      if ('error' in e) { set({ note: e.error }); return; }
+      if (e.kind === 'screamer') { setModal({ kind: 'screamer' }); return; }
+      const r = await request('effect:play', { kind: e.kind, target: e.target?.id ?? null });
+      if (!r.ok) set({ note: r.error });
     } else if (cmd === 'hote' || cmd === 'host') {
       const r = await request('host:ask');
       set({ note: !r.ok ? r.error : r.value === 'already' ? 'Tu es déjà l\'hôte.' : '' });
     } else if (cmd === 'kick') {
       const r = await request('kick:ask', arg ? { name: arg } : {});
       if (!r.ok) set({ note: r.error });
-    } else set({ note: `Commande inconnue : /${word}. Commandes : /activity, /hote, /kick, /credit-social.` });
+    } else set({ note: `Commande inconnue : /${word}. Commandes : /activity, /hote, /kick, /credit-social, /effet.` });
   }
 
   async function pickActivity(c: ActivityChoice) {
@@ -321,7 +329,7 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
     <ul className="chat" ref={listRef} data-chat onScroll={e => { const el = e.currentTarget; atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40; setAway(!atBottom.current); if (atBottom.current) setUnread(0); if (el.scrollTop < 40) void more(); }}>
       {room.chat.hasMore ? <li className="msg sys chat-start">{loadingMore ? 'Chargement…' : <button className="btn ghost sm" type="button" onClick={more}>Messages plus anciens</button>}</li>
         : room.chat.start && <li className="msg sys chat-start">{room.chat.start === 'begin' ? 'Début de la conversation' : 'Les messages de plus de 30 jours ont été supprimés'}</li>}
-      {room.chat.messages.map(m => m.kind === 'vote' && m.data?.vote ? <VoteCard key={m.id} id={m.id} v={m.data.vote as Vote} members={members} me={account.id} />
+      {room.chat.messages.filter(m => !m.scope || m.scope === room.scope).map(m => m.kind === 'vote' && m.data?.vote ? <VoteCard key={m.id} id={m.id} v={m.data.vote as Vote} members={members} me={account.id} />
         : m.kind === 'credit' && m.data ? <li key={m.id} className="msg credit" data-msg={m.id}><CreditCard data={m.data as { by: string; to: string; delta: number }} members={members} me={account.id} /></li>
         : m.from === null || m.kind === 'system'
         ? <li key={m.id} className="msg sys" data-msg={m.id}><Html html={withCustom(esc(m.text), custom)} /></li>
@@ -368,6 +376,7 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
     {modal?.kind === 'activity' && <ActivityPicker kind={modal.at} current={room.activity.activity} host={room.hostId === account.id}
       busy={room.chat.messages.some(m => m.kind === 'vote' && !(m.data?.vote as Vote | undefined)?.result)}
       onKind={k => setModal({ kind: 'activity', at: k })} onPick={c => void pickActivity(c)} onClose={() => setModal(null)} />}
+    {modal?.kind === 'screamer' && <ScreamerModal gifs={gifRef.current} pop={pop} onClose={() => setModal(null)} />}
     {modal?.kind === 'credit' && <CreditModal members={room.members} me={account.id} initial={modal.to ?? null} onClose={() => setModal(null)} />}
   </div>;
 }
@@ -421,6 +430,6 @@ export function PresenceIcon({ m, host }: { m: MemberView; host: boolean }) {
   useEffect(() => { if (m.presence === 'here') return; const t = setInterval(() => tick(n => n + 1), 30_000); return () => clearInterval(t); }, [m.presence]);
   if (m.presence === 'here' || m.awaySince === null) return null;
   const mins = Math.max(1, Math.floor((Date.now() - m.awaySince) / 60_000)), gone = mins >= 5;
-  return <> <span className={`presence ${gone ? 'gone' : 'away'}`} title={gone ? `Absence : ${mins} min, 5 min ou plus${host ? ' : /hote donne le rôle d\'hôte sans vote' : ''}` : `Absence : ${mins} min (fenêtre ou extension fermée)`}>
+  return <> <span className={`presence ${gone ? 'gone' : 'away'}`} title={`Absence : ${mins} min${gone && host ? ' · /hote donne le rôle d\'hôte sans vote' : ''}`}>
     <Icon name={gone ? 'gone' : 'away'} /></span></>;
 }

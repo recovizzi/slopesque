@@ -60,5 +60,17 @@ describe.skipIf(!up)('Trou du cul', () => {
     expect((await ask(host, 'game:reset')).ok).toBe(true);
     expect((await score()).tdc).toBeUndefined();
     expect(((await ask<unknown[]>(a, 'palmares:get')) as { value: unknown[] }).value).toHaveLength(kept.value.length);
+
+    // the game's lines belong to its session: back in the Chat, they are no longer this activity's (the clients hide them)
+    const during = ((await ask<RoomState>(a, 'room:join', { key: keyOf })) as { value: RoomState }).value;
+    expect(during.scope).toMatch(/^cards#\d+$/);
+    expect(during.chat.messages.find(m => m.text.startsWith('Manche'))?.scope).toMatch(/^cards#\d+$/);   // a session of the cards
+    await ask(a, 'chat:send', { text: 'bien joué' });
+    await ask(host, 'activity:choose', { choice: { activity: 'chat' } });
+    const after = ((await ask<RoomState>(a, 'room:join', { key: keyOf })) as { value: RoomState }).value;
+    expect(after.scope).toMatch(/^chat#\d+$/);
+    expect(after.chat.messages.find(m => m.text.startsWith('Manche'))?.scope).toMatch(/^cards#/);   // not the Chat's session: hidden now
+    expect(after.chat.messages.find(m => m.text === 'bien joué')?.scope ?? null).toBeNull();   // a player's message stays
+    expect(after.chat.messages.find(m => m.text.includes('passe à Chat'))?.scope ?? null).toBeNull();   // a general line stays
   }, 30_000);
 });
