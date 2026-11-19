@@ -12,6 +12,7 @@ import { Gateway } from './realtime/gateway.js';
 import { AccountsController } from './accounts/accounts.controller.js';
 import { MediaService } from './media/media.service.js';
 import { MediaController } from './media/media.controller.js';
+import { HomeController } from './health/home.controller.js';
 import { GifService } from './external/gif.service.js';
 import { PreviewService } from './external/preview.service.js';
 
@@ -23,5 +24,5 @@ import { PreviewService } from './external/preview.service.js';
 })
 export class CoreModule {}
 
-@Module({ imports: [CoreModule], providers: [RoomHub, Gateway, GifService, PreviewService], controllers: [HealthController, AccountsController, MediaController] })
+@Module({ imports: [CoreModule], providers: [RoomHub, Gateway, GifService, PreviewService], controllers: [HomeController, HealthController, AccountsController, MediaController] })
 export class AppModule {}

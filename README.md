@@ -34,6 +34,19 @@ pnpm build
 Sans `.env`, tout tourne avec les valeurs de développement de [`.env.example`](.env.example). Les clés externes
 (GIF) sont facultatives : sans elles, la fenêtre GIF dit pourquoi elle est vide.
 
+## La version de production sur ta machine
+
+```sh
+pnpm stack:up                                   # construit et lance la pile (port 8080), écrit infra/.env avec des secrets tirés au hasard
+pnpm stack:admin rooms:create --name "Mon salon"   # crée un salon, affiche sa clé
+pnpm stack:logs                                 # journaux du serveur
+pnpm stack:down
+```
+
+Dans l'extension (chargée depuis `apps/extension/dist/extension`) : onglet **Extension** → **Serveur** →
+`http://localhost:8080`, puis « + Ajouter » avec la clé du salon. Seul le port du serveur est exposé ; Postgres, Redis
+et RustFS restent sur le réseau interne de Docker.
+
 ## Exploitation
 
 - **Aucune sauvegarde.** Une base, un disque ou un salon supprimés ne se récupèrent pas : le projet est volontairement

@@ -8,7 +8,11 @@ import { chromium } from 'playwright';
 
 export const ROOT = path.resolve(import.meta.dirname, '../..');
 export const OUT = path.join(ROOT, 'tests/e2e/shots');
-export const PORT = 3198, SERVER = `http://localhost:${PORT}`;
+// E2E_STACK=1: against the production stack running on this Docker (`pnpm stack:up`, port 8080) instead of dist/;
+// infra/.env then needs CODE_ATTEMPTS_PER_MINUTE=1000 (the test makes many accounts from one address)
+export const STACK = process.env.E2E_STACK === '1';
+export const PORT = STACK ? 8080 : 3198, SERVER = `http://localhost:${PORT}`;
+const compose = ['compose', '-f', path.resolve(import.meta.dirname, '../../infra/docker-compose.prod.yml'), '--env-file', path.resolve(import.meta.dirname, '../../infra/.env')];
 const env = { ...process.env, PORT: String(PORT), PUBLIC_URL: SERVER, LOG_LEVEL: 'warn', CODE_ATTEMPTS_PER_MINUTE: '1000' };
 const serverDir = path.join(ROOT, 'apps/server');
 
@@ -21,11 +25,17 @@ let server = null;
 process.on('exit', () => server?.kill());
 process.on('uncaughtException', e => { console.error(e); server?.kill(); process.exit(1); });
 export async function startServer() {
+  if (STACK) {
+    execFileSync('docker', [...compose, 'start', 'server'], { stdio: 'ignore' });
+    if (!(await until(async () => (await fetch(`${SERVER}/api/health`)).ok, 60000))) throw new Error('the stack\'s server did not start');
+    return;
+  }
   server = spawn(process.execPath, ['dist/main.js'], { cwd: serverDir, env, stdio: ['ignore', 'inherit', 'inherit'] });
   if (!(await until(async () => (await fetch(`${SERVER}/api/health`)).ok, 15000))) throw new Error('the server did not start');
 }
-export async function stopServer() { if (!server) return; const s = server; server = null; s.kill(); await new Promise(r => s.once('exit', r)); }
-export const admin = (...args) => execFileSync(process.execPath, ['dist/admin.js', ...args], { cwd: serverDir, env, encoding: 'utf8' });
+export async function stopServer() { if (STACK) { execFileSync('docker', [...compose, 'stop', 'server'], { stdio: 'ignore' }); return; } if (!server) return; const s = server; server = null; s.kill(); await new Promise(r => s.once('exit', r)); }
+export const admin = (...args) => (STACK ? execFileSync('docker', [...compose, 'exec', '-T', 'server', 'admin', ...args], { encoding: 'utf8' })
+  : execFileSync(process.execPath, ['dist/admin.js', ...args], { cwd: serverDir, env, encoding: 'utf8' }));
 
 // Colour emoji in the screenshots: headless Chromium on Linux may have no emoji font. Noto Color Emoji, downloaded once
 // into tests/e2e/.cache/ (git-ignored), is given to the test browser only, through fontconfig.

@@ -1,5 +1,6 @@
 // The server's configuration, read from the environment and checked at start (openspec: repo-and-secrets).
 import { z } from 'zod';
+import { isInsecureUrl } from './url.js';
 
 const bool = z.enum(['true', 'false', '1', '0', '']).default('false').transform(v => v === 'true' || v === '1');
 const optional = z.string().trim().default('').transform(v => v || null);
@@ -39,9 +40,13 @@ export function parseEnv(raw: Record<string, string | undefined>): { env: Env | 
   const env = r.data, problems: string[] = [];
   if (env.NODE_ENV === 'production') {
     for (const k of SECRET_VARS) if (String(env[k] ?? '').includes('dev-only')) problems.push(`${k} : valeur de développement interdite en production`);
-    const url = new URL(env.PUBLIC_URL);
-    if (url.protocol !== 'https:' && !env.ALLOW_INSECURE) problems.push('PUBLIC_URL : https obligatoire en production (ou ALLOW_INSECURE=true, connexion non chiffrée)');
+    if (isInsecureUrl(env.PUBLIC_URL) && !env.ALLOW_INSECURE) problems.push('PUBLIC_URL : https obligatoire en production (ou ALLOW_INSECURE=true, connexion non chiffrée)');
     if (!env.ALLOWED_ORIGINS.length) problems.push('ALLOWED_ORIGINS : vide interdit en production (origines de l\'extension)');
   }
   return { env: problems.length ? null : env, problems };
 }
+
+/** An origin allowed by ALLOWED_ORIGINS: exact, or a pattern ending with « * » (chrome-extension://* while the
+ *  extension has no fixed id). Empty list: any (development). */
+export const originAllowed = (allowed: string[], origin: string | undefined) =>
+  !allowed.length || !origin || allowed.some(a => (a.endsWith('*') ? origin.startsWith(a.slice(0, -1)) : a === origin));

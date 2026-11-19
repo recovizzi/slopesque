@@ -5,7 +5,7 @@ import { NestFactory } from '@nestjs/core';
 import { raw } from 'express';
 import { AppModule } from './app.module.js';
 import { SlopesqueIoAdapter } from './realtime/io-adapter.js';
-import { isInsecureUrl } from '@slopesque/shared';
+import { isInsecureUrl, originAllowed } from '@slopesque/shared';
 import { ENV, type Env } from './config/config.module.js';
 
 const levels = { debug: ['debug', 'log', 'warn', 'error'], info: ['log', 'warn', 'error'], warn: ['warn', 'error'], error: ['error'] } as const;
@@ -16,6 +16,6 @@ app.useWebSocketAdapter(new SlopesqueIoAdapter(app, env.ALLOWED_ORIGINS));
 // an upload is the picture itself as the body (15 MB at most), with its ticket in X-Ticket
 app.use('/api/media', raw({ type: () => true, limit: '16mb' }));
 // the extension's pages (and the dev app on :5173) call the API from another origin
-app.enableCors({ origin: env.ALLOWED_ORIGINS.length ? env.ALLOWED_ORIGINS : true });
+app.enableCors({ origin: (o: string | undefined, cb: (e: Error | null, ok?: boolean) => void) => cb(null, originAllowed(env.ALLOWED_ORIGINS, o)) });
 await app.listen(env.PORT, '0.0.0.0');
 new Logger('Slopesque').log(`prêt sur ${env.PUBLIC_URL} (port ${env.PORT}, ${env.NODE_ENV})${isInsecureUrl(env.PUBLIC_URL) ? ' — connexion non chiffrée' : ''}`);

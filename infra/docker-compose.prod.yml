@@ -1,0 +1,44 @@
+# Production (and `pnpm stack:up` on a local Docker): the server, Postgres, Redis and RustFS on one machine, with ONE
+# public port (the server's: API, WebSocket, pictures, its own page). The data services stay on the internal
+# network. Secrets come from infra/.env (git-ignored; `pnpm stack:up` writes one with random values if missing).
+# No backup (openspec: data-retention): a lost volume is lost.
+name: slopesque
+services:
+  server:
+    image: ${SERVER_IMAGE:-ghcr.io/recovizzi/slopesque-server:latest}
+    build: { context: .., dockerfile: apps/server/Dockerfile }
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: '3100'
+      DATABASE_URL: postgres://slopesque:${POSTGRES_PASSWORD}@postgres:5432/slopesque
+      REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://rustfs:9000
+      S3_ACCESS_KEY: slopesque
+      S3_SECRET_KEY: ${RUSTFS_SECRET_KEY}
+    ports: ['${PUBLIC_PORT:-8080}:3100']
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      rustfs: { condition: service_healthy }
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment: { POSTGRES_USER: slopesque, POSTGRES_PASSWORD: '${POSTGRES_PASSWORD}', POSTGRES_DB: slopesque }
+    volumes: [postgres:/var/lib/postgresql/data]
+    healthcheck: { test: ['CMD-SHELL', 'pg_isready -U slopesque -d slopesque'], interval: 5s, timeout: 3s, retries: 30 }
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--save', '', '--appendonly', 'no', '--maxmemory', '128mb', '--maxmemory-policy', 'allkeys-lru']
+    healthcheck: { test: ['CMD', 'redis-cli', 'ping'], interval: 5s, timeout: 3s, retries: 30 }
+  rustfs:
+    image: rustfs/rustfs:1.0.6
+    restart: unless-stopped
+    environment: { RUSTFS_ACCESS_KEY: slopesque, RUSTFS_SECRET_KEY: '${RUSTFS_SECRET_KEY}', RUSTFS_VOLUMES: /data }
+    volumes: [rustfs:/data]
+    healthcheck: { test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:9000/health || curl -fs http://127.0.0.1:9000/health || exit 1'], interval: 5s, timeout: 3s, retries: 30 }
+volumes:
+  postgres:
+  rustfs:

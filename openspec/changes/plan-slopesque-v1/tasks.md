@@ -93,10 +93,10 @@ chaque jalon, les tâches sont groupées par partie du monorepo (`[racine]`, `[i
 
 ## 10. Jalon 10 : version de production sur le Docker local
 
-- [ ] 10.1 [infra] `docker-compose.prod.yml` : Caddy, serveur, Postgres, Redis, RustFS ; un seul port public, réseau interne
-- [ ] 10.2 [server] Image Docker du serveur (multi-étapes, sans privilèges), page « Installer l'extension » servie sur la même origine
-- [ ] 10.3 [racine] `pnpm stack:up` / `stack:down` : la pile de production sur le Docker local, l'extension réglée sur `http://localhost:<port>`
-- [ ] 10.4 [e2e] Les tests de bout en bout contre la pile de production locale
+- [x] 10.1 [infra] `docker-compose.prod.yml` : serveur (Caddy viendra avec le certificat, 11.3), Postgres, Redis, RustFS ; un seul port public, réseau interne
+- [x] 10.2 [server] Image Docker du serveur (multi-étapes, sans privilèges), page « Installer l'extension » servie sur la même origine
+- [x] 10.3 [racine] `pnpm stack:up` / `stack:down` : la pile de production sur le Docker local, l'extension réglée sur `http://localhost:<port>`
+- [x] 10.4 [e2e] Les tests de bout en bout contre la pile de production locale
 
 ## 11. Jalon 11 : releases et déploiement
 

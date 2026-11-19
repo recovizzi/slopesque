@@ -4,8 +4,7 @@ import type { INestApplicationContext } from '@nestjs/common';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import type { ServerOptions } from 'socket.io';
 
-export const originAllowed = (allowed: string[], origin: string | undefined) =>
-  !allowed.length || !origin || allowed.includes(origin) || origin.startsWith('moz-extension://');
+import { originAllowed } from '@slopesque/shared';
 
 export class SlopesqueIoAdapter extends IoAdapter {
   constructor(app: INestApplicationContext, private readonly allowed: string[]) { super(app); }

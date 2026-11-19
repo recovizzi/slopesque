@@ -9,3 +9,4 @@ onlyBuiltDependencies:
   - '@nestjs/core'
 patchedDependencies:
   emoji-picker-element@1.29.1: patches/emoji-picker-element@1.29.1.patch
+allowUnusedPatches: true
