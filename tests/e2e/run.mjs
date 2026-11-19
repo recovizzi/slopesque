@@ -203,6 +203,15 @@ await say(b.frame, '/activity');
 await b.frame.locator('.act-tile', { hasText: 'Chat' }).click();
 check(await until(async () => (await a.frame.locator('.chat-stage .chat').isVisible())), 'back to the Chat activity');
 
+// ---- jalon 9: the shortcut, shown in the Extension tab; « Rester ouvert sur toutes les pages » off by default
+check((await A.sw.evaluate(() => chrome.commands.getAll())).some(c => c.name === 'toggle-panel'), 'extension: the « toggle-panel » command exists');
+await a.frame.locator('.bar .avatar').click();
+await a.frame.locator('[data-action], .tab', { hasText: 'Extension' }).first().click();
+check(await until(async () => (await a.frame.getByText('Raccourci clavier').count()) === 1), 'extension: the shortcut in the Extension tab');
+check(!(await a.frame.getByRole('checkbox', { name: 'Rester ouvert sur toutes les pages' }).isChecked()), 'extension: « Rester ouvert sur toutes les pages » off by default');
+await shot(a.page, '15-extension-tab');
+await a.frame.locator('.drawer-right [aria-label="Fermer"]').click();
+
 // the server restarts: the panels say « Reconnexion… », then come back with the chat kept
 await stopServer();
 check(await until(async () => (await a.frame.getByText('Reconnexion…').count()) === 1, 8000), 'server down: « Reconnexion… » in the header');

@@ -6,7 +6,8 @@ import './style.css';
 import './app.css';
 import { App } from './App';
 import { loadDevice } from './lib/device';
-import { connect } from './net';
+import { connect, disconnect } from './net';
+import { PRESENCE } from '@slopesque/shared';
 import { useStore } from './store';
 
 const RELEASES = 'https://github.com/recovizzi/slopesque/releases/latest';
@@ -18,6 +19,13 @@ if (inExtension && !params.has('embed')) document.body.classList.add('popup');
 if (inExtension || import.meta.env.DEV || params.has('preview')) {
   useStore.getState().set({ device: await loadDevice() });
   if (useStore.getState().device.code) connect();
+  // several tabs with the panel: only the visible one stays connected (a hidden one lets go after 30 s, panel-persistence)
+  let hidden = 0;
+  document.addEventListener('visibilitychange', () => {
+    clearTimeout(hidden);
+    if (document.hidden) hidden = window.setTimeout(() => { disconnect(); useStore.getState().set({ conn: 'idle' }); }, PRESENCE.hiddenTabMs);
+    else if (useStore.getState().conn === 'idle' && useStore.getState().device.code && !useStore.getState().fatal) connect();
+  });
   createRoot(root).render(<StrictMode><App /></StrictMode>);
 } else {
   document.body.classList.add('install');

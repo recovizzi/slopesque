@@ -22,7 +22,7 @@ import type { Account } from '../accounts/accounts.service.js';
 interface MemberRt { sockets: Set<string>; awaySince: number | null; grace: NodeJS.Timeout | null }
 interface PollRt { phase: PollView['phase']; round: number; seconds: number; secret: boolean; poll: PollView['poll']; answers: Record<string, PollAnswer>; host: string | null; deadline: number | null; timer: NodeJS.Timeout | null }
 interface WheelRt { phase: WheelView['phase']; items: WheelView['items']; spin: WheelView['spin']; needle: number; timer: NodeJS.Timeout | null }
-interface CardsRt { seats: Table.CardSeat[]; tdc: Tdc.Tdc | null; paid: Record<string, string | null>; turnSince: number; robot: NodeJS.Timeout | null; late: NodeJS.Timeout | null }
+interface CardsRt { settled: boolean; seats: Table.CardSeat[]; tdc: Tdc.Tdc | null; paid: Record<string, string | null>; turnSince: number; robot: NodeJS.Timeout | null; late: NodeJS.Timeout | null }
 interface RoomRt { cards: CardsRt; room: Room; seq: number; members: Map<string, MemberRt>; vote: { id: number; v: Vote; timer: NodeJS.Timeout } | null; disk: D.DiskState; diskTimer: NodeJS.Timeout | null; poll: PollRt; wheel: WheelRt }
 export interface SocketData { account: Account; ip: string; roomId: string | null }
 
@@ -47,7 +47,7 @@ export class RoomHub implements OnModuleInit {
     const disk = { ...D.newDisk({ ...D.DEFAULT_RULES, ...saved.rules }), round: saved.round ?? 1, phase: (saved.round ?? 1) > 1 ? 'writing' as const : 'lobby' as const };
     const ps = (room.rules.poll ?? {}) as { seconds?: number; secret?: boolean; round?: number };
     const ws = (room.rules.wheel ?? {}) as { items?: WheelView['items']; needle?: number };
-    const rt: RoomRt = { cards: { seats: [], tdc: null, paid: {}, turnSince: 0, robot: null, late: null }, room, seq: 0, members: new Map(), vote: null, disk, diskTimer: null,
+    const rt: RoomRt = { cards: { settled: false, seats: [], tdc: null, paid: {}, turnSince: 0, robot: null, late: null }, room, seq: 0, members: new Map(), vote: null, disk, diskTimer: null,
       poll: { phase: 'writing', round: ps.round ?? 1, seconds: ps.seconds ?? 300, secret: ps.secret ?? false, poll: null, answers: {}, host: null, deadline: null, timer: null },
       wheel: { phase: 'writing', items: ws.items ?? [{ label: '', weight: '' }, { label: '', weight: '' }], spin: null, needle: ws.needle ?? 0, timer: null } };
     if (saved.guessing) { await this.saveDisk(rt); await this.chat.send(room.id, null, 'Le serveur a redémarré : tour annulé.', null, 'system'); }
@@ -629,6 +629,7 @@ export class RoomHub implements OnModuleInit {
     const names = new Map<string, string>();
     for (const s of c.seats) names.set(s.id, await this.seatName(rt, s.id));
     c.tdc = Tdc.deal(c.seats.map(s => s.id), fresh ? null : c.tdc, id => names.get(id) ?? '?');
+    c.settled = false;
     c.turnSince = Date.now();
     if (this.activity(rt).activity !== 'cards') await this.setActivity(rt, { activity: 'cards', cardGame: 'tdc' });
     const robots = c.seats.filter(s => !s.user).length;
@@ -654,7 +655,8 @@ export class RoomHub implements OnModuleInit {
     if (t.turn !== before) c.turnSince = Date.now();
     if (c.robot) { clearTimeout(c.robot); c.robot = null; }
     if (c.late) { clearTimeout(c.late); c.late = null; }
-    if (t.turn === null) {
+    if (t.turn === null && !c.settled) {   // the round's end, counted once
+      c.settled = true;
       for (const sid of t.out) {
         const uid = c.seats.find(s => s.id === sid)?.credit ?? null, role = t.roles[sid]!;
         c.paid[sid] = uid;
@@ -669,7 +671,7 @@ export class RoomHub implements OnModuleInit {
       const settled = Table.settle(c.seats);
       c.seats = settled.seats;
       for (const u of settled.freed) { const [m] = await this.members(rt, u); await this.say(rt, null, `${m?.name ?? '?'} a quitté la table : un robot prend sa place.`); }
-    } else {
+    } else if (t.turn !== null) {
       const s = c.seats.find(x => x.id === t.turn);
       if (!s?.user) c.robot = setTimeout(() => void this.robotPlays(rt), this.env.ROBOT_DELAY_MS);   // a robot plays this seat
       else c.late = setTimeout(() => void this.emitCards(rt), KICK_AFTER_MS + 200);   // 30 s: the « Exclure ? » button appears

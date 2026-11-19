@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { MIN_HUE_GAP, RAINBOW, hueColor, hueDistance, newCode } from '@slopesque/engines';
 import { isInsecureUrl, type ActivityChoice, type MemberView } from '@slopesque/shared';
 import { EmojiPop, emojiHtml } from './lib/emoji';
+import * as X from './lib/ext';
 import { connect, request, upload } from './net';
 import { useStore } from './store';
 import { AccountSection, CodeModal, Welcome, type CodeMode } from './ui/Account';
@@ -169,6 +170,7 @@ function ExtensionTab({ setDevice }: { setDevice: (p: Partial<ReturnType<typeof 
       onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} /></label>
     {isInsecureUrl(device.server) && <p className="alert">Connexion non chiffrée : ton code et tes messages circulent en clair jusqu'à ce serveur.</p>}
     <RoomList />
+    <ExtensionOptions />
     <label className="field"><span>Thème</span><select value={device.theme} onChange={e => setDevice({ theme: e.target.value as 'auto' })}>
       <option value="auto">Système</option><option value="light">Clair</option><option value="dark">Sombre</option></select></label>
   </>;
@@ -209,6 +211,27 @@ function GameTab() {
     {!host && <p className="note">Seul l'hôte change l'activité ; les autres la proposent au vote avec /activity.</p>}
     <hr />
     {act === 'disk' ? <DiskSettings /> : act === 'poll' ? <PollSettings /> : act === 'wheel' ? <p className="note">Les propositions et leurs poids se règlent dans la zone de jeu : tout le monde voit la roue se construire.</p> : <p className="note">Rien à régler : le chat prend toute la place, la liste des joueurs est à gauche. Les scores ne bougent pas.</p>}
+  </>;
+}
+
+/** Extension: the shortcut (shown, changed: Firefox here, Chrome and Edge in their page) and « Rester ouvert sur toutes
+ *  les pages » (off by default; the permission asked when turned on). */
+function ExtensionOptions() {
+  const [keys, setKeys] = useState(''), [persist, setPersist] = useState(false), [note, setNote] = useState(''), [edit, setEdit] = useState('');
+  const refresh = () => { void X.shortcut().then(setKeys); void X.persistent().then(setPersist); };
+  useEffect(() => { refresh(); addEventListener('focus', refresh); return () => removeEventListener('focus', refresh); }, []);
+  if (!X.inExtension()) return null;
+  return <>
+    <div className="field"><span>Raccourci clavier</span>
+      <p className="note">Ouvre et ferme le panneau : <b>{keys || 'aucun'}</b>{keys ? '' : ' (le navigateur ne l\'a pas attribué : un autre l\'utilise déjà)'}.</p>
+      {X.canEditShortcut() ? <form className="row" onSubmit={async e => { e.preventDefault(); try { await X.setShortcut(edit); setNote(''); refresh(); } catch { setNote('Raccourci refusé : par exemple Alt+Shift+S.'); } }}>
+        <input value={edit} onChange={e => setEdit(e.target.value)} placeholder="Alt+Shift+S" /><button className="btn sm">Changer</button></form>
+        : <><button className="btn ghost sm" type="button" onClick={() => X.openShortcutsPage()}>Changer le raccourci</button>
+          <p className="note">Chrome et Edge le changent dans leur page des raccourcis (elle s'ouvre dans un onglet) ; reviens ici ensuite.</p></>}</div>
+    <label className="check"><input type="checkbox" checked={persist} onChange={async e => { const msg = await X.setPersistent(e.target.checked); setNote(msg); refresh(); }} />
+      <span>Rester ouvert sur toutes les pages</span></label>
+    <p className="note">Le panneau se rouvre sur chaque page, à la même place ; le fermer le ferme partout. Le navigateur demande l'accès à tous les sites à l'activation.</p>
+    {note && <p className="alert" role="alert">{note}</p>}
   </>;
 }
 

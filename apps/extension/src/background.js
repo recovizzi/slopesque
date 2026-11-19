@@ -1,7 +1,7 @@
-// The toolbar icon opens the game as a floating panel in the current tab (panel.js): rounded corners and an outer
-// shadow, which an action popup can't have. Where extensions can't run (chrome:// / edge:// pages, the stores…),
-// the classic popup instead. Same approach as gitantix (openspec/specs/extension-shell).
-chrome.action.onClicked.addListener(async tab => {
+// The toolbar icon and the shortcut (openspec: panel-persistence) open the game as a floating panel in the current tab
+// (panel.js); where extensions can't run (chrome:// pages, the stores…), the classic popup instead.
+async function toggle(tab) {
+  if (!tab?.id) return;
   try {
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['panel.js'] });
   } catch {
@@ -9,6 +9,13 @@ chrome.action.onClicked.addListener(async tab => {
     try { await chrome.action.openPopup(); }
     catch { chrome.windows.create({ url: 'app/index.html', type: 'popup', width: 800, height: 620 }); }
   }
+}
+
+chrome.action.onClicked.addListener(toggle);
+chrome.commands.onCommand.addListener(async command => {
+  if (command !== 'toggle-panel') return;
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  await toggle(tab);
 });
 
 // a page left for another one gets the panel again

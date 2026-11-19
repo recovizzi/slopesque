@@ -16,11 +16,12 @@ const connect = async () => { const s = io(URL, { auth: { code: newCode(), proto
 const cards = (s: Socket, f: (c: CardsView) => boolean) => new Promise<CardsView>(res => { const h = (e: any) => { if (e.type === 'cards' && f(e.cards)) { s.off('event', h); res(e.cards); } }; s.on('event', h); });
 
 describe.skipIf(!up)('Trou du cul', () => {
-  let host: Socket, a: Socket, me = '';
+  let host: Socket, a: Socket, me = '', keyOf = '';
   beforeAll(async () => {
     server = spawn(process.execPath, ['dist/main.js'], { env, stdio: 'inherit' });
     for (let i = 0; i < 50; i++) { try { if ((await fetch(`${URL}/api/health`)).ok) break; } catch { /* starting */ } await new Promise(r => setTimeout(r, 200)); }
     const key = execFileSync(process.execPath, ['dist/admin.js', 'rooms:create'], { env, encoding: 'utf8' }).match(/[A-Z0-9]{4}-[A-Z0-9]{4}/)![0];
+    keyOf = key;
     host = await connect(); a = await connect();
     for (const s of [host, a]) { const j = await ask<RoomState>(s, 'room:join', { key }); if (!j.ok) throw new Error(j.error); if (s === a) me = j.value.me; }
     await ask(a, 'disk:join');
@@ -41,6 +42,9 @@ describe.skipIf(!up)('Trou du cul', () => {
     expect(end.paid[mine.id]).toBe(me);
     expect(Object.values(end.tdc!.roles).sort()).toEqual(['neutre', 'president', 'tdc']);
     expect(end.seats.find(s => s.id === mine.id)?.credit).toBeNull();
+    const score = async () => ((await ask<RoomState>(a, 'room:join', { key: keyOf })) as { value: RoomState }).value.members.find(m => m.id === me)!.score;
+    const before = await score();
     expect(await ask(a, 'table:join')).toMatchObject({ ok: true, value: 'ok' });
+    expect(await score()).toBe(before);   // taking a seat after the round doesn't count its points again
   }, 30_000);
 });
