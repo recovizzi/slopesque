@@ -36,7 +36,10 @@ const manifest = {
   web_accessible_resources: [{ resources: ['app/*'], matches: ['<all_urls>'] }],   // framed by the panel
   browser_specific_settings: { gecko: { id: 'slopesque@recovizzi', strict_min_version: '142.0', data_collection_permissions: { required: ['none'] } } },
 };
-fs.writeFileSync(path.join(ext, 'manifest.json'), JSON.stringify(manifest, null, 2));
+// Chrome: the public key fixes the extension's id (the same unpacked or from the .crx; see extension-id.txt). The private
+// key never enters the repository (CHROME_CRX_KEY secret, slopesque-crx.pem kept locally). Firefox has its gecko id.
+const publicKey = fs.readFileSync(path.join(root, 'public-key.txt'), 'utf8').trim();
+fs.writeFileSync(path.join(ext, 'manifest.json'), JSON.stringify({ ...manifest, key: publicKey }, null, 2));
 for (const entry of ['background.js', 'panel.js']) buildSync({
   entryPoints: [path.join(root, 'src', entry)], outfile: path.join(ext, entry),
   bundle: true, format: 'iife', target: ['chrome120', 'firefox128'], legalComments: 'inline',

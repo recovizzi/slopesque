@@ -1,0 +1,113 @@
+# Builds the release packages for a version tag and publishes them on a GitHub release page (the jethub method), plus
+# the server's image on GHCR. Run it by hand: Actions → Release → Run workflow, and enter the tag.
+#   1. bump "version" in apps/extension/package.json (the manifest takes it from there), commit
+#   2. git tag v0.2.0 && git push origin v0.2.0
+#   3. run this workflow with tag v0.2.0
+#
+# The release page gets:
+#   slopesque-chrome-<version>.zip    unzip, then chrome://extensions → Load unpacked (any OS)
+#   slopesque-chrome-<version>.crx    drag onto chrome://extensions (Linux); needs CHROME_CRX_KEY
+#   slopesque-firefox-<version>.xpi   signed by Mozilla (unlisted channel); needs MOZILLA_API_KEY / MOZILLA_API_SECRET
+# The secrets live in the « release » environment. A missing secret skips its package, with the reason in the summary:
+# a fork without secrets still gets the zip and the server's image. AMO accepts each version number once.
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Version tag to release, e.g. v0.2.0 (must already be pushed)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-26.04
+    environment: release
+    env:
+      TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Check the tag matches the extension's version
+        run: |
+          pkg=$(node -p "require('./apps/extension/package.json').version")
+          if [ "v$pkg" != "$TAG" ]; then echo "::error::Tag $TAG and apps/extension/package.json $pkg must match"; exit 1; fi
+          echo "VERSION=$pkg" >> "$GITHUB_ENV"
+
+      - run: pnpm build
+      - run: pnpm --filter @slopesque/extension run lint
+      - run: mkdir -p release && cp apps/extension/dist/slopesque-extension.zip release/slopesque-chrome-$VERSION.zip
+
+      - name: Archive the sources for AMO
+        run: git archive --format=zip --output "$RUNNER_TEMP/source.zip" HEAD
+
+      - name: Sign the Firefox package (unlisted)
+        env:
+          WEB_EXT_API_KEY: ${{ secrets.MOZILLA_API_KEY }}
+          WEB_EXT_API_SECRET: ${{ secrets.MOZILLA_API_SECRET }}
+        run: |
+          if [ -z "$WEB_EXT_API_KEY" ] || [ -z "$WEB_EXT_API_SECRET" ]; then
+            echo "::warning::.xpi non signé : MOZILLA_API_KEY ou MOZILLA_API_SECRET absent (environnement release)"
+            echo "- ⚠️ .xpi sauté : MOZILLA_API_KEY / MOZILLA_API_SECRET absents" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          pnpm --filter @slopesque/extension exec web-ext sign --source-dir dist/extension-firefox --artifacts-dir signed \
+            --channel unlisted --upload-source-code "$RUNNER_TEMP/source.zip" --approval-timeout 1800000
+          cp apps/extension/signed/*.xpi release/slopesque-firefox-$VERSION.xpi
+
+      - name: Pack the Chrome .crx
+        env:
+          CHROME_CRX_KEY: ${{ secrets.CHROME_CRX_KEY }}
+        run: |
+          if [ -z "$CHROME_CRX_KEY" ]; then
+            echo "::warning::.crx sauté : CHROME_CRX_KEY absent (environnement release)"
+            echo "- ⚠️ .crx sauté : CHROME_CRX_KEY absent" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          umask 077
+          printf '%s\n' "$CHROME_CRX_KEY" > "$RUNNER_TEMP/crx-key.pem"
+          pnpm --filter @slopesque/extension exec crx3 -p "$RUNNER_TEMP/crx-key.pem" -o "$GITHUB_WORKSPACE/release/slopesque-chrome-$VERSION.crx" -- dist/extension
+          rm "$RUNNER_TEMP/crx-key.pem"
+
+      - name: The server's image on GHCR
+        run: |
+          echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          image=ghcr.io/${GITHUB_REPOSITORY,,}-server
+          docker build -f apps/server/Dockerfile -t "$image:$VERSION" -t "$image:latest" .
+          docker push "$image:$VERSION" && docker push "$image:latest"
+          echo "- 🐳 $image:$VERSION" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: slopesque-${{ inputs.tag }}
+          path: release/*
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notes.md <<EOF
+          ## Installer l'extension
+
+          **Chrome / Edge / Brave sous Windows ou macOS :** télécharge \`slopesque-chrome-$VERSION.zip\` et dézippe-le. Ouvre \`chrome://extensions\`, active le **Mode développeur**, clique **Charger l'extension non empaquetée** et choisis le dossier dézippé.
+
+          **Chrome / Chromium sous Linux :** télécharge \`slopesque-chrome-$VERSION.crx\` et glisse-le sur \`chrome://extensions\` (s'il est dans la release).
+
+          **Firefox (142+) :** télécharge \`slopesque-firefox-$VERSION.xpi\` et ouvre-le dans Firefox, puis **Ajouter** (s'il est dans la release).
+
+          Puis : onglet **Extension** du panneau → **Serveur** → l'adresse du serveur de ton groupe.
+          EOF
+          gh release create "$TAG" release/* --verify-tag --title "$TAG" --notes-file notes.md --generate-notes

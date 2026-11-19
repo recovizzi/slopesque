@@ -100,8 +100,8 @@ chaque jalon, les tâches sont groupées par partie du monorepo (`[racine]`, `[i
 
 ## 11. Jalon 11 : releases et déploiement
 
-- [ ] 11.1 [ci] Release sur tag (méthode `jethub`) : zip, `.crx` et `.xpi` non listé si leurs secrets existent (sinon sautés avec la raison), notes d'installation
-- [ ] 11.1b [ci] Nouvelle clé CRX (jamais celle de `jethub`), secrets `CHROME_CRX_KEY` et Mozilla (valeurs de `jethub`, `MANQUES.md`) dans l'environnement `release`
-- [ ] 11.2 [ci] Image du serveur publiée sur GHCR à chaque release
+- [x] 11.1 [ci] Release sur tag (méthode `jethub`) : zip, `.crx` et `.xpi` non listé si leurs secrets existent (sinon sautés avec la raison), notes d'installation
+- [x] 11.1b [ci] Nouvelle clé CRX (jamais celle de `jethub`), secrets `CHROME_CRX_KEY` et Mozilla (valeurs de `jethub`, `MANQUES.md`) dans l'environnement `release`
+- [x] 11.2 [ci] Image du serveur publiée sur GHCR à chaque release
 - [ ] 11.3 [infra] Certificat sans domaine (sslip.io ou IP, décision 15) — bloqué jusqu'aux ports de la machine (`MANQUES.md`)
 - [ ] 11.4 [racine] `pnpm deploy` : SSH (alias local), compte de déploiement, `docker compose pull && up -d`, contrôle de santé — bloqué jusqu'à l'accès (`MANQUES.md`)
