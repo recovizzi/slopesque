@@ -8,7 +8,7 @@ import { COMMANDS, DEFAULT_REACTIONS, emojiHtml, expandCodes, loadCodes, NAME, p
 import { GifPop, useGif } from '../lib/gif';
 import { localGif } from '../lib/gif-cache';
 import { wireQuotes } from './hover';
-import { argSuggestions, parseActivity, parseCredit } from '../lib/commands';
+import { argSuggestions, isComplete, parseActivity, parseCredit } from '../lib/commands';
 import { linkify, previewHtml, type Preview } from '../lib/links';
 import { request, ServerGifs, toggleGifFavorite, upload } from '../net';
 import { useStore } from '../store';
@@ -272,7 +272,7 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); s.move(e.key === 'ArrowDown' ? 1 : -1); return; }
       const cur = s.current();
       if (e.key === 'Enter' && cur?.cmd !== undefined && !cur.arg && draft.trim().toLowerCase() === `/${cur.code}`) { s.hide(); return; }   // a command written out: sent
-      if (e.key === 'Enter' && cur?.arg && cur.fill?.trim() === draft.trim()) { s.hide(); return; }   // its arguments written out: sent
+      if (e.key === 'Enter' && cur?.arg && (cur.fill?.trim() === draft.trim() || isComplete(draft, room.members, account.id))) { s.hide(); return; }   // its arguments written out: sent
       if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); if (cur) complete(cur); return; }
       if (e.key === 'Escape') { e.stopPropagation(); s.hide(); return; }
     }

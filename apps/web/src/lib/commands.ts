@@ -87,3 +87,13 @@ export function argSuggestions(draft: string, members: MemberView[], me: string)
   }
   return null;
 }
+
+/** A command written out with its arguments, ready to run (Enter sends it rather than taking a suggestion). */
+export function isComplete(draft: string, members: MemberView[], me: string) {
+  const m = draft.match(/^\/(\S+)\s+(.+)$/s);
+  if (!m) return false;
+  const cmd = norm(m[1]!), arg = m[2]!.trim();
+  if (cmd === 'activity' || cmd === 'activite') { const a = parseActivity(arg); return !!a && 'choice' in a; }
+  if (cmd === 'credit social' || cmd === 'credit' || cmd === 'creditsocial' || cmd === 'credit score') { const c = parseCredit(arg, members.filter(p => p.id !== me)); return !!c.to && c.delta !== null; }
+  return false;
+}

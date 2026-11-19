@@ -31,7 +31,7 @@ export const PRESENCE = {
 export const LIMITS = {
   messages: { count: 10, perMs: 10_000 },
   reactions: { count: 20, perMs: 10_000 },
-  uploads: { count: 10, perMs: MINUTE },
+  uploads: { count: 30, perMs: MINUTE },   // the 22 trumps of the Tarot imported at once
   codeAttempts: { count: 10, perMs: MINUTE },   // unknown codes, per IP
   maxUploadBytes: 200 * 1024 * 1024,   // not a limit on pictures (any size is compressed), a guard against non-images
   chatPage: 50,                    // a join (or a scroll to the top) loads 50 messages

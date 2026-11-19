@@ -232,6 +232,17 @@ await b.frame.locator('.bar .avatar').click();
 await b.frame.locator('.drawer-right .tab', { hasText: 'Partie' }).click();
 check(await b.frame.locator('.drawer-right').getByLabel('Joueurs').locator('option').count() === 2, 'cards: the Tarot offers 4 or 5 players only');
 await b.frame.locator('.drawer-right').getByLabel('Joueurs').selectOption('5');
+// the trumps dressed by the host: a picture named after its number goes on that trump, for everyone
+const art = b.page.waitForEvent('filechooser');
+await b.frame.getByRole('button', { name: 'Importer des images…' }).click();
+await (await art).setFiles([{ name: 'atout-7.png', mimeType: 'image/png', buffer: await png(b.frame, 300, 420, '#7b2cbf') }]);
+check(await until(async () => (await b.frame.locator('.trump-slot svg.has-art').count()) === 1, 10000), 'Tarot: the host dresses the 7 of trumps with a picture (by its file name)');
+await shot(b.page, '14a-trump-art');
+await a.frame.locator('.bar .avatar').click();
+await a.frame.locator('.drawer-right .tab', { hasText: 'Partie' }).click();
+check(await until(async () => (await a.frame.locator('.drawer-right .trump-view svg.has-art').count()) === 1), 'Tarot: A sees the host\'s picture on the 7 (Partie, read only)');
+await shot(a.page, '14a-partie-read-only');
+await a.frame.locator('.drawer-right [aria-label="Fermer"]').click();
 await b.frame.locator('.drawer-right [aria-label="Fermer"]').click();
 check(await until(async () => (await b.frame.locator('.cg-title').textContent()) === 'Tarot à 5'), 'cards: the game, then its number of players in Partie');
 if (await a.frame.getByRole('button', { name: 'Prendre une place' }).count()) await a.frame.getByRole('button', { name: 'Prendre une place' }).click();
@@ -282,7 +293,7 @@ check(await until(async () => (await a.frame.locator('.drawer-left .pal, .drawer
 await a.frame.locator('.drawer-left .tab', { hasText: 'Joueurs' }).click();
 await a.frame.locator('.bar .avatar').click();
 await a.frame.locator('.drawer-right .tab', { hasText: 'Partie' }).click();
-check(await until(async () => (await a.frame.locator('.drawer-right .game-info').textContent().catch(() => '')).includes('Chat')) && (await a.frame.locator('.drawer-right select').count()) === 0,
+check(await until(async () => (await a.frame.locator('.drawer-right .ro-settings .ro-value').first().textContent().catch(() => '')) === 'Chat') && (await a.frame.locator('.drawer-right select').count()) === 0,
   'Partie: read only for a player who isn\'t the host (the settings, no control)');
 await a.frame.locator('.drawer-right [aria-label="Fermer"]').click();
 // ---- jalon 9: the shortcut, shown in the Extension tab; « Rester ouvert sur toutes les pages » off by default

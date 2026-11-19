@@ -133,6 +133,7 @@ export interface CardsView {
   paid: Record<string, string | null>;   // the last round: who got each seat's points (null: a robot)
   turnSince: number;
   late: { seat: string; user: string; secs: number } | null;   // a player's turn has lasted 30 s: /kick possible
+  art: Record<string, string>;           // Tarot: the room's pictures of the trumps (« 0 » the Excuse … « 21 »), their address
 }
 export const READY_CARD_GAMES = ['tdc', 'tarot'];
 /** The ranking an activity shows (and resets): each game its own; null: an activity without points. */
@@ -246,6 +247,8 @@ export const intents = {
   'tarot:call': z.object({ card: z.string().max(4) }),
   'tarot:discard': z.object({ cards: z.array(z.string().max(4)).max(6) }),
   'tarot:tricks': z.object({ show: z.boolean() }),
+  'tarot:art': z.object({ card: z.number().int().min(0).max(21), mediaId: z.string().uuid().nullable() }),
+  'tarot:art-reset': z.object({}),
   'cards:players': z.object({ game: z.enum(['tdc', 'tarot']), players: z.number().int().min(3).max(8) }),
   'table:join': z.object({}),
   'table:leave': z.object({}),
@@ -308,6 +311,8 @@ export interface IntentResults {
   'tarot:call': null;
   'tarot:discard': null;
   'tarot:tricks': null;
+  'tarot:art': null;
+  'tarot:art-reset': null;
   'cards:players': null;
   'table:join': 'ok' | 'full';
   'table:leave': null;

@@ -78,7 +78,7 @@ chaque jalon, les tâches sont groupées par partie du monorepo (`[racine]`, `[i
 
 - [x] 8.1 [engines] Tarot à 4 (enchères, écart, plis, décompte), vue par joueur, tests
 - [x] 8.2 [engines] Tarot à 5 (Roi appelé, robots honnêtes), tests de non-fuite
-- [ ] 8.3 [server] Tarot à 4 et 5, réglage des plis visibles, images des atouts du salon — fait sauf les images des atouts (les atouts gardent leurs dessins par défaut)
+- [x] 8.3 [server] Tarot à 4 et 5, réglage des plis visibles, images des atouts du salon
 - [x] 8.4 [web] Tarot (enchères, appel, écart, plis, atouts habillés)
 - [x] 8.5 [e2e] Une donne à 5 ; l'écart et les mains cachés
 
@@ -113,8 +113,9 @@ chaque jalon, les tâches sont groupées par partie du monorepo (`[racine]`, `[i
 - [x] 10b.11 [web+server] Roulette : numéro du tirage (pas de « Participer » : seul l'hôte agit sur la roue tant qu'il n'y a pas de réactions en direct)
 - [x] 10b.12 [web+server] Partie : titre et aide de l'activité, description du jeu de cartes, note sur le tour en cours ; un classement par jeu, « Réinitialiser la partie » dans chaque activité à classement (ce jeu seulement, palmarès gardé) ; résumé en lecture seule pour qui n'est pas l'hôte
 - [x] 10b.13 [web] Palmarès : ouvert sur le jeu de cartes choisi, rafraîchi après une donne de Tarot
-- [ ] 10b.14 [web] Tarot : images des atouts du salon (= 8.3)
+- [x] 10b.14 [web+server] Tarot : images des atouts du salon, comme la maquette (22 cases, import de plusieurs d'après leur nom, retrait, habillage par défaut ; table, annonce du Roi, règles, Partie en lecture seule)
 - [x] 10b.16 [web+server] Palmarès aussi en activité Chat ; pubs KLIPY cachées quand elles sont marquées, pages complétées
+- [x] 10b.17 [web+server] Partie en lecture seule : une ligne par réglage (le réglage et ce qu'il fait, le choix de l'hôte) ; le format choisi avec /activity (Amphithéâtre) appliqué au mode de scrutin ; Entrée envoie une commande déjà complète
 - [x] 10b.15 [web+server] Retours du 2026-11-19 : pseudo affiché dès l'ouverture du Profil ; la table montrée à tous quand on prend ou quitte une place avant la donne ; `/activity cartes tarot`, `/credit-social Léa +100` et leur complétion ; chat ouvert en bas, bouton pour y revenir, chargement par morceaux gardé sur l'appareil (seuls les nouveaux messages demandés)
 
 ## 11. Jalon 11 : releases et déploiement

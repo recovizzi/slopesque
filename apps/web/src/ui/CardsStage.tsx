@@ -42,7 +42,7 @@ export function CardsStage() {
   const free = c.seats.filter(s => !s.user), mine = free.find(s => s.credit === me);
   const late = c.late ? { seat: c.late.seat, secs: c.late.secs, vote: room.chat.messages.some(m => m.kind === 'vote' && !(m.data?.vote as { result?: string } | undefined)?.result) } : null;
   const html = tarot ? TV.tarotTableHtml({ t: tarot as unknown as TA.Tarot, me: mySeat, playing: !!mySeat, host: room.hostId === me, selected: sel,
-      fan: fan((tarot.hands[mySeat]?.length ?? 0), box.current), who, art: {}, showLast, wonView, showTricks: c.showTricks })
+      fan: fan((tarot.hands[mySeat]?.length ?? 0), box.current), who, art: c.art ?? {}, showLast, wonView, showTricks: c.showTricks })
     : t ? K.tableHtml({ t: t as unknown as K.TableCtx['t'], me: mySeat, playing: !!mySeat, host: room.hostId === me, selected: sel, fan: fan(t.hands[mySeat]?.length ?? 0, box.current),
     who, elapsed: '', late: late && late.seat !== mySeat ? late : null,
     seats: { free: free.length, total: c.seats.length, mine: !!mine, takes: free[0] ? who(free[0].id).name : '', full,
@@ -84,7 +84,7 @@ export function CardsStage() {
         if (step.take) { setAnnounce(TV.takeAnnounce(name(step.take.seat), step.take.bid as Exclude<TA.Bid, 'pass'>)); await A.wait(2000); setAnnounce(''); }
         if (step.call) {
           const mine = step.call.taker !== seat && !!next.tarot?.hands[seat]?.some(x => x.id === step.call!.card.id);
-          setAnnounce(TV.callAnnounce(name(step.call.taker), step.call.card as TA.TCard, {}, mine)); await A.wait(2800); setAnnounce('');
+          setAnnounce(TV.callAnnounce(name(step.call.taker), step.call.card as TA.TCard, next.art ?? {}, mine)); await A.wait(2800); setAnnounce('');
         }
       }
     } finally { busy.current = false; }
@@ -144,6 +144,6 @@ export function CardsStage() {
     <LiveHtml className="cards-holder" html={html} onAction={(a, el) => void onAction(a, el)} />
     {note && <p className="alert cards-note" role="alert">{note}</p>}
     {announce && <div className="announce-layer"><LiveHtml className="announce" html={announce} /></div>}
-    {rules && <LiveHtml html={c.game === 'tarot' ? TV.tarotRulesHtml({}) : K.rulesHtml()} onAction={(a, el) => void onAction(a, el)} />}
+    {rules && <LiveHtml html={c.game === 'tarot' ? TV.tarotRulesHtml(c.art ?? {}) : K.rulesHtml()} onAction={(a, el) => void onAction(a, el)} />}
   </div>;
 }

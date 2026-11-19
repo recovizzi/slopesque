@@ -47,4 +47,13 @@ describe.skipIf(!up)('Demi-disque', () => {
     expect(d.results[ids[2]!]!.points).toBe(0);
     expect(d.rules.roundSeconds).toBe(60);
   });
+
+  it('the format chosen with the activity sets the voting mode (Amphithéâtre), and back', async () => {
+    const amphi = disk(a, d => d.rules.mode === 'amphi');
+    expect((await ask(host, 'activity:choose', { choice: { activity: 'disk', mode: 'amphi' } })).ok).toBe(true);
+    expect((await amphi).rules.mode).toBe('amphi');
+    const ray = disk(a, d => d.rules.mode === 'ray');
+    expect((await ask(host, 'activity:choose', { choice: { activity: 'disk', mode: 'ray' } })).ok).toBe(true);
+    expect((await ray).rules.mode).toBe('ray');
+  });
 });

@@ -235,6 +235,12 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
   tarotCall(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('tarot:call', b, async v => { await this.hub.tarotDo(s, { call: v.card }); return null; }); }
   @SubscribeMessage('tarot:discard')
   tarotDiscard(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('tarot:discard', b, async v => { await this.hub.tarotDo(s, { discard: v.cards }); return null; }); }
+  @SubscribeMessage('tarot:art')
+  tarotArt(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('tarot:art', b, async v => { await this.hub.tarotArt(s, v.card, v.mediaId); return null; }); }
+
+  @SubscribeMessage('tarot:art-reset')
+  tarotArtReset(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('tarot:art-reset', b, async () => { await this.hub.tarotArtReset(s); return null; }); }
+
   @SubscribeMessage('tarot:tricks')
   tarotTricks(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('tarot:tricks', b, async v => { await this.hub.tarotTricks(s, v.show); return null; }); }
   @SubscribeMessage('cards:players')

@@ -10,7 +10,7 @@ import { Poll, Table, Tarot, Tdc, Wheel, KICK_AFTER_MS } from '@slopesque/engine
 import { CARD_PLAYERS, PRESENCE, SCORE_NAMES, scoreKey, READY_ACTIVITIES, READY_CARD_GAMES, type CardsView, type PollAnswer, type PollView, type WheelView, type PollPicView, type ActivityChoice, type EmojiView, type GifRef, type MemberView, type RoomEvent, type RoomState, type StickerView } from '@slopesque/shared';
 import { DB, SQL, type Db } from '../db/db.module.js';
 import { ENV, type Env } from '../config/config.module.js';
-import { accounts, customEmoji, media, messages, palmares, roomMembers, rooms, stickers } from '../db/schema.js';
+import { accounts, customEmoji, media, messages, palmares, roomMembers, rooms, stickers, trumpArt } from '../db/schema.js';
 import { sql } from 'drizzle-orm';
 import { MediaService, type MediaRow } from '../media/media.service.js';
 import { PreviewService } from '../external/preview.service.js';
@@ -22,7 +22,7 @@ import type { Account } from '../accounts/accounts.service.js';
 interface MemberRt { sockets: Set<string>; awaySince: number | null; grace: NodeJS.Timeout | null }
 interface PollRt { phase: PollView['phase']; round: number; seconds: number; secret: boolean; poll: PollView['poll']; answers: Record<string, PollAnswer>; host: string | null; deadline: number | null; timer: NodeJS.Timeout | null }
 interface WheelRt { phase: WheelView['phase']; items: WheelView['items']; spin: WheelView['spin']; needle: number; round: number; timer: NodeJS.Timeout | null }
-interface CardsRt { game: 'tdc' | 'tarot'; players: number; settings: { tdc: number; tarot: number }; showTricks: boolean; tarot: Tarot.Tarot | null; settled: boolean; seats: Table.CardSeat[]; tdc: Tdc.Tdc | null; paid: Record<string, string | null>; turnSince: number; robot: NodeJS.Timeout | null; late: NodeJS.Timeout | null }
+interface CardsRt { game: 'tdc' | 'tarot'; players: number; settings: { tdc: number; tarot: number }; showTricks: boolean; tarot: Tarot.Tarot | null; settled: boolean; seats: Table.CardSeat[]; tdc: Tdc.Tdc | null; paid: Record<string, string | null>; turnSince: number; robot: NodeJS.Timeout | null; late: NodeJS.Timeout | null; art: Record<string, string> }
 interface RoomRt { cards: CardsRt; room: Room; seq: number; members: Map<string, MemberRt>; vote: { id: number; v: Vote; timer: NodeJS.Timeout } | null; disk: D.DiskState; diskTimer: NodeJS.Timeout | null; poll: PollRt; wheel: WheelRt }
 export interface SocketData { account: Account; ip: string; roomId: string | null }
 
@@ -47,9 +47,10 @@ export class RoomHub implements OnModuleInit {
     const disk = { ...D.newDisk({ ...D.DEFAULT_RULES, ...saved.rules }), round: saved.round ?? 1, phase: (saved.round ?? 1) > 1 ? 'writing' as const : 'lobby' as const };
     const ps = (room.rules.poll ?? {}) as { seconds?: number; secret?: boolean; round?: number };
     const ws = (room.rules.wheel ?? {}) as { items?: WheelView['items']; needle?: number; round?: number };
-    const rt: RoomRt = { cards: { game: 'tdc', players: 4, settings: { tdc: 4, tarot: 4, ...((room.rules.cards as object | undefined) ?? {}) }, showTricks: true, tarot: null, settled: false, seats: [], tdc: null, paid: {}, turnSince: 0, robot: null, late: null }, room, seq: 0, members: new Map(), vote: null, disk, diskTimer: null,
+    const rt: RoomRt = { cards: { game: 'tdc', players: 4, settings: { tdc: 4, tarot: 4, ...((room.rules.cards as object | undefined) ?? {}) }, showTricks: true, tarot: null, settled: false, seats: [], tdc: null, paid: {}, turnSince: 0, robot: null, late: null, art: {} }, room, seq: 0, members: new Map(), vote: null, disk, diskTimer: null,
       poll: { phase: 'writing', round: ps.round ?? 1, seconds: ps.seconds ?? 300, secret: ps.secret ?? false, poll: null, answers: {}, host: null, deadline: null, timer: null },
       wheel: { phase: 'writing', items: ws.items ?? [{ label: '', weight: '' }, { label: '', weight: '' }], spin: null, needle: ws.needle ?? 0, round: ws.round ?? 1, timer: null } };
+    for (const a of await this.db.select().from(trumpArt).where(eq(trumpArt.roomId, room.id))) rt.cards.art[a.card] = a.mediaId;   // the trumps' pictures
     if (saved.guessing) { await this.saveDisk(rt); await this.chat.send(room.id, null, 'Le serveur a redémarré : tour annulé.', null, 'system'); }
     return rt;
   }
@@ -254,6 +255,11 @@ export class RoomHub implements OnModuleInit {
   private async setActivity(rt: RoomRt, choice: ActivityChoice) {
     if (choice.cardGame === 'tarot' && choice.tarotPlayers) rt.cards.settings = { ...rt.cards.settings, tarot: choice.tarotPlayers };
     if (choice.activity === 'cards') this.prepareTable(rt, choice.cardGame === 'tarot' ? 'tarot' : 'tdc');
+    if (choice.activity === 'disk' && choice.mode && choice.mode !== { ...rt.disk.rules, ...rt.disk.pending }.mode) {   // the format chosen: its voting mode
+      rt.disk = D.setRules(rt.disk, { mode: choice.mode }).state;
+      await this.saveDisk(rt);
+      await this.emitDisk(rt);
+    }
     const rules = { ...rt.room.rules, activity: choice };
     await this.db.update(rooms).set({ rules }).where(eq(rooms.id, rt.room.id));
     rt.room = { ...rt.room, rules };
@@ -652,7 +658,8 @@ export class RoomHub implements OnModuleInit {
   private cardsView(rt: RoomRt, me: string): CardsView {
     const c = rt.cards, mine = Table.seatOfUser(c.seats, me)?.id ?? null;
     return { game: c.game, players: c.players, settings: c.settings, showTricks: c.showTricks, seats: c.seats, tdc: c.tdc ? Tdc.tdcView(c.tdc, mine) : null,
-      tarot: c.tarot ? Tarot.tarotView(c.tarot, mine) : null, paid: c.paid, turnSince: c.turnSince, late: this.lateSeat(rt) };
+      tarot: c.tarot ? Tarot.tarotView(c.tarot, mine) : null, paid: c.paid, turnSince: c.turnSince, late: this.lateSeat(rt),
+      art: Object.fromEntries(Object.entries(c.art).map(([n, id]) => [n, this.media.url(id)])) };
   }
   private async emitCards(rt: RoomRt) {
     rt.seq++;
@@ -884,6 +891,34 @@ export class RoomHub implements OnModuleInit {
     await this.saveRules(rt, 'cards', rt.cards.settings);
     if (!this.inRound(rt)) this.prepareTable(rt, game);
     await this.say(rt, null, `${game === 'tarot' ? 'Tarot' : 'Trou du cul'} à ${players} joueurs${this.inRound(rt) ? ', à partir de la donne suivante' : ''} : des robots complètent les places libres.`);
+    await this.emitCards(rt);
+  }
+
+  /** The host dresses a trump with a picture (its « trump » format), or gives it back its default look (null). */
+  async tarotArt(socket: Socket, card: number, mediaId: string | null) {
+    const rt = this.roomOf(socket);
+    this.hostOnly(rt, socket);
+    const key = String(card), old = rt.cards.art[key];
+    if (mediaId) {
+      const m = await this.picture(mediaId, 'trump');
+      await this.db.insert(trumpArt).values({ roomId: rt.room.id, card: key, mediaId: m.id }).onConflictDoUpdate({ target: [trumpArt.roomId, trumpArt.card], set: { mediaId: m.id } });
+      rt.cards.art[key] = m.id;
+    } else {
+      await this.db.delete(trumpArt).where(and(eq(trumpArt.roomId, rt.room.id), eq(trumpArt.card, key)));
+      delete rt.cards.art[key];
+    }
+    if (old && old !== mediaId) void this.media.sweep([old]);   // no longer used: deleted (unless used elsewhere)
+    await this.emitCards(rt);
+  }
+
+  async tarotArtReset(socket: Socket) {
+    const rt = this.roomOf(socket);
+    this.hostOnly(rt, socket);
+    const old = Object.values(rt.cards.art);
+    await this.db.delete(trumpArt).where(eq(trumpArt.roomId, rt.room.id));
+    rt.cards.art = {};
+    if (old.length) void this.media.sweep(old);
+    await this.say(rt, null, 'Les atouts reprennent leur habillage par défaut.');
     await this.emitCards(rt);
   }
 

@@ -15,6 +15,7 @@ import { ServerField } from './ui/ServerField';
 import { DiskSettings, DiskStage, Ranking } from './ui/DiskStage';
 import { PollSettings, PollStage, WheelStage } from './ui/PollWheel';
 import { CardsStage } from './ui/CardsStage';
+import { TrumpArt } from './ui/TrumpArt';
 import { Palmares } from './ui/Palmares';
 import { WebSettings, WebStage } from './ui/WebStage';
 import { CARD_PLAYERS, READY_ACTIVITIES, SCORE_NAMES, scoreKey } from '@slopesque/shared';
@@ -254,21 +255,37 @@ function GameTab() {
 
 const ACT_NAMES: Record<string, string> = { chat: 'Chat', disk: 'Demi-disque', poll: 'Sondage', wheel: 'Roulette', cards: 'Cartes', lowtide: 'Low Tide' };
 const fmtDur = (s: number) => (s < 3600 ? `${s / 60} min` : `${s / 3600} h`);
-/** Partie, for the players who aren't the host: the game's settings, read only. */
+/** Partie, for the players who aren't the host: each setting on its line — what it is (and does) on the left, the
+ *  host's choice on the right — read only. */
 function GameInfo() {
   const room = useStore(s => s.room)!, act = room.activity.activity, host = room.members.find(m => m.id === room.hostId);
   const d = { ...room.disk.rules, ...room.disk.pending }, game = room.activity.cardGame === 'tarot' ? 'tarot' : 'tdc';
-  const rows: [string, React.ReactNode][] = act === 'disk' ? [['Sujet', d.topic], ['Extrémités', `${d.left} ↔ ${d.right}`], ['Mode', d.mode === 'amphi' ? 'Amphithéâtre' : 'Rayon libre'], ['Temps de réponse', `${d.roundSeconds} s`]]
-    : act === 'poll' ? [['Temps de réponse', fmtDur(room.poll.seconds)], ['Résultats', room.poll.secret ? 'secrets : personne ne voit qui a répondu quoi' : 'nominatifs : survoler un résultat montre qui l\'a donné']]
-    : act === 'wheel' ? [['Propositions', String(room.wheel.items.filter(i => i.label.trim()).length)], ['Tirage', String(room.wheel.round)]]
-    : act === 'cards' ? [['Jeu', game === 'tarot' ? 'Tarot' : 'Trou du cul'], ['Joueurs', `${room.cards.settings[game]}${game === 'tarot' && room.cards.settings.tarot === 5 ? ' (le preneur appelle un Roi)' : ''}`],
-      ...(game === 'tarot' ? [['Revoir les plis gagnés', room.cards.showTricks ? 'oui (au survol)' : 'non'] as [string, string]] : [])]
-    : act === 'lowtide' ? [['Adresse', Object.values(room.web)[0] ?? '—']] : [];
+  type Row = [label: string, help: string, value: React.ReactNode];
+  const rows: Row[] = act === 'disk' ? [
+      ['Sujet', 'La question posée à chaque tour', d.topic],
+      ['Extrémités', 'Les deux bouts du demi-disque', <>{d.left} <span className="ro-arrow">↔</span> {d.right}</>],
+      ['Mode de scrutin', d.mode === 'amphi' ? 'Une colonne pour l\'hôte, un siège par candidat' : 'Chacun place son rayon où il veut', d.mode === 'amphi' ? 'Amphithéâtre' : 'Rayon libre'],
+      ['Temps de réponse', 'Pour placer sa réponse', `${d.roundSeconds} s`]]
+    : act === 'poll' ? [
+      ['Temps de réponse', 'Le sondage se ferme à la fin du temps, ou quand tous ont répondu', fmtDur(room.poll.seconds)],
+      ['Résultats', room.poll.secret ? 'Personne ne voit qui a répondu quoi' : 'Survoler un résultat montre qui l\'a donné', room.poll.secret ? 'Secrets' : 'Nominatifs']]
+    : act === 'wheel' ? [
+      ['Propositions', 'Écrites par l\'hôte dans la zone de jeu', String(room.wheel.items.filter(i => i.label.trim()).length)],
+      ['Tirage', 'Le numéro du tirage en cours', `n° ${room.wheel.round}`]]
+    : act === 'cards' ? [
+      ['Jeu', GAME_HELP[game], game === 'tarot' ? 'Tarot' : 'Trou du cul'],
+      ['Joueurs', 'Des robots complètent les places libres', `${room.cards.settings[game]}${game === 'tarot' && room.cards.settings.tarot === 5 ? ' · Roi appelé' : ''}`],
+      ...(game === 'tarot' ? [['Revoir les plis gagnés', 'Au survol d\'un joueur ou de sa pile', room.cards.showTricks ? 'Oui' : 'Non'] as Row] : [])]
+    : act === 'lowtide' ? [['Adresse', 'La page du jeu, vérifiée par l\'hôte', <span className="ro-url">{Object.values(room.web)[0] ?? '—'}</span>]] : [];
   return <>
-    <p className="note">Seul l'hôte ({host?.name ?? '—'}) peut modifier la partie ; les autres proposent une activité au vote avec /activity.</p>
-    <dl className="game-info"><dt>Activité</dt><dd>{ACT_NAMES[act]}</dd>{rows.flatMap(([k, v]) => [<dt key={`${k}-t`}>{k}</dt>, <dd key={`${k}-d`}>{v}</dd>])}</dl>
-    <p className="note">{ACT_HELP[act]}</p>
-    {act === 'cards' && <p className="note">{GAME_HELP[game]}</p>}
+    <div className="ro-head"><span className="ro-who">Réglé par l'hôte</span>{host && <span className="ro-host"><Avatar name={host.name} hue={host.hue} photo={host.photo} size="sm" />{host.name}</span>}</div>
+    <ul className="ro-settings">
+      {([['Activité', ACT_HELP[act], ACT_NAMES[act]], ...rows] as Row[]).map(([label, help, value]) => <li key={label} className={typeof value !== 'string' || value.length > 16 ? 'is-long' : ''}>
+        <span className="ro-label">{label}</span><span className="ro-value">{value}</span>
+        <small className="ro-help">{help}</small></li>)}
+    </ul>
+    {act === 'cards' && game === 'tarot' && <TrumpArt edit={false} />}
+    <p className="note">Seul l'hôte modifie la partie ; propose une autre activité au vote avec /activity.</p>
   </>;
 }
 
@@ -308,7 +325,8 @@ function CardsSettings() {
       {CARD_PLAYERS[game].map(n => <option key={n} value={n}>{n} joueurs{game === 'tarot' && n === 5 ? ' (le preneur appelle un Roi)' : ''}</option>)}</select></label>
     <p className="note">À partir de la donne suivante. Prends une place à la table avant la donne ; des robots complètent les places libres. Les règles se lisent avec le bouton « i » de la table.</p>
     {game === 'tarot' && <><label className="check"><input type="checkbox" checked={room.cards.showTricks} disabled={!host} onChange={e => void request('tarot:tricks', { show: e.target.checked })} /><span>Revoir les plis gagnés (au survol)</span></label>
-      <p className="note">Décoché, la partie est plus dure : personne ne peut revoir les plis déjà joués.</p></>}
+      <p className="note">Décoché, la partie est plus dure : personne ne peut revoir les plis déjà joués.</p>
+      <TrumpArt edit={host} /></>}
   </>;
 }
 
