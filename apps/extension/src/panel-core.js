@@ -5,7 +5,8 @@
 export function panel() {
   if (globalThis.__slpPanel) return globalThis.__slpPanel;
   let host = null;
-  const api = globalThis.__slpPanel = { isOpen: () => !!host?.isConnected, open, close, toggle: () => (api.isOpen() ? close() : open()) };
+  // open as soon as asked (the card is added to the page a moment later, once its size is read): isOpen() must say so at once
+  const api = globalThis.__slpPanel = { isOpen: () => host !== null, open, close, toggle: () => (api.isOpen() ? close() : open()) };
   // the app asks to close (✕, Échap): closed here, and on every page when the panel follows the pages
   addEventListener('message', e => { if (host && e.source === host.__frame?.contentWindow && e.data?.scd === 'close') { close(); chrome.storage.local.set({ 'slp-open': false }); } });
   return api;

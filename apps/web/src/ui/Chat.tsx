@@ -31,7 +31,6 @@ interface Picked { file: File; url: string; w: number; h: number; error: string 
 async function pick(file: File): Promise<Picked> {
   const url = URL.createObjectURL(file);
   if (!file.type.startsWith('image/')) return { file, url, w: 0, h: 0, error: 'Ce fichier n\'est pas une image : seules les images peuvent être envoyées (en sticker, en image ou en emoji).' };
-  if (file.size > 15 * 1024 * 1024) return { file, url, w: 0, h: 0, error: `Image trop lourde (${fmtSize(file.size)}, 15 Mo au plus).` };
   const img = new Image();
   img.src = url;
   try { await img.decode(); } catch { return { file, url, w: 0, h: 0, error: 'Cette image ne peut pas être lue.' }; }
@@ -317,7 +316,7 @@ function UploadPanel({ p, naming, nameError, onCancel, onUse, onNaming, onEmoji 
       <div className="row"><button className="btn ghost sm" type="button" onClick={() => onNaming(null)}>Retour</button><button className="btn sm">Ajouter aux emoji</button></div></form>
       : <div className="upload-choice">
         <button className="choice" type="button" onClick={() => onUse('sticker')}><b>Sticker</b><small>petit format, gardé dans les stickers du salon</small></button>
-        <button className="choice" type="button" onClick={() => onUse('image')}><b>Image</b><small>grand format, envoyée maintenant (gardée une semaine)</small></button>
+        <button className="choice" type="button" onClick={() => onUse('image')}><b>Image</b><small>grand format, envoyée maintenant (gardée une semaine) ; le serveur la compresse</small></button>
         <button className="choice" type="button" onClick={onEmoji}><b>Emoji</b><small>ajouté aux emoji du salon, pour tous</small></button></div>}</div>;
 }
 

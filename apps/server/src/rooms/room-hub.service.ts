@@ -253,10 +253,23 @@ export class RoomHub implements OnModuleInit {
 
   private async setActivity(rt: RoomRt, choice: ActivityChoice) {
     if (choice.cardGame === 'tarot' && choice.tarotPlayers) rt.cards.settings = { ...rt.cards.settings, tarot: choice.tarotPlayers };
+    if (choice.activity === 'cards') this.prepareTable(rt, choice.cardGame === 'tarot' ? 'tarot' : 'tdc');
     const rules = { ...rt.room.rules, activity: choice };
     await this.db.update(rooms).set({ rules }).where(eq(rooms.id, rt.room.id));
     rt.room = { ...rt.room, rules };
     this.emit(rt, { type: 'activity', activity: choice });
+    if (choice.activity === 'cards') await this.emitCards(rt);
+  }
+
+  /** The table of a card game, before its first deal (or another number of seats): the players already seated keep
+   *  their seat, robots on the others; players take a seat before the host deals (the robots wait for the deal). */
+  private prepareTable(rt: RoomRt, game: 'tdc' | 'tarot') {
+    const c = rt.cards, n = c.settings[game];
+    if (this.inRound(rt) && c.game === game) return;
+    if (c.game === game && c.seats.length === n) return;
+    const seated = c.seats.map(s => s.user).filter((u): u is string => !!u).slice(0, n);
+    c.seats = Table.seatTable(seated, n).slice(0, n);
+    c.game = game; c.players = n; c.tdc = null; c.tarot = null; c.paid = {};
   }
 
   private async setHost(rt: RoomRt, to: string) {
@@ -649,15 +662,10 @@ export class RoomHub implements OnModuleInit {
     this.hostOnly(rt, socket);
     const choice = this.activity(rt);
     if (choice.cardGame === 'tarot') return this.tarotDeal(rt, rt.cards.settings.tarot as 4 | 5);
-    if (rt.cards.game !== 'tdc') { rt.cards = { ...rt.cards, game: 'tdc', seats: [], tdc: null, tarot: null }; }
     const c = rt.cards;
-    if (c.tdc && c.tdc.turn !== null) throw new UserError('Une manche est en cours.');
-    const n = c.settings.tdc, fresh = c.seats.length !== n;   // a new table: the first deal, or another number of seats
-    if (fresh) {
-      const seated = c.seats.map(s => s.user).filter((u): u is string => !!u);
-      const playing = [...seated, ...[...(await this.playingIds(rt))].filter(id => rt.members.has(id) && !seated.includes(id))];
-      c.seats = Table.seatTable(playing.slice(0, n), n).slice(0, n);
-    }
+    if (c.game === 'tdc' && c.tdc && c.tdc.turn !== null) throw new UserError('Une manche est en cours.');
+    const n = c.settings.tdc, fresh = c.game !== 'tdc' || c.seats.length !== n || !c.tdc;   // a new table, or another number of seats
+    this.prepareTable(rt, 'tdc');
     c.players = n;
     c.seats = c.seats.map(s => ({ ...s, credit: s.user }));
     c.paid = {};
@@ -731,6 +739,7 @@ export class RoomHub implements OnModuleInit {
     if (r === 'seated') return 'ok';
     if (r === 'full') return 'full';
     rt.cards.seats = r.seats;
+    await this.setPlaying(rt, me.id, true);   // seated: a player, not a spectator
     const inRound = this.inRound(rt);
     await this.say(rt, null, r.was.owner === me.id ? `${me.name} reprend sa place.` : `${me.name} prend la place de ${r.was.name}${inRound ? ' et joue sa main en cours : les points de la manche seront les siens' : ''}.`);
     await this.afterMove(rt, this.turnOf(rt));
@@ -743,9 +752,15 @@ export class RoomHub implements OnModuleInit {
     if (!Table.seatOfUser(rt.cards.seats, user)) return;
     const inRound = this.inRound(rt);
     rt.cards.seats = Table.leave(rt.cards.seats, user, inRound);
+    await this.setPlaying(rt, user, false);
     const [m] = await this.members(rt, user);
     await this.say(rt, null, inRound ? `${m?.name ?? '?'} quitte la table : un robot finit la manche à sa place (les points de la manche restent les siens).` : `${m?.name ?? '?'} quitte la table : un robot prend sa place.`);
     await this.afterMove(rt, this.turnOf(rt));
+  }
+
+  private async setPlaying(rt: RoomRt, user: string, playing: boolean) {
+    await this.db.update(roomMembers).set({ playing }).where(and(eq(roomMembers.roomId, rt.room.id), eq(roomMembers.accountId, user)));
+    await this.emitMember(rt, user);
   }
 
   /** /kick (or the button on his seat): a vote to make the late player leave the table. */
@@ -768,12 +783,7 @@ export class RoomHub implements OnModuleInit {
   private async tarotDeal(rt: RoomRt, n: 4 | 5) {
     const c = rt.cards;
     if (c.game === 'tarot' && c.tarot && c.tarot.phase !== 'done') throw new UserError('Une donne est en cours.');
-    if (c.game !== 'tarot' || c.players !== n || c.seats.length !== n) {
-      const seated = c.seats.map(s => s.user).filter((u): u is string => !!u);
-      const playing = [...seated, ...[...(await this.playingIds(rt))].filter(id => rt.members.has(id) && !seated.includes(id))];
-      c.seats = Table.seatTable(playing.slice(0, n), n).slice(0, n);
-      c.tarot = null;
-    }
+    if (c.game !== 'tarot' || c.players !== n || c.seats.length !== n) { c.settings = { ...c.settings, tarot: n }; this.prepareTable(rt, 'tarot'); }
     c.game = 'tarot'; c.players = n; c.tdc = null;
     c.seats = c.seats.map(s => ({ ...s, credit: s.user }));
     c.paid = {}; c.settled = false;
@@ -855,6 +865,7 @@ export class RoomHub implements OnModuleInit {
     if (!(CARD_PLAYERS[game] as readonly number[]).includes(players)) throw new UserError(game === 'tarot' ? 'Le Tarot se joue à 4 ou à 5.' : 'Le Trou du cul se joue de 3 à 8.');
     rt.cards.settings = { ...rt.cards.settings, [game]: players };
     await this.saveRules(rt, 'cards', rt.cards.settings);
+    if (!this.inRound(rt)) this.prepareTable(rt, game);
     await this.say(rt, null, `${game === 'tarot' ? 'Tarot' : 'Trou du cul'} à ${players} joueurs${this.inRound(rt) ? ', à partir de la donne suivante' : ''} : des robots complètent les places libres.`);
     await this.emitCards(rt);
   }

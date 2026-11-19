@@ -201,6 +201,8 @@ await b.frame.locator('.drawer-right .tab', { hasText: 'Partie' }).click();
 check(await b.frame.locator('.drawer-right').getByLabel('Joueurs').locator('option').count() === 6, 'cards: the Trou du cul offers 3 to 8 players');
 await b.frame.locator('.drawer-right').getByLabel('Joueurs').selectOption('3');
 await b.frame.locator('.drawer-right [aria-label="Fermer"]').click();
+await a.frame.getByRole('button', { name: 'Prendre une place' }).click();   // seated before the deal: the robots wait
+check(await until(async () => (await a.frame.locator('.person, .rank-row', { hasText: 'spectateur' }).count()) === 0), 'cards: seated, A is a player (not a spectator)');
 await b.frame.getByRole('button', { name: 'Distribuer' }).click();
 check(await until(async () => (await a.frame.locator('.cg-hand .in-hand').count()) >= 17, 8000), 'cards: A sees his hand in a fan');
 check(await a.frame.locator('.cg-seat').count() === 2 && (await a.frame.locator('.cg-seat .seat-bot').count()) === 2, 'cards: two robots on the free seats');
@@ -221,6 +223,7 @@ check(await b.frame.locator('.drawer-right').getByLabel('Joueurs').locator('opti
 await b.frame.locator('.drawer-right').getByLabel('Joueurs').selectOption('5');
 await b.frame.locator('.drawer-right [aria-label="Fermer"]').click();
 check(await until(async () => (await b.frame.locator('.cg-title').textContent()) === 'Tarot à 5'), 'cards: the game, then its number of players in Partie');
+if (await a.frame.getByRole('button', { name: 'Prendre une place' }).count()) await a.frame.getByRole('button', { name: 'Prendre une place' }).click();
 await b.frame.getByRole('button', { name: 'Distribuer' }).click();
 check(await until(async () => (await a.frame.locator('.cg-hand .in-hand').count()) === 15, 8000), 'Tarot à 5: A sees his 15 cards');
 await shot(a.page, '14b-tarot');
@@ -291,8 +294,17 @@ check(await until(async () => (await a.frame.getByText('Salon inconnu').count())
   const other = await C.ctx.newPage();
   await other.goto('https://example.org/troisieme');
   check(await until(async () => await other.evaluate(() => !!document.querySelector('slp-panel')), 8000), 'persistent panel: also in a new tab');
-  await C.sw.evaluate(() => chrome.storage.local.set({ 'slp-open': false }));   // as the ✕ of the panel does
-  check(await until(async () => !(await page.evaluate(() => !!document.querySelector('slp-panel'))) && !(await other.evaluate(() => !!document.querySelector('slp-panel'))), 5000), 'persistent panel: closed everywhere at once');
+  const icon = async tabPage => C.sw.evaluate(async url => { const [t] = await chrome.tabs.query({ url }); await chrome.scripting.executeScript({ target: { tabId: t.id }, files: ['panel.js'] }); }, tabPage.url());
+  const shown = p => p.evaluate(() => !!document.querySelector('slp-panel'));
+  await icon(other);   // the icon (or the shortcut) closes it: closed everywhere, and it stays closed on the next page
+  check(await until(async () => !(await shown(page)) && !(await shown(other)), 5000), 'persistent panel: closed by the icon, closed everywhere at once');
+  await page.goto('https://example.org/quatrieme');
+  await page.waitForTimeout(1500);
+  check(!(await shown(page)), 'persistent panel: closed, it stays closed on the next page');
+  await icon(page);    // opened again by the icon: it follows the pages again
+  check(await until(async () => await shown(other), 5000), 'persistent panel: opened by the icon, open in the other tab too');
+  await page.goto('https://example.org/cinquieme');
+  check(await until(async () => await shown(page), 8000), 'persistent panel: opened by the icon, back on the next page');
   await C.close();
 }
 

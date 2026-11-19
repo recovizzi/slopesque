@@ -1,7 +1,7 @@
 // The connection to the server (openspec: realtime-sync): Socket.IO with my code in `auth`, reconnection from 0.5 s to
 // 10 s, the room joined again after each reconnection (full state), events applied in order.
 import { io, type Socket } from 'socket.io-client';
-import { LIMITS, PROTOCOL_VERSION, type Ack, type UploadResult, type FatalReason, type Hello, type IntentName, type IntentResults, type RoomState, type SequencedEvent } from '@slopesque/shared';
+import { PROTOCOL_VERSION, type Ack, type UploadResult, type FatalReason, type Hello, type IntentName, type IntentResults, type RoomState, type SequencedEvent } from '@slopesque/shared';
 import { useStore } from './store';
 
 let socket: Socket | null = null;
@@ -77,7 +77,6 @@ export type Usage = 'chat' | 'sticker' | 'emoji' | 'photo' | 'poll' | 'trump';
  *  for its usage and keeps one copy per file). */
 export async function upload(usage: Usage, file: Blob): Promise<UploadResult> {
   if (!file.type.startsWith('image/')) return { ok: false, error: 'Ce fichier n\'est pas une image : seules les images peuvent être envoyées.' };
-  if (file.size > LIMITS.maxUploadBytes) return { ok: false, error: 'Image trop lourde (15 Mo au plus).' };
   const t = await request('media:ticket', { usage });
   if (!t.ok) return t;
   try {

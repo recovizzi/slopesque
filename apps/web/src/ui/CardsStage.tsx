@@ -43,9 +43,18 @@ export function CardsStage() {
     who, elapsed: '', late: late && late.seat !== mySeat ? late : null,
     seats: { free: free.length, total: c.seats.length, mine: !!mine, takes: free[0] ? who(free[0].id).name : '', full,
       paid: id => { const u = c.paid[id]; const m = u ? members.get(u) : undefined; return u ? { name: u === me ? 'Toi' : m?.name ?? '?', color: m ? hueColor(m.hue) : '#8a8f98', bot: false } : { ...who(id), bot: true }; } } })
-    : `<div class="cards-game"><header class="cg-head"><b class="cg-title">${want === 'tarot' ? `Tarot à ${c.settings.tarot}` : `Trou du cul à ${c.settings.tdc}`}</b><span class="cg-info">${room.hostId === me ? 'Distribue quand les joueurs ont cliqué « Participer » : des robots prennent les places libres (3 au moins).' : "L'hôte distribue les cartes…"}</span></header>
-      <div class="cg-table"><div class="cg-pile">${room.hostId === me ? '<button class="btn big" type="button" data-action="cards-deal">Distribuer</button>' : ''}</div></div>
-      <div class="cg-me">${room.members.find(m => m.id === me)?.playing || room.hostId === me ? '' : '<div class="cg-watch"><button class="btn" type="button" data-action="join-game">Participer</button></div>'}</div></div>`;
+    : (() => {   // before the first deal: the seats (take one, or leave it), the host deals when the players are seated
+      const n = want === 'tarot' ? c.settings.tarot : c.settings.tdc, seats = c.game === want ? c.seats : [];
+      const chips = seats.map(st => { const w = who(st.id); return `<li class="cg-seat" style="--c:${w.color}">${K.seatLabel(w)}</li>`; }).join('');
+      const freeSeats = seats.filter(st => !st.user).length;
+      const mine = !!mySeat;
+      return `<div class="cards-game"><header class="cg-head"><b class="cg-title">${want === 'tarot' ? `Tarot à ${c.settings.tarot}` : `Trou du cul à ${c.settings.tdc}`}</b>
+        <span class="cg-info">Avant la donne : prends une place ; des robots jouent les places libres.</span></header>
+        <div class="cg-table"><ul class="cg-seats">${chips}</ul><div class="cg-pile">${room.hostId === me ? `<button class="btn big" type="button" data-action="cards-deal">Distribuer</button>` : ''}</div>
+          <p class="cg-pile-text">${seats.length - freeSeats} joueur${seats.length - freeSeats > 1 ? 's' : ''} sur ${n} place${n > 1 ? 's' : ''}${room.hostId === me ? '' : ' · l\'hôte distribue'}</p></div>
+        <div class="cg-me"><div class="cg-watch">${mine ? '<button class="btn ghost" type="button" data-action="table-leave">Quitter la table</button>'
+          : `<button class="btn cg-join ${full ? 'is-error' : ''}" type="button" data-action="table-join">${freeSeats || !seats.length ? 'Prendre une place' : `Table complète (${n}/${n})`}</button>`}</div></div></div>`;
+    })();
 
   useLayoutEffect(() => {   // the exact fan for the hand's width, after each redraw
     const hand = box.current?.querySelector<HTMLElement>('[data-hand]'), cards = hand ? [...hand.querySelectorAll<HTMLElement>('.in-hand')] : [];

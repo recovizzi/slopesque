@@ -25,6 +25,7 @@ describe.skipIf(!up)('Tarot', () => {
     for (const s of [host, a]) { const j = await ask<RoomState>(s, 'room:join', { key }); if (!j.ok) throw new Error(j.error); if (s === a) me = j.value.me; }
     await ask(a, 'disk:join');
     expect((await ask(host, 'activity:choose', { choice: { activity: 'cards', cardGame: 'tarot', tarotPlayers: 5 } })).ok).toBe(true);
+    expect((await ask(a, 'table:join')).ok).toBe(true);
   }, 20_000);
   afterAll(() => { host?.close(); a?.close(); server?.kill(); });
 

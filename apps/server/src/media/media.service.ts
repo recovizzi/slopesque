@@ -16,11 +16,19 @@ import { CacheService } from '../cache/cache.service.js';
 import { UserError } from '../errors.js';
 
 export type Usage = 'emoji' | 'sticker' | 'photo' | 'chat' | 'poll' | 'trump' | 'preview';
-/** Longest side in pixels; the photo is a square cut in the middle (media-storage, Formats d'image). */
-const FORMATS: Record<Usage, { side: number; square?: boolean; quality: number }> = {
-  emoji: { side: 128, quality: 85 }, sticker: { side: 256, quality: 85 }, photo: { side: 256, square: true, quality: 82 },
-  chat: { side: 1600, quality: 80 }, poll: { side: 480, quality: 80 }, trump: { side: 360, quality: 82 }, preview: { side: 480, quality: 75 },
+/** By usage (media-storage, Formats d'image): the longest side in pixels (the photo: a square cut in the middle), the
+ *  starting quality, and the weight aimed at — small things light, a chat image large with a lighter compression. Any
+ *  file is accepted: the server converts it until it fits (quality first, then the size), and keeps only that. */
+const FORMATS: Record<Usage, { side: number; square?: boolean; quality: number; maxBytes: number }> = {
+  emoji: { side: 128, quality: 80, maxBytes: 24_000 },
+  photo: { side: 256, square: true, quality: 78, maxBytes: 32_000 },
+  sticker: { side: 320, quality: 82, maxBytes: 90_000 },
+  poll: { side: 480, quality: 80, maxBytes: 100_000 },
+  trump: { side: 360, quality: 80, maxBytes: 80_000 },
+  preview: { side: 480, quality: 72, maxBytes: 60_000 },
+  chat: { side: 1600, quality: 82, maxBytes: 450_000 },
 };
+export const IMAGE_FORMATS = FORMATS;
 const EXPIRING: Usage[] = ['chat', 'preview'];
 export type MediaRow = typeof media.$inferSelect;
 interface Ticket { accountId: string; usage: Usage; until: number }
@@ -61,7 +69,7 @@ export class MediaService implements OnModuleInit, OnModuleDestroy {
   async store(usage: Usage, body: Buffer): Promise<MediaRow> {
     const t = { usage };
     if (!body.length) throw new UserError('Fichier vide.');
-    if (body.length > LIMITS.maxUploadBytes) throw new UserError('Image trop lourde (15 Mo au plus).');
+    if (body.length > LIMITS.maxUploadBytes) throw new UserError('Fichier énorme : plus de 200 Mo, ce n\'est sans doute pas une image.');
     const sha256 = createHash('sha256').update(body).digest('hex');
     const found = await this.db.query.media.findFirst({ where: and(eq(media.usage, t.usage), eq(media.sha256, sha256)) });
     if (found) {   // sent again: the same picture; a chat image lives a week from now
@@ -69,12 +77,19 @@ export class MediaService implements OnModuleInit, OnModuleDestroy {
       return found;
     }
     const f = FORMATS[t.usage];
-    let out: { data: Buffer; info: import('sharp').OutputInfo };
+    let out: { data: Buffer; info: import('sharp').OutputInfo } | null = null;
     try {
-      const img = sharp(body, { animated: !f.square, limitInputPixels: 50_000_000 }).rotate();
-      out = await (f.square ? img.resize(f.side, f.side, { fit: 'cover', position: 'centre', withoutEnlargement: false })
-        : img.resize(f.side, f.side, { fit: 'inside', withoutEnlargement: true })).webp({ quality: f.quality, effort: 4 }).toBuffer({ resolveWithObject: true });
+      // quality first (down to 40), then the size (×0.8 at a time): until the weight aimed at is met
+      for (let side = f.side, step = 0; step < 6 && !(out && out.data.length <= f.maxBytes); step++, side = Math.round(side * 0.8)) {
+        for (let q = f.quality; q >= 40; q -= 10) {
+          const img = sharp(body, { animated: !f.square, limitInputPixels: false, failOn: 'none' }).rotate();
+          out = await (f.square ? img.resize(side, side, { fit: 'cover', position: 'centre' })
+            : img.resize(side, side, { fit: 'inside', withoutEnlargement: true })).webp({ quality: q, effort: 4 }).toBuffer({ resolveWithObject: true });
+          if (out.data.length <= f.maxBytes) break;
+        }
+      }
     } catch { throw new UserError('Ce fichier n\'est pas une image lisible.'); }
+    if (!out) throw new UserError('Ce fichier n\'est pas une image lisible.');
     const bucket = EXPIRING.includes(t.usage) ? this.storage.buckets.chat : this.storage.buckets.durable;
     const objectKey = `${t.usage}/${sha256}.webp`;
     const height = out.info.pageHeight ?? out.info.height;

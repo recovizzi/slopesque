@@ -33,7 +33,7 @@ export const LIMITS = {
   reactions: { count: 20, perMs: 10_000 },
   uploads: { count: 10, perMs: MINUTE },
   codeAttempts: { count: 10, perMs: MINUTE },   // unknown codes, per IP
-  maxUploadBytes: 15 * 1024 * 1024,
+  maxUploadBytes: 200 * 1024 * 1024,   // not a limit on pictures (any size is compressed), a guard against non-images
   chatPage: 100,
 } as const;
 

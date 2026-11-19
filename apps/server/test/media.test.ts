@@ -1,6 +1,7 @@
 // Pictures over the real server: one copy per (usage, file), the old profile photo deleted at once, GIFs without a key.
 import { spawn, execFileSync, type ChildProcess } from 'node:child_process';
 import net from 'node:net';
+import { randomBytes } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { io, type Socket } from 'socket.io-client';
 import sharp from 'sharp';
@@ -36,13 +37,13 @@ describe.skipIf(!up)('pictures', () => {
   afterAll(() => { s?.close(); server?.kill(); });
 
   it('converts by usage, keeps one copy per file and usage', async () => {
-    const file = await png(200, 40, 40, 2400, 1600);
+    const file = await png(...([0, 0, 0].map(() => Math.floor(Math.random() * 256)) as [number, number, number]), 2400, 1600);   // new each run (one copy per file)
     const a = await send(s, 'chat', file), b = await send(s, 'chat', file), c = await send(s, 'sticker', file);
     if (!a.ok || !b.ok || !c.ok) throw new Error('upload failed');
     expect(a.value.id).toBe(b.value.id);
     expect(c.value.id).not.toBe(a.value.id);
     expect([a.value.w, a.value.h]).toEqual([1600, 1067]);
-    expect(Math.max(c.value.w, c.value.h)).toBe(256);
+    expect(Math.max(c.value.w, c.value.h)).toBe(320);
     const img = await fetch(a.value.url);
     expect(img.headers.get('content-type')).toBe('image/webp');
     expect(img.headers.get('cache-control')).toMatch(/immutable/);
@@ -51,6 +52,25 @@ describe.skipIf(!up)('pictures', () => {
     const m = (await msg) as Extract<SequencedEvent, { type: 'message' }>;
     expect(m.message.media).toMatchObject({ kind: 'image', src: a.value.url });
   });
+
+  it('any size is taken and compressed to the weight of its usage (noise: the hardest to compress)', async () => {
+    const w = 5000, h = 3500, noise = randomBytes(w * h * 3);
+    const big = await sharp(noise, { raw: { width: w, height: h, channels: 3 } }).png({ compressionLevel: 1 }).toBuffer();
+    expect(big.length).toBeGreaterThan(15 * 1024 * 1024);
+    const sizes: Record<string, number> = {};
+    const other = io(URL, { auth: { code: newCode(), protocol: PROTOCOL_VERSION }, transports: ['websocket'], forceNew: true });   // its own upload limit
+    await new Promise(r => other.once('hello', r));
+    for (const usage of ['chat', 'sticker', 'emoji', 'photo']) {
+      const r = await send(other, usage, big);
+      if (!r.ok) throw new Error(r.error);
+      sizes[usage] = (await (await fetch(r.value.url)).arrayBuffer()).byteLength;
+    }
+    expect(sizes.chat!).toBeLessThanOrEqual(450_000);
+    expect(sizes.sticker!).toBeLessThanOrEqual(90_000);
+    expect(sizes.emoji!).toBeLessThanOrEqual(24_000);
+    expect(sizes.photo!).toBeLessThanOrEqual(32_000);
+    other.close();
+  }, 120_000);
 
   it('an upload is good only for the usage of its ticket; a ticket is used once', async () => {
     const r = await send(s, 'photo', await png(1, 2, 3));

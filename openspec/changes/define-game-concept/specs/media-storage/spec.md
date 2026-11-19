@@ -1,23 +1,26 @@
 ## ADDED Requirements
 
 ### Requirement: Formats d'image
-Les images envoyées au serveur MUST être stockées (RustFS, compatible S3) dans un format choisi selon leur **usage**,
-jamais plus grand que ce qu'il affiche. Le serveur MUST refaire la conversion (sans se fier au client) et retirer les
-métadonnées (EXIF : lieu, appareil) :
+Les images envoyées au serveur MUST être acceptées **quelle que soit leur taille** (pas de limite pour le joueur ; le
+serveur refuse seulement ce qui n'est pas une image, ou un fichier de plus de 200 Mo) et stockées (RustFS, compatible
+S3) dans un format choisi selon leur **usage**, avec un **poids visé** : le serveur MUST recompresser l'image reçue
+(qualité d'abord, jusqu'à 40, puis la taille, par paliers de 80 %) jusqu'à tenir dans ce poids, sans se fier au
+client, et retirer les métadonnées (EXIF : lieu, appareil). Les petits usages sont légers, l'image du chat garde une
+compression plus douce :
 
-| Usage | Taille | Format |
-|---|---|---|
-| Emoji personnalisé | 128 px au plus (côté le plus long) | WebP (PNG si transparence non gérée) |
-| Sticker | 256 px au plus | WebP, transparence gardée ; GIF animé gardé animé |
-| Photo de profil | carré de 256 px, coupé au milieu | WebP |
-| Image du chat | 1600 px au plus | WebP qualité 80 ; GIF animé gardé animé |
-| Choix de sondage | 480 px au plus | WebP |
-| Atout du Tarot | 360 px au plus | WebP |
-| Aperçu de lien | 480 px au plus | WebP |
+| Usage | Taille | Poids visé | Format |
+|---|---|---|---|
+| Emoji personnalisé | 128 px au plus (côté le plus long) | 24 Ko | WebP, animation gardée |
+| Photo de profil | carré de 256 px, coupé au milieu | 32 Ko | WebP |
+| Sticker | 320 px au plus | 90 Ko | WebP, transparence et animation gardées |
+| Choix de sondage | 480 px au plus | 100 Ko | WebP |
+| Atout du Tarot | 360 px au plus | 80 Ko | WebP |
+| Aperçu de lien | 480 px au plus | 60 Ko | WebP |
+| Image du chat | 1600 px au plus | 450 Ko | WebP, animation gardée |
 
 #### Scenario: Une photo de profil
-- **WHEN** un joueur choisit une photo de 4000 × 3000
-- **THEN** le serveur garde un carré WebP de 256 px, sans ses métadonnées
+- **WHEN** un joueur choisit une photo de 4000 × 3000 (12 Mo)
+- **THEN** le serveur garde un carré WebP de 256 px de moins de 32 Ko, sans ses métadonnées
 
 ### Requirement: Une image envoyée deux fois est stockée une fois
 Le serveur MUST calculer l'**empreinte** (SHA-256) du fichier reçu et chercher une image stockée avec la même empreinte
