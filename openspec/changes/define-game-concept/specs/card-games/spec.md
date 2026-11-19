@@ -1,5 +1,16 @@
 ## ADDED Requirements
 
+### Requirement: Nombre de joueurs d'un jeu de cartes
+L'hôte MUST choisir d'abord le jeu (Trou du cul, Tarot), puis, dans l'onglet Partie, le nombre de joueurs parmi les
+valeurs que ce jeu permet : de 3 à 8 au Trou du cul, 4 ou 5 au Tarot (à 5, le preneur appelle un Roi). Le choix MUST
+valoir à partir de la donne suivante ; les joueurs qui ont cliqué « Participer » prennent les places, des robots
+complètent les autres.
+
+#### Scenario: Tarot à 5
+- **WHEN** l'hôte choisit Cartes → Tarot, puis 5 joueurs dans Partie, et distribue avec deux joueurs inscrits
+- **THEN** la donne se joue à 5 : les deux joueurs et trois robots ; le preneur appellera un Roi
+
+
 ### Requirement: Activité Cartes et liste des jeux
 L'hôte MUST pouvoir choisir l'activité « Cartes », puis, dans Paramètres → Partie, le **jeu** parmi une liste : le
 **Trou du cul** (aussi appelé Président) d'abord, puis le **Tarot**, le **Texas Hold'em** et la **Coinche**, et d'autres

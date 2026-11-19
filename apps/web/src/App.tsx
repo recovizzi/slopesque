@@ -17,7 +17,7 @@ import { PollSettings, PollStage, WheelStage } from './ui/PollWheel';
 import { CardsStage } from './ui/CardsStage';
 import { Palmares } from './ui/Palmares';
 import { WebSettings, WebStage } from './ui/WebStage';
-import { READY_ACTIVITIES } from '@slopesque/shared';
+import { CARD_PLAYERS, READY_ACTIVITIES } from '@slopesque/shared';
 
 const EMBED = new URLSearchParams(location.search).has('embed');
 const RELEASES = 'https://github.com/recovizzi/slopesque/releases/latest';
@@ -239,17 +239,20 @@ function ExtensionOptions() {
   </>;
 }
 
-/** Partie (cards): the game (Trou du cul, Tarot at 4 or 5), the Tarot's won tricks shown or not. */
+/** Partie (cards): the game first, then its number of players (the values each game allows; robots complete the
+ *  free seats, from the next deal), and the Tarot's won tricks shown or not. */
 function CardsSettings() {
   const room = useStore(s => s.room)!, me = useStore(s => s.account)?.id, set = useStore(s => s.set), host = room.hostId === me;
-  const a = room.activity, v = a.cardGame === 'tarot' ? `tarot${a.tarotPlayers ?? 4}` : 'tdc';
-  const choose = async (x: string) => { const r = await request('activity:choose', { choice: x === 'tdc' ? { activity: 'cards', cardGame: 'tdc' } : { activity: 'cards', cardGame: 'tarot', tarotPlayers: x === 'tarot5' ? 5 : 4 } }); if (!r.ok) set({ note: r.error }); };
+  const game = room.activity.cardGame === 'tarot' ? 'tarot' : 'tdc', players = room.cards.settings[game];
+  const ack = (r: { ok: boolean; error?: string }) => { if (!r.ok) set({ note: r.error ?? '' }); };
   return <>
-    <label className="field"><span>Jeu</span><select value={v} disabled={!host} onChange={e => void choose(e.target.value)}>
-      <option value="tdc">Trou du cul</option><option value="tarot4">Tarot à 4</option><option value="tarot5">Tarot à 5 (le preneur appelle un Roi)</option>
+    <label className="field"><span>Jeu</span><select value={game} disabled={!host} onChange={async e => ack(await request('activity:choose', { choice: { activity: 'cards', cardGame: e.target.value as 'tdc' } }))}>
+      <option value="tdc">Trou du cul</option><option value="tarot">Tarot</option>
       <option disabled>Texas Hold'em (bientôt)</option><option disabled>Coinche (bientôt)</option></select></label>
-    <p className="note">À partir de la donne suivante ; des robots prennent les places libres. Les règles se lisent avec le bouton « i » de la table.</p>
-    {a.cardGame === 'tarot' && <><label className="check"><input type="checkbox" checked={room.cards.showTricks} disabled={!host} onChange={e => void request('tarot:tricks', { show: e.target.checked })} /><span>Revoir les plis gagnés (au survol)</span></label>
+    <label className="field"><span>Joueurs</span><select value={players} disabled={!host} onChange={async e => ack(await request('cards:players', { game, players: Number(e.target.value) }))}>
+      {CARD_PLAYERS[game].map(n => <option key={n} value={n}>{n} joueurs{game === 'tarot' && n === 5 ? ' (le preneur appelle un Roi)' : ''}</option>)}</select></label>
+    <p className="note">À partir de la donne suivante. Les joueurs qui ont cliqué « Participer » prennent les places, des robots complètent les autres. Les règles se lisent avec le bouton « i » de la table.</p>
+    {game === 'tarot' && <><label className="check"><input type="checkbox" checked={room.cards.showTricks} disabled={!host} onChange={e => void request('tarot:tricks', { show: e.target.checked })} /><span>Revoir les plis gagnés (au survol)</span></label>
       <p className="note">Décoché, la partie est plus dure : personne ne peut revoir les plis déjà joués.</p></>}
   </>;
 }

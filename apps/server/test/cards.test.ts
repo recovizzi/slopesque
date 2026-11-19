@@ -29,6 +29,8 @@ describe.skipIf(!up)('Trou du cul', () => {
   afterAll(() => { host?.close(); a?.close(); server?.kill(); });
 
   it('a deal: my hand only; robots on the free seats; leaving mid-round keeps my points; the round ends', async () => {
+    expect(await ask(host, 'cards:players', { game: 'tdc', players: 9 })).toMatchObject({ ok: false });
+    expect((await ask(host, 'cards:players', { game: 'tdc', players: 3 })).ok).toBe(true);
     const dealt = cards(a, c => !!c.tdc);
     expect((await ask(host, 'cards:deal')).ok).toBe(true);
     const c = await dealt;

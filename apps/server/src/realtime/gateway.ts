@@ -237,6 +237,8 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
   tarotDiscard(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('tarot:discard', b, async v => { await this.hub.tarotDo(s, { discard: v.cards }); return null; }); }
   @SubscribeMessage('tarot:tricks')
   tarotTricks(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('tarot:tricks', b, async v => { await this.hub.tarotTricks(s, v.show); return null; }); }
+  @SubscribeMessage('cards:players')
+  cardsPlayers(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('cards:players', b, async v => { await this.hub.cardsPlayers(s, v.game, v.players); return null; }); }
   @SubscribeMessage('table:join')
   tableJoin(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('table:join', b, () => this.hub.tableJoin(s)); }
   @SubscribeMessage('table:leave')
@@ -247,6 +249,6 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
 function activityName(c: { activity: string; mode?: string; cardGame?: string; tarotPlayers?: number }) {
   const names: Record<string, string> = { chat: 'Chat', disk: 'Demi-disque', poll: 'Sondage', wheel: 'Roulette', cards: 'Cartes', lowtide: 'Low Tide' };
   if (c.activity === 'disk' && c.mode) return `Demi-disque · ${c.mode === 'amphi' ? 'Amphithéâtre' : 'Rayon libre'}`;
-  if (c.activity === 'cards' && c.cardGame) return c.cardGame === 'tarot' ? `Tarot à ${c.tarotPlayers ?? 4}` : ({ tdc: 'Trou du cul', holdem: 'Texas Hold\'em', coinche: 'Coinche' } as Record<string, string>)[c.cardGame] ?? 'Cartes';
+  if (c.activity === 'cards' && c.cardGame) return c.cardGame === 'tarot' ? (c.tarotPlayers ? `Tarot à ${c.tarotPlayers}` : 'Tarot') : ({ tdc: 'Trou du cul', holdem: 'Texas Hold\'em', coinche: 'Coinche' } as Record<string, string>)[c.cardGame] ?? 'Cartes';
   return names[c.activity] ?? c.activity;
 }

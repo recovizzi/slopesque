@@ -23,7 +23,7 @@ const fmtClock = (ms: number) => { const s = Math.floor(ms / 1000), h = Math.flo
 export function CardsStage() {
   const room = useStore(s => s.room)!, me = useStore(s => s.account)!.id;
   const c: CardsView = room.cards, want = room.activity.cardGame ?? 'tdc';   // the game the host chose (the table may still hold the other)
-  const t = c.game === 'tdc' && want === 'tdc' ? c.tdc : null, tarot = c.game === 'tarot' && want === 'tarot' && c.players === (room.activity.tarotPlayers ?? 4) ? c.tarot : null;
+  const t = c.game === 'tdc' && want === 'tdc' ? c.tdc : null, tarot = c.game === 'tarot' && want === 'tarot' ? c.tarot : null;
   const [wonView, setWonView] = useState<string | null>(null);
   const members = new Map(room.members.map(m => [m.id, m]));
   const [sel, setSel] = useState<Set<string>>(new Set()), [rules, setRules] = useState(false), [full, setFull] = useState(false), [note, setNote] = useState('');
@@ -43,7 +43,7 @@ export function CardsStage() {
     who, elapsed: '', late: late && late.seat !== mySeat ? late : null,
     seats: { free: free.length, total: c.seats.length, mine: !!mine, takes: free[0] ? who(free[0].id).name : '', full,
       paid: id => { const u = c.paid[id]; const m = u ? members.get(u) : undefined; return u ? { name: u === me ? 'Toi' : m?.name ?? '?', color: m ? hueColor(m.hue) : '#8a8f98', bot: false } : { ...who(id), bot: true }; } } })
-    : `<div class="cards-game"><header class="cg-head"><b class="cg-title">${room.activity.cardGame === 'tarot' ? `Tarot à ${room.activity.tarotPlayers ?? 4}` : 'Trou du cul'}</b><span class="cg-info">${room.hostId === me ? 'Distribue quand les joueurs ont cliqué « Participer » : des robots prennent les places libres (3 au moins).' : "L'hôte distribue les cartes…"}</span></header>
+    : `<div class="cards-game"><header class="cg-head"><b class="cg-title">${want === 'tarot' ? `Tarot à ${c.settings.tarot}` : `Trou du cul à ${c.settings.tdc}`}</b><span class="cg-info">${room.hostId === me ? 'Distribue quand les joueurs ont cliqué « Participer » : des robots prennent les places libres (3 au moins).' : "L'hôte distribue les cartes…"}</span></header>
       <div class="cg-table"><div class="cg-pile">${room.hostId === me ? '<button class="btn big" type="button" data-action="cards-deal">Distribuer</button>' : ''}</div></div>
       <div class="cg-me">${room.members.find(m => m.id === me)?.playing || room.hostId === me ? '' : '<div class="cg-watch"><button class="btn" type="button" data-action="join-game">Participer</button></div>'}</div></div>`;
 

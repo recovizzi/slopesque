@@ -117,9 +117,12 @@ export interface TarotDealView {
   won: Record<string, TarotCardView[]>; tricks: Record<string, { by: string; card: TarotCardView }[][]>; lastWinner: string | null; deal: number; startedAt: number;
   result: { taker: string; partner: string | null; bid: string; bouts: number; need: number; made: number; won: boolean; score: number; marks: Record<string, number> } | null; note: string;
 }
+/** How many seats each card game can have (robots complete the free ones). */
+export const CARD_PLAYERS = { tdc: [3, 4, 5, 6, 7, 8], tarot: [4, 5] } as const;
 export interface CardsView {
   game: 'tdc' | 'tarot';
-  players: 4 | 5;                        // Tarot: at 4 or 5
+  players: number;                       // the seats of the table on the table now
+  settings: { tdc: number; tarot: number };   // the host's choice for each game, from the next deal
   showTricks: boolean;                   // Tarot: the won tricks can be looked at
   seats: CardSeatView[];
   tdc: TdcRoundView | null;
@@ -236,6 +239,7 @@ export const intents = {
   'tarot:call': z.object({ card: z.string().max(4) }),
   'tarot:discard': z.object({ cards: z.array(z.string().max(4)).max(6) }),
   'tarot:tricks': z.object({ show: z.boolean() }),
+  'cards:players': z.object({ game: z.enum(['tdc', 'tarot']), players: z.number().int().min(3).max(8) }),
   'table:join': z.object({}),
   'table:leave': z.object({}),
   'gif:favorites': z.object({ favorites: z.array(z.object({ id: z.string().max(64), provider: z.string().max(16), url: z.url(), w: z.number().int(), h: z.number().int(), title: z.string().max(200) })).max(200) }),
@@ -297,6 +301,7 @@ export interface IntentResults {
   'tarot:call': null;
   'tarot:discard': null;
   'tarot:tricks': null;
+  'cards:players': null;
   'table:join': 'ok' | 'full';
   'table:leave': null;
 }

@@ -25,7 +25,8 @@ en entier part avec Entrée). Une commande qui ne peut pas aboutir MUST l'expliq
 commandes :
 - **/activity** : ouvre une fenêtre avec tous les types d'activité, chacun avec une **petite image** simple et claire
   et une ligne d'explication (l'activité en cours marquée). Pour ceux qui en ont, un deuxième choix MUST donner le
-  **format exact** : Demi-disque → Rayon libre ou Amphithéâtre ; Cartes → Trou du cul, Tarot à 4, Tarot à 5 (Texas
+  **format exact** : Demi-disque → Rayon libre ou Amphithéâtre ; Cartes → Trou du cul, Tarot (le nombre de joueurs se règle ensuite dans Partie : 3 à 8 au Trou du
+  cul, 4 ou 5 au Tarot ; des robots complètent les places libres) (Texas
   Hold'em et Coinche grisés, à venir) ; Jeux web → Low Tide. L'hôte MUST lancer l'activité choisie tout de suite ;
   un autre joueur MUST la proposer au **vote**.
 - **/hote** : demander le rôle d'hôte (voir « Rôle d'hôte » dans game-session).

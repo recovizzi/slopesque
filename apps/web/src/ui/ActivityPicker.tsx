@@ -25,9 +25,8 @@ const KINDS: Kind[] = [
   { id: 'wheel', name: 'Roulette', help: 'Tirer au sort parmi des propositions', choice: { activity: 'wheel' } },
   { id: 'chat', name: 'Chat', help: 'Discuter, sans jeu', choice: { activity: 'chat' } },
   { id: 'cards', name: 'Cartes', help: 'Des jeux de cartes à plusieurs', formats: [
-    { label: 'Trou du cul', help: 'Se débarrasser de ses cartes le premier', choice: { activity: 'cards', cardGame: 'tdc' } },
-    { label: 'Tarot à 4', help: 'Le preneur seul contre trois', choice: { activity: 'cards', cardGame: 'tarot', tarotPlayers: 4 } },
-    { label: 'Tarot à 5', help: 'Le preneur appelle un Roi pour partenaire', choice: { activity: 'cards', cardGame: 'tarot', tarotPlayers: 5 } },
+    { label: 'Trou du cul', help: 'Se débarrasser de ses cartes le premier · de 3 à 8 joueurs', choice: { activity: 'cards', cardGame: 'tdc' } },
+    { label: 'Tarot', help: 'Le preneur contre les autres · à 4, ou à 5 avec un Roi appelé', choice: { activity: 'cards', cardGame: 'tarot' } },
     { label: 'Texas Hold\'em', help: 'Bientôt', choice: { activity: 'cards', cardGame: 'holdem' }, soon: true },
     { label: 'Coinche', help: 'Bientôt', choice: { activity: 'cards', cardGame: 'coinche' }, soon: true }] },
   { id: 'web', name: 'Jeux web', help: 'Le jeu d\'un autre site, dans le salon', formats: [
@@ -47,7 +46,7 @@ export function ActivityPicker({ kind, current, host, busy, onKind, onPick, onCl
       <p className={`note act-how ${!host && busy ? 'is-busy' : ''}`}>{!host && <Icon name="vote" />}{how}</p>
       {k?.formats ? <>
         <button className="btn ghost sm act-back" type="button" onClick={() => onKind(null)}>← Toutes les activités</button>
-        <div className="act-kind-head"><Art k={k.id} /><div><b>{k.name}</b><small>Choisis le format</small></div></div>
+        <div className="act-kind-head"><Art k={k.id} /><div><b>{k.name}</b><small>{k.id === 'cards' ? 'Choisis le jeu ; le nombre de joueurs se règle dans Partie' : 'Choisis le format'}</small></div></div>
         <ul className="act-formats">{k.formats.map(f => { const off = f.soon || !ready(f.choice); return <li key={f.label}><button type="button" className="act-format" disabled={off || (!host && busy)} onClick={() => onPick(f.choice)}>
           <b>{f.label}</b><small>{off && !f.soon ? 'Bientôt dans la V1' : f.help}</small></button></li>; })}</ul></>
         : <ul className="act-grid">{KINDS.map(x => { const off = x.choice ? !ready(x.choice) : !x.formats!.some(f => ready(f.choice)); const on = kindOf(current) === x.id;
