@@ -219,6 +219,8 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
   wheelEdit(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('wheel:edit', b, async () => { await this.hub.wheelEdit(s); return null; }); }
 
   // ---------------------------------------------------------------- Cartes
+  @SubscribeMessage('palmares:get')
+  palmares(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('palmares:get', b, () => this.hub.palmares(s)); }
   @SubscribeMessage('cards:deal')
   cardsDeal(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('cards:deal', b, async () => { await this.hub.cardsDeal(s); return null; }); }
   @SubscribeMessage('cards:play')

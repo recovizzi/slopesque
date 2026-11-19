@@ -65,7 +65,7 @@ export function PollStage() {
     else if (a === 'poll-choose') setPick(i);
     void e;
   };
-  const onInput = (el: HTMLInputElement) => {
+  const onInput = (el: HTMLInputElement | HTMLSelectElement) => {
     if (el.dataset.poll === 'question') setDraft({ ...draft, question: el.value });
     else if (el.dataset.poll === 'choice') { const c = [...draft.choices]; c[Number(el.dataset.i)] = el.value; setDraft({ ...draft, choices: c }); }
     else if (el.dataset.poll === 'free') setFree(el.value);

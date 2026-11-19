@@ -11,7 +11,7 @@ function keyOf(a: Element) {
 }
 
 export function LiveHtml({ html, className, onAction, onInput }: { html: string; className?: string;
-  onAction?: (action: string, el: HTMLElement, e: React.MouseEvent) => void; onInput?: (el: HTMLInputElement) => void }) {
+  onAction?: (action: string, el: HTMLElement, e: React.MouseEvent) => void; onInput?: (el: HTMLInputElement | HTMLSelectElement) => void }) {
   const ref = useRef<HTMLDivElement>(null), last = useRef('');
   useLayoutEffect(() => {
     const box = ref.current!;
@@ -25,5 +25,6 @@ export function LiveHtml({ html, className, onAction, onInput }: { html: string;
   });
   return <div ref={ref} className={className}
     onClick={e => { const el = (e.target as Element).closest<HTMLElement>('[data-action]'); if (el && onAction) onAction(el.dataset.action!, el, e); }}
-    onInput={e => { if (e.target instanceof HTMLInputElement && onInput) onInput(e.target); }} />;
+    onInput={e => { if ((e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) && onInput) onInput(e.target); }}
+    onChange={e => { if (e.target instanceof HTMLSelectElement && onInput) onInput(e.target); }} />;
 }

@@ -14,6 +14,7 @@ import { KeyBadge, RoomList, RoomPage } from './ui/Rooms';
 import { DiskSettings, DiskStage, Ranking } from './ui/DiskStage';
 import { PollSettings, PollStage, WheelStage } from './ui/PollWheel';
 import { CardsStage } from './ui/CardsStage';
+import { Palmares } from './ui/Palmares';
 import { READY_ACTIVITIES } from '@slopesque/shared';
 
 const EMBED = new URLSearchParams(location.search).has('embed');
@@ -25,7 +26,7 @@ export function App() {
   const [leftOpen, setLeftOpen] = useState(innerWidth >= 640);
   const [rightOpen, setRightOpen] = useState(false);
   const [tab, setTab] = useState<RightTab>('profile');
-  const [leftTab, setLeftTab] = useState<'chat' | 'ranking'>('chat');
+  const [leftTab, setLeftTab] = useState<'chat' | 'ranking' | 'palmares'>('chat');
   const [codeModal, setCodeModal] = useState<{ first: boolean; start: CodeMode | null } | null>(null);
   const [welcomeCode] = useState(() => newCode());   // drawn at the first launch; kept only after « Continuer »
   const popHost = useRef<HTMLDivElement>(null);
@@ -95,8 +96,9 @@ export function App() {
         <div className="tabs">
           <button className={`tab ${leftTab === 'chat' ? 'on' : ''}`} type="button" onClick={() => setLeftTab('chat')} title="Chat"><Icon name="chat" /><span className="tab-label">Chat</span></button>
           <button className={`tab ${leftTab === 'ranking' ? 'on' : ''}`} type="button" onClick={() => setLeftTab('ranking')} title="Classement"><Icon name="trophy" /><span className="tab-label">Classement</span></button>
+          <button className={`tab ${leftTab === 'palmares' ? 'on' : ''}`} type="button" onClick={() => setLeftTab('palmares')} title="Palmarès : victoires et taux de victoire, gardés dans le temps"><Icon name="chart" /><span className="tab-label">Palmarès</span></button>
           <button className="icon-btn" type="button" onClick={() => setLeftOpen(false)} title="Fermer" aria-label="Fermer le panneau"><Icon name="close" /></button></div>
-        {leftTab === 'chat' ? !blocked && <Chat pop={pop} /> : act === 'disk' || act === 'cards' ? <Ranking onGiveHost={giveHost} /> : <People onGiveHost={giveHost} />}</>)}</aside>
+        {leftTab === 'chat' ? !blocked && <Chat pop={pop} /> : leftTab === 'palmares' ? <Palmares /> : act === 'disk' || act === 'cards' ? <Ranking onGiveHost={giveHost} /> : <People onGiveHost={giveHost} />}</>)}</aside>
       <main className="stage">
         <div className="room-page">{page}</div>
         <div className="chat-stage">{!blocked && act === 'chat' && <Chat pop={pop} />}</div>

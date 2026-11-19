@@ -115,6 +115,8 @@ export interface CardsView {
   late: { seat: string; user: string; secs: number } | null;   // a player's turn has lasted 30 s: /kick possible
 }
 export const READY_CARD_GAMES = ['tdc'];
+/** One player's result in one round (the Palmarès, kept with the room). */
+export interface PalmaresEvent { at: number; game: 'disk' | 'tdc' | 'tarot'; id: string; name: string; hue: number; won: boolean; pts?: number; perfect?: boolean; role?: string; taker?: boolean; partner?: boolean }
 
 export type PollAnswer = number | string | [number, number];
 export interface PollPicView { kind: 'image' | 'sticker' | 'gif'; src: string; w: number; h: number }
@@ -211,6 +213,7 @@ export const intents = {
   'wheel:set': z.object({ items: z.array(z.object({ label: z.string().max(40), weight: z.string().max(8) })).max(12) }),
   'wheel:spin': z.object({}),
   'wheel:edit': z.object({}),
+  'palmares:get': z.object({}),
   'cards:deal': z.object({}),
   'cards:play': z.object({ cards: z.array(z.string().max(4)).min(1).max(4) }),
   'cards:pass': z.object({}),
@@ -266,6 +269,7 @@ export interface IntentResults {
   'wheel:set': null;
   'wheel:spin': null;
   'wheel:edit': null;
+  'palmares:get': PalmaresEvent[];
   'cards:deal': null;
   'cards:play': null;
   'cards:pass': null;

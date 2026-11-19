@@ -156,6 +156,9 @@ check(await until(async () => (await b.frame.locator('.results .perfect, .result
 await shot(a.page, '10-disk-reveal');
 await a.frame.locator('.drawer-left .tab', { hasText: 'Classement' }).click();
 check(await until(async () => Number(await a.frame.locator('.rank-row.is-me .rank-score').textContent()) > 0), 'A\'s score counts in the ranking');
+await a.frame.locator('.drawer-left .tab', { hasText: 'Palmarès' }).click();
+check(await until(async () => (await a.frame.locator('.drawer-left').textContent()).includes('Léa')), 'the Palmarès shows the round\'s results');
+await shot(a.page, '10b-palmares');
 await a.frame.locator('.drawer-left .tab', { hasText: 'Chat' }).click();
 await b.frame.getByRole('button', { name: 'Tour suivant' }).click();
 check(await until(async () => (await b.frame.locator('[name="word"]').count()) === 1), 'next round: the host writes a new word');

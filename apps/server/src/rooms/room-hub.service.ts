@@ -594,6 +594,18 @@ export class RoomHub implements OnModuleInit {
     this.emitWheel(rt);
   }
 
+  // ---------------------------------------------------------------- Palmarès
+  /** The room's results (the last 5 000), with each player's current name and colour. */
+  async palmares(socket: Socket) {
+    const rt = this.roomOf(socket);
+    const rows = await this.db.execute<{ at: string; game: string; data: Record<string, unknown>; name: string | null; hue: number | null }>(sql`
+      select p.at, p.game, p.data, a.name, m.hue from palmares p
+      left join accounts a on a.id = (p.data->>'account')::uuid
+      left join room_members m on m.room_id = p.room_id and m.account_id = (p.data->>'account')::uuid
+      where p.room_id = ${rt.room.id} order by p.at desc limit 5000`);
+    return rows.map(r => ({ ...(r.data as object), at: new Date(r.at).getTime(), game: r.game, id: String(r.data.account), name: r.name ?? '?', hue: r.hue ?? 0, won: !!r.data.won })) as import('@slopesque/shared').PalmaresEvent[];
+  }
+
   // ---------------------------------------------------------------- Cartes: the Trou du cul
   /** What a player sees: the seats, his own hand (the others' as backs), the last round's points, the late seat. */
   private cardsView(rt: RoomRt, me: string): CardsView {
