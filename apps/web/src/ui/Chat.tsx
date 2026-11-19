@@ -4,12 +4,17 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { GifRef, MediaView, MemberView, MessageView, Quote } from '@slopesque/shared';
 import { esc } from '../lib/html';
-import { DEFAULT_REACTIONS, emojiHtml, expandCodes, loadCodes, NAME, placeFloating, suggest, suggestName, SuggestList, useRecent, withCustom, type CustomEmoji, type EmojiPop } from '../lib/emoji';
+import { COMMANDS, DEFAULT_REACTIONS, emojiHtml, expandCodes, loadCodes, NAME, placeFloating, suggest, suggestName, SuggestList, useRecent, withCustom, type CustomEmoji, type EmojiPop } from '../lib/emoji';
 import { GifPop, useGif } from '../lib/gif';
 import { linkify, previewHtml, type Preview } from '../lib/links';
 import { request, ServerGifs, upload } from '../net';
 import { useStore } from '../store';
 import { Avatar, Html, Icon, Who } from './common';
+import { ActivityPicker } from './ActivityPicker';
+import { CreditBadge, CreditCard, CreditModal } from './Credit';
+import { VoteCard } from './Vote';
+import type { Vote } from '@slopesque/engines';
+import type { ActivityChoice } from '@slopesque/shared';
 
 const QUICK = '\u{1F44D}\u{FE0F}';
 
@@ -53,6 +58,7 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
   const [playing, setPlaying] = useState<number | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [modal, setModal] = useState<{ kind: 'activity'; at: string | null } | { kind: 'credit' } | null>(null);
   const [showStickers, setShowStickers] = useState(false);
   const [picked, setPicked] = useState<Picked | 'loading' | null>(null);
   const [naming, setNaming] = useState<string | null>(null), [nameError, setNameError] = useState('');
@@ -139,11 +145,34 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
     if (!r.ok) set({ note: r.error });
   }
 
+  /** /activity, /hote, /credit-social, /kick: a command, not a message to everyone; what fails is said to me only. */
+  async function command(text: string) {
+    const [word = '', ...rest] = text.slice(1).trim().split(/\s+/), arg = rest.join(' ');
+    const cmd = word.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    setDraft(''); set({ note: '' });
+    if (cmd === 'activity' || cmd === 'activite') setModal({ kind: 'activity', at: null });
+    else if (cmd === 'credit-social' || cmd === 'credit' || cmd === 'creditsocial') setModal({ kind: 'credit' });
+    else if (cmd === 'hote' || cmd === 'host') {
+      const r = await request('host:ask');
+      set({ note: !r.ok ? r.error : r.value === 'already' ? 'Tu es déjà l\'hôte.' : '' });
+    } else if (cmd === 'kick') {
+      const r = await request('kick:ask', arg ? { name: arg } : {});
+      if (!r.ok) set({ note: r.error });
+    } else set({ note: `Commande inconnue : /${word}. Commandes : /activity, /hote, /kick, /credit-social.` });
+  }
+
+  async function pickActivity(c: ActivityChoice) {
+    setModal(null);
+    const r = await request('activity:choose', { choice: c });
+    if (!r.ok) set({ note: r.error });
+  }
+
   async function send(e: React.FormEvent) {
     e.preventDefault();
     const text = draft.trim();
     if (!text) return;
     suggestRef.current?.hide();
+    if (text.startsWith('/')) { await command(text); inputRef.current?.focus(); return; }
     await loadCodes();
     const r = await request('chat:send', { text: expandCodes(text, custom), replyTo: replyTo?.id ?? null });
     if (!r.ok) { set({ note: r.error }); return; }
@@ -153,6 +182,7 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
 
   function complete(code: string) {
     const input = inputRef.current!, at = input.selectionStart ?? draft.length;
+    if (draft.startsWith('/')) { setDraft(`/${code}`); suggestRef.current?.hide(); requestAnimationFrame(() => input.focus()); return; }
     const before = draft.slice(0, at).replace(/:([a-z0-9_+-]*)$/, `:${code}: `);
     setDraft(before + draft.slice(at));
     suggestRef.current?.hide();
@@ -161,6 +191,8 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
 
   function onType(v: string) {
     setDraft(v);
+    const c = v.match(/^\/([a-z-]*)$/i);
+    if (c) { const items = COMMANDS.filter(x => x.code.startsWith(c[1]!.toLowerCase())); if (items.length) { suggestRef.current?.show(items, inputRef.current!); return; } }
     const m = v.slice(0, inputRef.current?.selectionStart ?? v.length).match(/(?:^|\s):([a-z0-9_+-]{2,})$/);
     if (m) { const items = suggest(m[1]!, custom); if (items.length) { suggestRef.current?.show(items, inputRef.current!); return; } }
     suggestRef.current?.hide();
@@ -170,7 +202,9 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
     const s = suggestRef.current;
     if (s?.isOpen) {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); s.move(e.key === 'ArrowDown' ? 1 : -1); return; }
-      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); const c = s.current(); if (c) complete(c.code); return; }
+      const cur = s.current();
+      if (e.key === 'Enter' && cur?.cmd !== undefined && draft.trim().toLowerCase() === `/${cur.code}`) { s.hide(); return; }   // a command written out: sent
+      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); if (cur) complete(cur.code); return; }
       if (e.key === 'Escape') { e.stopPropagation(); s.hide(); return; }
     }
     if (e.key === 'Escape' && replyTo) { e.stopPropagation(); setReplyTo(null); }
@@ -218,7 +252,9 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
     <ul className="chat" ref={listRef} data-chat onScroll={e => { const el = e.currentTarget; atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40; if (el.scrollTop < 40) void more(); }}>
       {room.chat.hasMore ? <li className="msg sys chat-start">{loadingMore ? 'Chargement…' : <button className="btn ghost sm" type="button" onClick={more}>Messages plus anciens</button>}</li>
         : room.chat.start && <li className="msg sys chat-start">{room.chat.start === 'begin' ? 'Début de la conversation' : 'Les messages de plus de 30 jours ont été supprimés'}</li>}
-      {room.chat.messages.map(m => m.from === null || m.kind === 'system'
+      {room.chat.messages.map(m => m.kind === 'vote' && m.data?.vote ? <VoteCard key={m.id} id={m.id} v={m.data.vote as Vote} members={members} me={account.id} />
+        : m.kind === 'credit' && m.data ? <li key={m.id} className="msg credit" data-msg={m.id}><CreditCard data={m.data as { by: string; to: string; delta: number }} members={members} me={account.id} /></li>
+        : m.from === null || m.kind === 'system'
         ? <li key={m.id} className="msg sys" data-msg={m.id}><Html html={withCustom(esc(m.text), custom)} /></li>
         : <li key={m.id} className={`msg${m.media ? ' has-media' : ''}${m.reply ? ' is-reply' : ''}${reacting === m.id ? ' is-reacting' : ''}`} data-msg={m.id}>
           {m.reply && replyRef(m.reply)}
@@ -244,7 +280,7 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
     {replyTo && <div className="reply-bar"><Icon name="reply" /><span className="reply-who">Réponse à {who(replyTo.from)}</span><Html className="reply-quote" html={quoteHtml(replyTo, custom)} />
       <button className="icon-btn sm" type="button" onClick={() => setReplyTo(null)} title="Ne plus répondre" aria-label="Ne plus répondre"><Icon name="close" /></button></div>}
     <form className="chat-form" data-form="chat" onSubmit={send}>
-      <input ref={inputRef} name="text" placeholder={replyTo ? 'Ta réponse…' : 'Écrire un message…'} autoComplete="off" maxLength={500} value={draft}
+      <input ref={inputRef} name="text" placeholder={replyTo ? 'Ta réponse…' : 'Écrire un message… (/ pour les commandes)'} autoComplete="off" maxLength={500} value={draft}
         onChange={e => onType(e.target.value)} onKeyDown={onKey} onBlur={() => suggestRef.current?.hide()} />
       <button className="icon-btn" title="Envoyer" aria-label="Envoyer"><Icon name="send" /></button>
       <div className="plus-wrap"><button ref={plusRef} className="icon-btn" type="button" title="Fichier, sticker, GIF, emoji" aria-label="Fichier, sticker, GIF, emoji" aria-haspopup="menu" aria-expanded={menu}
@@ -257,6 +293,10 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
     </form>
     <input ref={fileRef} type="file" accept="image/*" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void choose(f); }} />
     <div className="drop-hint" aria-hidden="true"><Icon name="file" />Dépose ton image</div>
+    {modal?.kind === 'activity' && <ActivityPicker kind={modal.at} current={room.activity.activity} host={room.hostId === account.id}
+      busy={room.chat.messages.some(m => m.kind === 'vote' && !(m.data?.vote as Vote | undefined)?.result)}
+      onKind={k => setModal({ kind: 'activity', at: k })} onPick={c => void pickActivity(c)} onClose={() => setModal(null)} />}
+    {modal?.kind === 'credit' && <CreditModal members={room.members} me={account.id} onClose={() => setModal(null)} />}
   </div>;
 }
 
@@ -297,6 +337,7 @@ export function People({ onGiveHost }: { onGiveHost: (m: MemberView) => void }) 
   return <><ol className="people">{list.map(p => <li key={p.id} className={`person ${p.id === me ? 'is-me' : ''}`}>
     <Avatar name={p.name} hue={p.hue} photo={p.photo} />
     <span className="person-name">{p.name}{p.id === me && <> <i>(toi)</i></>}<PresenceIcon m={p} host={p.id === room.hostId} /></span>
+    {room.activity.activity === 'chat' && <CreditBadge v={p.credit} />}
     <span className="role">{p.id === room.hostId ? <><span className="crown"><Icon name="crown" /></span>hôte</> : p.playing ? 'joueur' : 'membre'}</span>
     {room.hostId === me && p.id !== me && <button className="icon-btn sm" type="button" onClick={() => onGiveHost(p)} title={`Donner le rôle d'hôte à ${p.name}`} aria-label="Donner le rôle d'hôte"><Icon name="crown" /></button>}
   </li>)}</ol></>;

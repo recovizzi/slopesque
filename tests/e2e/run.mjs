@@ -107,6 +107,33 @@ await shot(a.page, '05-photo');
 await a.frame.locator('.drawer-right [aria-label="Fermer"]').click();
 await shot(b.page, '06-pictures-dark');
 
+// ---- jalon 4: commands, votes, social credit
+const say = async (frame, text) => { await frame.locator('[name="text"]').fill(text); await frame.locator('[name="text"]').press('Enter'); };
+await b.frame.locator('[name="text"]').fill('/');
+check(await until(async () => (await b.frame.locator('.emoji-suggest li').count()) === 4), 'commands: « / » lists /activity, /hote, /credit-social, /kick');
+await b.frame.locator('[name="text"]').fill('');
+await say(b.frame, '/hote');
+const vote = a.frame.locator('.msg.vote.is-open');
+check(await until(async () => (await vote.count()) === 1, 8000) && (await vote.textContent()).includes('demande à devenir l\'hôte'), '/hote: a vote in the chat, for A too');
+await shot(a.page, '07-vote');
+await vote.getByRole('button', { name: 'Oui' }).click();
+check(await until(async () => (await a.frame.locator('.person', { hasText: 'Hugo' }).getByText('hôte').count()) === 1, 8000), 'vote: everyone voted yes, B becomes the host');
+check(await a.frame.locator('.msg.vote .vote-result.ok').count() === 1, 'vote: « Accepté »');
+await say(a.frame, '/credit-social');
+const modal = a.frame.locator('.modal.credit-modal');
+await modal.locator('.credit-row', { hasText: 'Hugo' }).click();
+await modal.locator('[name="creditAmount"]').fill('20');
+check(await modal.locator('.credit-apply[data-v="1"] .hiero[data-glyph="1304f"]').count() === 1, 'credit: +20 shows its hieroglyph (liesse)');
+await modal.locator('.credit-apply[data-v="1"]').click();
+check(await until(async () => (await b.frame.locator('.msg.credit').textContent().catch(() => '')).includes('accorde 20 crédits sociaux à Toi'), 8000), 'credit: said in the chat, B sees it');
+check(await until(async () => (await a.frame.locator('.person', { hasText: 'Hugo' }).locator('.credit-badge').textContent()) === '+20'), 'credit: B\'s badge +20 in the players');
+await say(a.frame, '/activity');
+check(await until(async () => (await a.frame.locator('.act-tile').count()) === 6) && (await a.frame.locator('.act-tile:disabled').count()) === 2, '/activity: the six kinds, the ones to come without a format greyed');
+await shot(a.page, '08-activity');
+await a.frame.locator('.act-picker [aria-label="Fermer"]').click();
+await say(a.frame, '/nimporte');
+check(await until(async () => (await a.frame.locator('.chat-note').textContent().catch(() => '')).includes('Commande inconnue')), 'an unknown command: said to me only');
+
 // the server restarts: the panels say « Reconnexion… », then come back with the chat kept
 await stopServer();
 check(await until(async () => (await a.frame.getByText('Reconnexion…').count()) === 1, 8000), 'server down: « Reconnexion… » in the header');
