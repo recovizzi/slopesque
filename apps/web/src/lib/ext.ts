@@ -6,7 +6,6 @@ declare const browser: any;
 export const inExtension = () => typeof chrome !== 'undefined' && !!chrome.runtime?.id;
 const firefox = () => typeof browser !== 'undefined' && !!browser.commands?.update;
 const SITES = ['https://*/*', 'http://*/*'];
-const AUTO = 'slp-panel-auto';
 
 export async function shortcut(): Promise<string> {
   if (!inExtension() || !chrome.commands?.getAll) return '';
@@ -23,24 +22,23 @@ export function openShortcutsPage() {
 }
 
 export async function persistent(): Promise<boolean> {
-  if (!inExtension() || !chrome.scripting?.getRegisteredContentScripts) return false;
-  const [has, scripts] = await Promise.all([chrome.permissions.contains({ origins: SITES }), chrome.scripting.getRegisteredContentScripts({ ids: [AUTO] })]);
-  return has && scripts.length > 0;
+  if (!inExtension()) return false;
+  const { 'slp-persist': on } = await chrome.storage.local.get({ 'slp-persist': false });
+  return !!on && await chrome.permissions.contains({ origins: SITES });
 }
 
-/** On: asks the browser for every site (refused: stays off, with the reason); off: the script and the permission go. */
+/** On: asks the browser for every site (refused: stays off, with the reason); the service worker then puts the panel in
+ *  every page loaded (and in the tabs already open). Off: the option and the permission go. */
 export async function setPersistent(on: boolean): Promise<string> {
   if (!inExtension()) return 'Seulement dans l\'extension.';
   if (on) {
     let granted: boolean;
-    try { granted = await chrome.permissions.request({ origins: SITES }); } catch { granted = false; }
+    try { granted = await chrome.permissions.request({ origins: SITES }); } catch (e) { return `Le navigateur a refusé la demande : ${(e as Error).message}`; }
     if (!granted) return 'Permission refusée par le navigateur : le panneau reste dans l\'onglet où il est ouvert.';
-    const known = await chrome.scripting.getRegisteredContentScripts({ ids: [AUTO] });
-    if (!known.length) await chrome.scripting.registerContentScripts([{ id: AUTO, matches: SITES, js: ['panel-auto.js'], runAt: 'document_idle', persistAcrossSessions: true }]);
-    await chrome.storage.local.set({ 'slp-open': true });
+    await chrome.storage.local.set({ 'slp-open': true, 'slp-persist': true });
     return '';
   }
-  await chrome.scripting.unregisterContentScripts({ ids: [AUTO] }).catch(() => {});
+  await chrome.storage.local.set({ 'slp-persist': false });
   await chrome.permissions.remove({ origins: SITES }).catch(() => {});
   return '';
 }

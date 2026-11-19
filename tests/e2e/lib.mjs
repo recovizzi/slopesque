@@ -63,11 +63,12 @@ const PAGE = `<!doctype html><html lang="fr"><body style="margin:0;font:16px sys
 export const WEB = { ok: 'https://lowtide.test', other: 'https://autre.test', down: 'https://down.test' };
 
 /** A browser with the extension (a copy allowed on the test page), as a new player. */
-export async function player(scheme = 'light', { presetServer = true } = {}) {
+export async function player(scheme = 'light', { presetServer = true, allSites = false } = {}) {
   const ext = fs.mkdtempSync(path.join(os.tmpdir(), 'slp-ext-'));
   fs.cpSync(path.join(ROOT, 'apps/extension/dist/extension'), ext, { recursive: true });
   const mf = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-  fs.writeFileSync(path.join(ext, 'manifest.json'), JSON.stringify({ ...mf, host_permissions: ['https://example.org/*', ...Object.values(WEB).map(o => `${o}/*`)] }));
+  // allSites: the permission to every site already given (the browser's prompt can't be clicked headless)
+  fs.writeFileSync(path.join(ext, 'manifest.json'), JSON.stringify({ ...mf, host_permissions: allSites ? ['<all_urls>'] : ['https://example.org/*', ...Object.values(WEB).map(o => `${o}/*`)] }));
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'slp-profile-'));
   const ctx = await chromium.launchPersistentContext(profile, {
     env: fontEnv, headless: false, colorScheme: scheme, viewport: { width: 1280, height: 760 }, locale: 'fr-FR',

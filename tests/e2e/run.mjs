@@ -266,6 +266,25 @@ await shot(a.page, '04-presence');
 admin('rooms:delete', key, '--yes');
 check(await until(async () => (await a.frame.getByText('Salon inconnu').count()) === 1), 'the admin deletes the room: « Salon inconnu »');
 
+// ---- « Rester ouvert sur toutes les pages »: a third player turns it on, changes page, opens a tab, closes everywhere
+{
+  const C = await player('light', { allSites: true });
+  const { page, frame } = await C.open();
+  await frame.locator('.room-card.welcome').getByRole('button', { name: 'Continuer avec ce code' }).click();
+  await frame.getByText('Aucun salon').waitFor();
+  await frame.getByRole('button', { name: 'Choisir un salon' }).click();
+  await frame.getByRole('checkbox', { name: 'Rester ouvert sur toutes les pages' }).click();   // checked once the browser said yes
+  check(await until(async () => await frame.getByRole('checkbox', { name: 'Rester ouvert sur toutes les pages' }).isChecked()), 'persistent panel: turned on (permission given)');
+  await page.goto('https://example.org/autre-page');
+  check(await until(async () => await page.evaluate(() => !!document.querySelector('slp-panel')), 8000), 'persistent panel: back by itself on the next page');
+  const other = await C.ctx.newPage();
+  await other.goto('https://example.org/troisieme');
+  check(await until(async () => await other.evaluate(() => !!document.querySelector('slp-panel')), 8000), 'persistent panel: also in a new tab');
+  await C.sw.evaluate(() => chrome.storage.local.set({ 'slp-open': false }));   // as the ✕ of the panel does
+  check(await until(async () => !(await page.evaluate(() => !!document.querySelector('slp-panel'))) && !(await other.evaluate(() => !!document.querySelector('slp-panel'))), 5000), 'persistent panel: closed everywhere at once');
+  await C.close();
+}
+
 await A.close(); await B.close();
 await stopServer();
 console.log(failures() ? `\n${failures()} échec(s)` : '\nTout est bon.');
