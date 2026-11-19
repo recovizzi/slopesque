@@ -15,10 +15,11 @@ export function connect() {
   const s = io(device.server, { auth: { code: device.code, protocol: PROTOCOL_VERSION }, transports: ['websocket'],
     reconnectionDelay: 500, reconnectionDelayMax: 10_000, timeout: 8000 });
   socket = s;
-  s.on('hello', (h: Hello) => {
-    set({ conn: 'ok', account: h.account, insecure: h.insecure, clockSkew: h.serverTime - Date.now() });
+  s.on('hello', async (h: Hello) => {
+    set({ account: h.account, insecure: h.insecure, clockSkew: h.serverTime - Date.now() });
     const key = useStore.getState().device.roomKey;
-    if (key) void join(key, true);
+    if (key) await join(key, true);   // « Reconnexion… » stays until the room is joined again (nothing sent before)
+    set({ conn: 'ok' });
   });
   s.on('connect_error', (e: Error & { data?: { reason?: FatalReason } }) => {
     const reason = e.data?.reason;

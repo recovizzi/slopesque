@@ -174,6 +174,7 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
     suggestRef.current?.hide();
     if (text.startsWith('/')) { await command(text); inputRef.current?.focus(); return; }
     await loadCodes();
+    if (useStore.getState().conn !== 'ok') { set({ note: 'Reconnexion en cours : ton message partira quand le salon sera de retour.' }); return; }
     const r = await request('chat:send', { text: expandCodes(text, custom), replyTo: replyTo?.id ?? null });
     if (!r.ok) { set({ note: r.error }); return; }
     setDraft(''); setReplyTo(null); set({ note: '' });
