@@ -7,3 +7,5 @@ export * from './credit.js';
 export * from './disk.js';
 export * as Poll from './poll.js';
 export * as Wheel from './wheel.js';
+export * as Tdc from './tdc.js';
+export * as Table from './table.js';

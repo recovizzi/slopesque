@@ -77,6 +77,7 @@ export interface RoomState {
   disk: DiskView;
   poll: PollView;
   wheel: WheelView;
+  cards: CardsView;
   serverTime: number;
 }
 
@@ -95,7 +96,25 @@ export type RoomEvent =
   | { type: 'activity'; activity: ActivityChoice }
   | { type: 'disk'; disk: DiskView }
   | { type: 'poll'; poll: PollView }
-  | { type: 'wheel'; wheel: WheelView };
+  | { type: 'wheel'; wheel: WheelView }
+  | { type: 'cards'; cards: CardsView };
+
+export interface PlayingCard { id: string; r: number; s: 'S' | 'H' | 'D' | 'C' }
+export interface CardSeatView { id: string; user: string | null; credit: string | null; bot: string }
+/** The Trou du cul's round as a seat sees it (the others' hands as backs: hidden cards with r = 0). */
+export interface TdcRoundView {
+  seats: string[]; hands: Record<string, PlayingCard[]>; trick: { by: string; cards: PlayingCard[] }[]; lastTrick: { by: string; cards: PlayingCard[] }[];
+  turn: string | null; passed: string[]; out: string[]; roles: Record<string, 'president' | 'vice' | 'neutre' | 'vtdc' | 'tdc'>; round: number; startedAt: number; exchanges: string[];
+}
+export interface CardsView {
+  game: 'tdc' | 'tarot';
+  seats: CardSeatView[];
+  tdc: TdcRoundView | null;
+  paid: Record<string, string | null>;   // the last round: who got each seat's points (null: a robot)
+  turnSince: number;
+  late: { seat: string; user: string; secs: number } | null;   // a player's turn has lasted 30 s: /kick possible
+}
+export const READY_CARD_GAMES = ['tdc'];
 
 export type PollAnswer = number | string | [number, number];
 export interface PollPicView { kind: 'image' | 'sticker' | 'gif'; src: string; w: number; h: number }
@@ -144,7 +163,7 @@ export const activityChoice = z.object({
 });
 export type ActivityChoice = z.infer<typeof activityChoice>;
 /** The activities the V1 can play now (grows with the milestones). */
-export const READY_ACTIVITIES: ActivityChoice['activity'][] = ['chat', 'disk', 'poll', 'wheel'];
+export const READY_ACTIVITIES: ActivityChoice['activity'][] = ['chat', 'disk', 'poll', 'wheel', 'cards'];
 export type SequencedEvent = RoomEvent & { seq: number };
 
 // ------------------------------------------------------------------ intents (client → server), with their answers
@@ -192,6 +211,11 @@ export const intents = {
   'wheel:set': z.object({ items: z.array(z.object({ label: z.string().max(40), weight: z.string().max(8) })).max(12) }),
   'wheel:spin': z.object({}),
   'wheel:edit': z.object({}),
+  'cards:deal': z.object({}),
+  'cards:play': z.object({ cards: z.array(z.string().max(4)).min(1).max(4) }),
+  'cards:pass': z.object({}),
+  'table:join': z.object({}),
+  'table:leave': z.object({}),
   'gif:favorites': z.object({ favorites: z.array(z.object({ id: z.string().max(64), provider: z.string().max(16), url: z.url(), w: z.number().int(), h: z.number().int(), title: z.string().max(200) })).max(200) }),
 } as const;
 export type IntentName = keyof typeof intents;
@@ -242,6 +266,11 @@ export interface IntentResults {
   'wheel:set': null;
   'wheel:spin': null;
   'wheel:edit': null;
+  'cards:deal': null;
+  'cards:play': null;
+  'cards:pass': null;
+  'table:join': 'ok' | 'full';
+  'table:leave': null;
 }
 
 /** GIF results: the provider that answered, or why there is none (no key, key refused, no answer). */

@@ -6,9 +6,10 @@ import type { Server, Socket } from 'socket.io';
 import type postgres from 'postgres';
 import { castVote, closeVote, creditWord, defaultHue, startVote, tierOf, type Vote } from '@slopesque/engines';
 import * as D from '@slopesque/engines';
-import { Poll, Wheel } from '@slopesque/engines';
-import { PRESENCE, READY_ACTIVITIES, type PollAnswer, type PollView, type WheelView, type PollPicView, type ActivityChoice, type EmojiView, type GifRef, type MemberView, type RoomEvent, type RoomState, type StickerView } from '@slopesque/shared';
+import { Poll, Table, Tdc, Wheel, KICK_AFTER_MS } from '@slopesque/engines';
+import { PRESENCE, READY_ACTIVITIES, READY_CARD_GAMES, type CardsView, type PollAnswer, type PollView, type WheelView, type PollPicView, type ActivityChoice, type EmojiView, type GifRef, type MemberView, type RoomEvent, type RoomState, type StickerView } from '@slopesque/shared';
 import { DB, SQL, type Db } from '../db/db.module.js';
+import { ENV, type Env } from '../config/config.module.js';
 import { accounts, customEmoji, media, messages, palmares, roomMembers, rooms, stickers } from '../db/schema.js';
 import { sql } from 'drizzle-orm';
 import { MediaService, type MediaRow } from '../media/media.service.js';
@@ -21,7 +22,8 @@ import type { Account } from '../accounts/accounts.service.js';
 interface MemberRt { sockets: Set<string>; awaySince: number | null; grace: NodeJS.Timeout | null }
 interface PollRt { phase: PollView['phase']; round: number; seconds: number; secret: boolean; poll: PollView['poll']; answers: Record<string, PollAnswer>; host: string | null; deadline: number | null; timer: NodeJS.Timeout | null }
 interface WheelRt { phase: WheelView['phase']; items: WheelView['items']; spin: WheelView['spin']; needle: number; timer: NodeJS.Timeout | null }
-interface RoomRt { room: Room; seq: number; members: Map<string, MemberRt>; vote: { id: number; v: Vote; timer: NodeJS.Timeout } | null; disk: D.DiskState; diskTimer: NodeJS.Timeout | null; poll: PollRt; wheel: WheelRt }
+interface CardsRt { seats: Table.CardSeat[]; tdc: Tdc.Tdc | null; paid: Record<string, string | null>; turnSince: number; robot: NodeJS.Timeout | null; late: NodeJS.Timeout | null }
+interface RoomRt { cards: CardsRt; room: Room; seq: number; members: Map<string, MemberRt>; vote: { id: number; v: Vote; timer: NodeJS.Timeout } | null; disk: D.DiskState; diskTimer: NodeJS.Timeout | null; poll: PollRt; wheel: WheelRt }
 export interface SocketData { account: Account; ip: string; roomId: string | null }
 
 @Injectable()
@@ -30,7 +32,7 @@ export class RoomHub implements OnModuleInit {
   io!: Server;
   private readonly live = new Map<string, RoomRt>();
 
-  constructor(@Inject(DB) private readonly db: Db, @Inject(SQL) private readonly sql: postgres.Sql,
+  constructor(@Inject(ENV) private readonly env: Env, @Inject(DB) private readonly db: Db, @Inject(SQL) private readonly sql: postgres.Sql,
     private readonly rooms: RoomsService, readonly chat: ChatService, private readonly media: MediaService, private readonly previews: PreviewService) {}
 
   async onModuleInit() {
@@ -45,7 +47,7 @@ export class RoomHub implements OnModuleInit {
     const disk = { ...D.newDisk({ ...D.DEFAULT_RULES, ...saved.rules }), round: saved.round ?? 1, phase: (saved.round ?? 1) > 1 ? 'writing' as const : 'lobby' as const };
     const ps = (room.rules.poll ?? {}) as { seconds?: number; secret?: boolean; round?: number };
     const ws = (room.rules.wheel ?? {}) as { items?: WheelView['items']; needle?: number };
-    const rt: RoomRt = { room, seq: 0, members: new Map(), vote: null, disk, diskTimer: null,
+    const rt: RoomRt = { cards: { seats: [], tdc: null, paid: {}, turnSince: 0, robot: null, late: null }, room, seq: 0, members: new Map(), vote: null, disk, diskTimer: null,
       poll: { phase: 'writing', round: ps.round ?? 1, seconds: ps.seconds ?? 300, secret: ps.secret ?? false, poll: null, answers: {}, host: null, deadline: null, timer: null },
       wheel: { phase: 'writing', items: ws.items ?? [{ label: '', weight: '' }, { label: '', weight: '' }], spin: null, needle: ws.needle ?? 0, timer: null } };
     if (saved.guessing) { await this.saveDisk(rt); await this.chat.send(room.id, null, 'Le serveur a redémarré : tour annulé.', null, 'system'); }
@@ -112,7 +114,7 @@ export class RoomHub implements OnModuleInit {
     return { seq: rt.seq, room: { key: rt.room.key, name: rt.room.name, createdAt: rt.room.createdAt.getTime() }, me, hostId: rt.room.hostId,
       members: await this.members(rt), chat: await this.chat.page(rt.room.id, rt.room.createdAt), serverTime: Date.now(),
       stickers: await this.stickerViews(rt), emoji: await this.emojiViews(rt), activity: this.activity(rt), disk: D.diskView(rt.disk, me),
-      poll: this.pollView(rt, me), wheel: this.wheelView(rt) };
+      poll: this.pollView(rt, me), wheel: this.wheelView(rt), cards: this.cardsView(rt, me) };
   }
 
   private async members(rt: RoomRt, only?: string): Promise<MemberView[]> {
@@ -302,6 +304,11 @@ export class RoomHub implements OnModuleInit {
       const [m] = await this.members(rt, v.target);
       await this.say(rt, null, `${m?.name ?? '?'} devient l'hôte (vote accepté).`);
     } else if (v.kind === 'activity' && v.choice) await this.setActivity(rt, v.choice as ActivityChoice);
+    else if (v.kind === 'kick' && v.target) {
+      const [m] = await this.members(rt, v.target);
+      await this.say(rt, null, `${m?.name ?? '?'} doit quitter la table : vote accepté.`);
+      await this.tableLeaveOf(rt, v.target);
+    }
   }
 
   /** At start: the votes left open by a restart are cancelled, and it is said. */
@@ -331,7 +338,7 @@ export class RoomHub implements OnModuleInit {
   /** /activity: the host changes it at once; another player proposes it to a vote. */
   async chooseActivity(socket: Socket, choice: ActivityChoice, label: string): Promise<'applied' | 'vote'> {
     const rt = this.roomOf(socket), me = (socket.data as SocketData).account;
-    if (!READY_ACTIVITIES.includes(choice.activity)) throw new UserError('Cette activité arrive bientôt.');
+    if (!READY_ACTIVITIES.includes(choice.activity) || (choice.activity === 'cards' && !READY_CARD_GAMES.includes(choice.cardGame ?? 'tdc'))) throw new UserError('Cette activité arrive bientôt.');
     if (rt.room.hostId === me.id) {
       await this.setActivity(rt, choice);
       await this.say(rt, null, `${me.name} passe à ${label}.`);
@@ -585,6 +592,133 @@ export class RoomHub implements OnModuleInit {
     if (rt.wheel.phase === 'spinning') throw new UserError('La roue tourne.');
     rt.wheel = { ...rt.wheel, phase: 'writing', spin: null };
     this.emitWheel(rt);
+  }
+
+  // ---------------------------------------------------------------- Cartes: the Trou du cul
+  /** What a player sees: the seats, his own hand (the others' as backs), the last round's points, the late seat. */
+  private cardsView(rt: RoomRt, me: string): CardsView {
+    const c = rt.cards, mine = Table.seatOfUser(c.seats, me)?.id ?? null;
+    return { game: 'tdc', seats: c.seats, tdc: c.tdc ? Tdc.tdcView(c.tdc, mine) : null, paid: c.paid, turnSince: c.turnSince, late: this.lateSeat(rt) };
+  }
+  private async emitCards(rt: RoomRt) {
+    rt.seq++;
+    for (const s of await this.io.in(`room:${rt.room.id}`).fetchSockets()) s.emit('event', { type: 'cards', cards: this.cardsView(rt, (s.data as SocketData).account.id), seq: rt.seq });
+  }
+  private async seatName(rt: RoomRt, seat: string) {
+    const s = rt.cards.seats.find(x => x.id === seat), uid = s ? s.user ?? s.credit : null;
+    if (!uid) return s?.bot ?? '?';
+    return (await this.members(rt, uid))[0]?.name ?? '?';
+  }
+  /** The player whose turn has lasted 30 s or more (a player, not a robot): /kick may propose to make him leave. */
+  private lateSeat(rt: RoomRt) {
+    const t = rt.cards.tdc, s = t && t.turn !== null ? rt.cards.seats.find(x => x.id === t.turn) : null;
+    if (!s?.user || Date.now() - rt.cards.turnSince < KICK_AFTER_MS) return null;
+    return { seat: s.id, user: s.user, secs: Math.floor((Date.now() - rt.cards.turnSince) / 1000) };
+  }
+
+  /** A new round (host): the first seats the players who joined (« Participer »), robots up to 3; then the same seats. */
+  async cardsDeal(socket: Socket) {
+    const rt = this.roomOf(socket);
+    this.hostOnly(rt, socket);
+    const c = rt.cards;
+    if (c.tdc && c.tdc.turn !== null) throw new UserError('Une manche est en cours.');
+    const fresh = !c.seats.length;
+    if (fresh) c.seats = Table.seatTable([...(await this.playingIds(rt))].filter(id => rt.members.has(id)).slice(0, 8), 3);
+    c.seats = c.seats.map(s => ({ ...s, credit: s.user }));
+    c.paid = {};
+    const names = new Map<string, string>();
+    for (const s of c.seats) names.set(s.id, await this.seatName(rt, s.id));
+    c.tdc = Tdc.deal(c.seats.map(s => s.id), fresh ? null : c.tdc, id => names.get(id) ?? '?');
+    c.turnSince = Date.now();
+    if (this.activity(rt).activity !== 'cards') await this.setActivity(rt, { activity: 'cards', cardGame: 'tdc' });
+    const robots = c.seats.filter(s => !s.user).length;
+    await this.say(rt, null, `Trou du cul, manche ${c.tdc.round} : ${c.seats.length} places${robots ? `, dont ${robots} robot${robots > 1 ? 's' : ''}` : ''}.`);
+    for (const e of c.tdc.exchanges) await this.say(rt, null, `Échange : ${e}`);
+    await this.afterMove(rt);
+  }
+
+  async cardsMove(socket: Socket, move: { play: string[] } | { pass: true }) {
+    const rt = this.roomOf(socket), c = rt.cards, t = c.tdc, me = (socket.data as SocketData).account.id;
+    const seat = Table.seatOfUser(c.seats, me);
+    if (!t || !seat) throw new UserError('Tu n\'es pas à la table.');
+    if (t.turn !== seat.id) throw new UserError('Ce n\'est pas ton tour.');
+    const ok = 'play' in move ? Tdc.play(t, seat.id, t.hands[seat.id]!.filter(x => move.play.includes(x.id)).slice(0, move.play.length)) : Tdc.pass(t, seat.id);
+    if (!ok) throw new UserError('pass' in move ? 'Tu ouvres le pli : tu ne peux pas passer.' : 'Pas jouable : autant de cartes que le pli, de même valeur, plus fortes.');
+    await this.afterMove(rt);
+  }
+
+  /** After a move: the clock of the turn, the end of the round (points to the last player of each seat), the robots. */
+  private async afterMove(rt: RoomRt, before: string | null = null) {
+    const c = rt.cards, t = c.tdc;
+    if (!t) return;
+    if (t.turn !== before) c.turnSince = Date.now();
+    if (c.robot) { clearTimeout(c.robot); c.robot = null; }
+    if (c.late) { clearTimeout(c.late); c.late = null; }
+    if (t.turn === null) {
+      for (const sid of t.out) {
+        const uid = c.seats.find(s => s.id === sid)?.credit ?? null, role = t.roles[sid]!;
+        c.paid[sid] = uid;
+        if (!uid) continue;
+        await this.db.update(roomMembers).set({ score: sql`${roomMembers.score} + ${Tdc.ROLES[role].points}` }).where(and(eq(roomMembers.roomId, rt.room.id), eq(roomMembers.accountId, uid)));
+        await this.db.insert(palmares).values({ roomId: rt.room.id, game: 'tdc', data: { account: uid, won: role === 'president', role } });
+        await this.emitMember(rt, uid);
+      }
+      const parts = [];
+      for (const sid of t.out) parts.push(`${await this.seatName(rt, sid)} ${Tdc.ROLES[t.roles[sid]!].name}`);
+      await this.say(rt, null, `Manche ${t.round} : ${parts.join(', ')}.`);
+      const settled = Table.settle(c.seats);
+      c.seats = settled.seats;
+      for (const u of settled.freed) { const [m] = await this.members(rt, u); await this.say(rt, null, `${m?.name ?? '?'} a quitté la table : un robot prend sa place.`); }
+    } else {
+      const s = c.seats.find(x => x.id === t.turn);
+      if (!s?.user) c.robot = setTimeout(() => void this.robotPlays(rt), this.env.ROBOT_DELAY_MS);   // a robot plays this seat
+      else c.late = setTimeout(() => void this.emitCards(rt), KICK_AFTER_MS + 200);   // 30 s: the « Exclure ? » button appears
+    }
+    await this.emitCards(rt);
+  }
+
+  private async robotPlays(rt: RoomRt) {
+    const t = rt.cards.tdc;
+    if (!t || t.turn === null || rt.cards.seats.find(s => s.id === t.turn)?.user) return;
+    const turn = t.turn, m = Tdc.botMove(t, turn);
+    if ('play' in m) Tdc.play(t, turn, m.play); else Tdc.pass(t, turn);
+    await this.afterMove(rt, turn);
+  }
+
+  /** Watching: take a seat a robot plays (my own first); its hand and this round's points become mine. */
+  async tableJoin(socket: Socket): Promise<'ok' | 'full'> {
+    const rt = this.roomOf(socket), me = (socket.data as SocketData).account;
+    const r = Table.join(rt.cards.seats, me.id);
+    if (r === 'seated') return 'ok';
+    if (r === 'full') return 'full';
+    rt.cards.seats = r.seats;
+    const inRound = !!rt.cards.tdc && rt.cards.tdc.turn !== null;
+    await this.say(rt, null, r.was.owner === me.id ? `${me.name} reprend sa place.` : `${me.name} prend la place de ${r.was.name}${inRound ? ' et joue sa main en cours : les points de la manche seront les siens' : ''}.`);
+    await this.afterMove(rt, rt.cards.tdc?.turn ?? null);
+    return 'ok';
+  }
+
+  async tableLeave(socket: Socket) { await this.tableLeaveOf(this.roomOf(socket), (socket.data as SocketData).account.id); }
+
+  private async tableLeaveOf(rt: RoomRt, user: string) {
+    if (!Table.seatOfUser(rt.cards.seats, user)) return;
+    const inRound = !!rt.cards.tdc && rt.cards.tdc.turn !== null;
+    rt.cards.seats = Table.leave(rt.cards.seats, user, inRound);
+    const [m] = await this.members(rt, user);
+    await this.say(rt, null, inRound ? `${m?.name ?? '?'} quitte la table : un robot finit la manche à sa place (les points de la manche restent les siens).` : `${m?.name ?? '?'} quitte la table : un robot prend sa place.`);
+    await this.afterMove(rt, rt.cards.tdc?.turn ?? null);
+  }
+
+  /** /kick (or the button on his seat): a vote to make the late player leave the table. */
+  async askKick(socket: Socket, name?: string): Promise<'vote'> {
+    const rt = this.roomOf(socket), me = (socket.data as SocketData).account.id;
+    if (this.activity(rt).activity !== 'cards' || !rt.cards.tdc || rt.cards.tdc.turn === null) throw new UserError('/kick sert pendant une partie de cartes.');
+    const late = this.lateSeat(rt);
+    const lateName = late ? (await this.members(rt, late.user))[0]?.name ?? '?' : '';
+    if (name && (!late || lateName.toLowerCase() !== name.toLowerCase())) throw new UserError(`${name} ne fait pas attendre la table : seul le joueur dont le tour dure depuis 30 s peut être exclu.`);
+    if (!late) throw new UserError('Personne ne fait attendre la table : /kick vise le joueur dont le tour dure depuis 30 s.');
+    await this.launch(rt, { kind: 'kick', by: me, target: late.user, label: `propose d'exclure ${lateName} de la table : son tour dure depuis ${late.secs} s` });
+    return 'vote';
   }
 
   // ---------------------------------------------------------------- the console's notices

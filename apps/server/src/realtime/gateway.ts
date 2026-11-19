@@ -184,9 +184,7 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
   credit(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('credit:give', b, async v => { await this.hub.giveCredit(s, v.to, v.delta); return null; }); }
 
   @SubscribeMessage('kick:ask')
-  kick(@MessageBody() b: unknown) {
-    return this.run('kick:ask', b, async () => { throw new UserError('Personne n\'est en retard à une table : /kick sert pendant une partie de cartes.'); });
-  }
+  kick(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('kick:ask', b, v => this.hub.askKick(s, v.name)); }
 
   // ---------------------------------------------------------------- Demi-disque
   @SubscribeMessage('disk:rules')
@@ -219,6 +217,18 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
   wheelSpin(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('wheel:spin', b, async () => { await this.hub.wheelSpin(s); return null; }); }
   @SubscribeMessage('wheel:edit')
   wheelEdit(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('wheel:edit', b, async () => { await this.hub.wheelEdit(s); return null; }); }
+
+  // ---------------------------------------------------------------- Cartes
+  @SubscribeMessage('cards:deal')
+  cardsDeal(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('cards:deal', b, async () => { await this.hub.cardsDeal(s); return null; }); }
+  @SubscribeMessage('cards:play')
+  cardsPlay(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('cards:play', b, async v => { await this.hub.cardsMove(s, { play: v.cards }); return null; }); }
+  @SubscribeMessage('cards:pass')
+  cardsPass(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('cards:pass', b, async () => { await this.hub.cardsMove(s, { pass: true }); return null; }); }
+  @SubscribeMessage('table:join')
+  tableJoin(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('table:join', b, () => this.hub.tableJoin(s)); }
+  @SubscribeMessage('table:leave')
+  tableLeave(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('table:leave', b, async () => { await this.hub.tableLeave(s); return null; }); }
 }
 
 /** An activity and its format, in words (« Tarot à 5 », « Demi-disque · Amphithéâtre »). */
