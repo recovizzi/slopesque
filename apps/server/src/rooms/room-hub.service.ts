@@ -5,9 +5,10 @@ import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { Server, Socket } from 'socket.io';
 import type postgres from 'postgres';
 import { castVote, closeVote, creditWord, defaultHue, startVote, tierOf, type Vote } from '@slopesque/engines';
+import * as D from '@slopesque/engines';
 import { PRESENCE, READY_ACTIVITIES, type ActivityChoice, type EmojiView, type GifRef, type MemberView, type RoomEvent, type RoomState, type StickerView } from '@slopesque/shared';
 import { DB, SQL, type Db } from '../db/db.module.js';
-import { accounts, customEmoji, media, messages, roomMembers, rooms, stickers } from '../db/schema.js';
+import { accounts, customEmoji, media, messages, palmares, roomMembers, rooms, stickers } from '../db/schema.js';
 import { sql } from 'drizzle-orm';
 import { MediaService, type MediaRow } from '../media/media.service.js';
 import { PreviewService } from '../external/preview.service.js';
@@ -17,7 +18,7 @@ import { ADMIN_CHANNEL, RoomsService, type AdminNotice, type Room } from './room
 import type { Account } from '../accounts/accounts.service.js';
 
 interface MemberRt { sockets: Set<string>; awaySince: number | null; grace: NodeJS.Timeout | null }
-interface RoomRt { room: Room; seq: number; members: Map<string, MemberRt>; vote: { id: number; v: Vote; timer: NodeJS.Timeout } | null }
+interface RoomRt { room: Room; seq: number; members: Map<string, MemberRt>; vote: { id: number; v: Vote; timer: NodeJS.Timeout } | null; disk: D.DiskState; diskTimer: NodeJS.Timeout | null }
 export interface SocketData { account: Account; ip: string; roomId: string | null }
 
 @Injectable()
@@ -34,13 +35,23 @@ export class RoomHub implements OnModuleInit {
     await this.sql.listen(ADMIN_CHANNEL, payload => { try { this.onAdmin(JSON.parse(payload) as AdminNotice); } catch { /* malformed */ } });
   }
 
+  /** A room starts being played (first player since the server started): its Demi-disque from the saved rules; a round
+   *  that was running when the server stopped is cancelled, and it is said. */
+  private async load(room: Room): Promise<RoomRt> {
+    const saved = (room.rules.disk ?? {}) as { rules?: D.DiskRules; round?: number; guessing?: boolean };
+    const disk = { ...D.newDisk({ ...D.DEFAULT_RULES, ...saved.rules }), round: saved.round ?? 1, phase: (saved.round ?? 1) > 1 ? 'writing' as const : 'lobby' as const };
+    const rt: RoomRt = { room, seq: 0, members: new Map(), vote: null, disk, diskTimer: null };
+    if (saved.guessing) { await this.saveDisk(rt); await this.chat.send(room.id, null, 'Le serveur a redémarré : tour annulé.', null, 'system'); }
+    return rt;
+  }
+
   // ---------------------------------------------------------------- join / leave
   async join(socket: Socket, key: string): Promise<RoomState> {
     const room = await this.rooms.byKey(key);
     if (!room) throw new UserError('unknown');
     const data = socket.data as SocketData, me = data.account.id;
     if (data.roomId && data.roomId !== room.id) this.leave(socket);
-    const rt = this.live.get(room.id) ?? { room, seq: 0, members: new Map(), vote: null };
+    const rt = this.live.get(room.id) ?? await this.load(room);
     this.live.set(room.id, rt);
 
     const existing = await this.db.query.roomMembers.findFirst({ where: and(eq(roomMembers.roomId, room.id), eq(roomMembers.accountId, me)) });
@@ -93,7 +104,7 @@ export class RoomHub implements OnModuleInit {
   async state(rt: RoomRt, me: string): Promise<RoomState> {
     return { seq: rt.seq, room: { key: rt.room.key, name: rt.room.name, createdAt: rt.room.createdAt.getTime() }, me, hostId: rt.room.hostId,
       members: await this.members(rt), chat: await this.chat.page(rt.room.id, rt.room.createdAt), serverTime: Date.now(),
-      stickers: await this.stickerViews(rt), emoji: await this.emojiViews(rt), activity: this.activity(rt) };
+      stickers: await this.stickerViews(rt), emoji: await this.emojiViews(rt), activity: this.activity(rt), disk: D.diskView(rt.disk, me) };
   }
 
   private async members(rt: RoomRt, only?: string): Promise<MemberView[]> {
@@ -332,6 +343,97 @@ export class RoomHub implements OnModuleInit {
     const [m] = await this.db.insert(messages).values({ roomId: rt.room.id, authorId: null, kind: 'credit', data: { by: me, to, delta, tier: tierOf(delta).name, words: creditWord(Math.abs(delta)) } }).returning();
     this.emit(rt, { type: 'message', message: this.chat.view(m!) });
     await this.emitMember(rt, to);
+  }
+
+  // ---------------------------------------------------------------- Demi-disque
+  /** Each player gets the round as he may see it (the host's answer hidden from the others until the reveal). */
+  private async emitDisk(rt: RoomRt) {
+    rt.seq++;
+    for (const s of await this.io.in(`room:${rt.room.id}`).fetchSockets()) s.emit('event', { type: 'disk', disk: D.diskView(rt.disk, (s.data as SocketData).account.id), seq: rt.seq });
+  }
+  private async saveDisk(rt: RoomRt) {
+    const rules = { ...rt.room.rules, disk: { rules: { ...rt.disk.rules, ...rt.disk.pending }, round: rt.disk.round, guessing: rt.disk.phase === 'guessing' } };
+    await this.db.update(rooms).set({ rules }).where(eq(rooms.id, rt.room.id));
+    rt.room = { ...rt.room, rules };
+  }
+  private hostOnly(rt: RoomRt, socket: Socket) { if (rt.room.hostId !== (socket.data as SocketData).account.id) throw new UserError('Seul l\'hôte peut faire ça.'); }
+  private wrap<T>(f: () => T): T { try { return f(); } catch (e) { if (e instanceof D.DiskError) throw new UserError(e.message); throw e; } }
+  /** The candidates of a round: the players who joined (« Participer »), connected, except the host. */
+  private candidates(rt: RoomRt, playing: Set<string>) { return this.connected(rt).filter(id => playing.has(id) && id !== rt.disk.host); }
+
+  async diskRules(socket: Socket, changes: Partial<D.DiskRules>) {
+    const rt = this.roomOf(socket);
+    this.hostOnly(rt, socket);
+    const r = D.setRules(rt.disk, changes);
+    rt.disk = r.state;
+    await this.saveDisk(rt);
+    await this.emitDisk(rt);
+    return r.now ? 'now' as const : 'pending' as const;
+  }
+
+  async diskJoin(socket: Socket) {
+    const rt = this.roomOf(socket), me = (socket.data as SocketData).account;
+    await this.db.update(roomMembers).set({ playing: true }).where(and(eq(roomMembers.roomId, rt.room.id), eq(roomMembers.accountId, me.id)));
+    await this.emitMember(rt, me.id);
+    await this.say(rt, null, `${me.name} rejoint la partie.`);
+  }
+
+  async diskStart(socket: Socket, word: string, target: number) {
+    const rt = this.roomOf(socket);
+    this.hostOnly(rt, socket);
+    rt.disk = this.wrap(() => D.startRound(rt.disk.phase === 'reveal' || rt.disk.phase === 'lobby' ? D.nextRound(rt.disk) : rt.disk, rt.room.hostId!, word, target));
+    if (this.activity(rt).activity !== 'disk') await this.setActivity(rt, { activity: 'disk', mode: rt.disk.mode });
+    await this.saveDisk(rt);
+    await this.say(rt, null, `Tour ${rt.disk.round} : « ${rt.disk.word} »`);
+    if (rt.diskTimer) clearTimeout(rt.diskTimer);
+    rt.diskTimer = setTimeout(() => void this.diskReveal(rt), rt.disk.deadline! - Date.now());
+    await this.emitDisk(rt);
+  }
+
+  async diskGuess(socket: Socket, value: number) {
+    const rt = this.roomOf(socket), me = (socket.data as SocketData).account.id;
+    const [m] = await this.db.select({ playing: roomMembers.playing }).from(roomMembers).where(and(eq(roomMembers.roomId, rt.room.id), eq(roomMembers.accountId, me)));
+    if (!m?.playing) throw new UserError('Clique d\'abord « Participer ».');
+    rt.disk = this.wrap(() => D.guess(rt.disk, me, value));
+    await this.emitDisk(rt);
+    const playing = new Set((await this.db.select({ id: roomMembers.accountId }).from(roomMembers).where(and(eq(roomMembers.roomId, rt.room.id), eq(roomMembers.playing, true)))).map(r => r.id));
+    if (D.allValidated(rt.disk, this.candidates(rt, playing))) await this.diskReveal(rt);   // everyone validated: no need to wait
+  }
+
+  /** The end of the answer time (or everyone validated): the points, the Palmarès, the pending rules. */
+  private async diskReveal(rt: RoomRt) {
+    if (rt.disk.phase !== 'guessing') return;
+    if (rt.diskTimer) { clearTimeout(rt.diskTimer); rt.diskTimer = null; }
+    const r = D.reveal(rt.disk);
+    rt.disk = r.state;
+    for (const [id, pts] of Object.entries(r.points)) if (pts) await this.db.update(roomMembers).set({ score: sql`${roomMembers.score} + ${pts}` }).where(and(eq(roomMembers.roomId, rt.room.id), eq(roomMembers.accountId, id)));
+    const top = Math.max(0, ...Object.values(r.state.results).map(x => x.points));
+    for (const [id, x] of Object.entries(r.state.results)) await this.db.insert(palmares).values({ roomId: rt.room.id, game: 'disk', data: { account: id, won: x.points === top && top > 0, pts: x.points, perfect: x.perfect } });
+    await this.saveDisk(rt);
+    await this.emitDisk(rt);
+    for (const id of Object.keys(r.points)) await this.emitMember(rt, id);
+    if (r.best) { const [b] = await this.members(rt, r.best[0]); await this.say(rt, null, `${b?.name ?? '?'} gagne le tour (+${r.best[1].points}${r.best[1].perfect ? ', perfect !' : ''})`); }
+  }
+
+  async diskNext(socket: Socket) {
+    const rt = this.roomOf(socket);
+    this.hostOnly(rt, socket);
+    if (rt.disk.phase === 'guessing') throw new UserError('Le tour n\'est pas fini.');
+    rt.disk = D.nextRound(rt.disk);
+    await this.saveDisk(rt);
+    await this.emitDisk(rt);
+  }
+
+  async diskReset(socket: Socket) {
+    const rt = this.roomOf(socket);
+    this.hostOnly(rt, socket);
+    if (rt.diskTimer) { clearTimeout(rt.diskTimer); rt.diskTimer = null; }
+    await this.db.update(roomMembers).set({ score: 0 }).where(eq(roomMembers.roomId, rt.room.id));
+    rt.disk = { ...D.newDisk(rt.disk.rules), round: 1 };
+    await this.saveDisk(rt);
+    await this.emitDisk(rt);
+    for (const id of rt.members.keys()) await this.emitMember(rt, id);
+    await this.say(rt, null, 'La partie a été réinitialisée.');
   }
 
   // ---------------------------------------------------------------- the console's notices

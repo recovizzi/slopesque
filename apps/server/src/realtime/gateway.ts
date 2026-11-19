@@ -187,6 +187,20 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
   kick(@MessageBody() b: unknown) {
     return this.run('kick:ask', b, async () => { throw new UserError('Personne n\'est en retard à une table : /kick sert pendant une partie de cartes.'); });
   }
+
+  // ---------------------------------------------------------------- Demi-disque
+  @SubscribeMessage('disk:rules')
+  diskRules(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('disk:rules', b, v => this.hub.diskRules(s, v)); }
+  @SubscribeMessage('disk:join')
+  diskJoin(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('disk:join', b, async () => { await this.hub.diskJoin(s); return null; }); }
+  @SubscribeMessage('disk:start')
+  diskStart(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('disk:start', b, async v => { await this.hub.diskStart(s, v.word, v.target); return null; }); }
+  @SubscribeMessage('disk:guess')
+  diskGuess(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('disk:guess', b, async v => { await this.hub.diskGuess(s, v.value); return null; }); }
+  @SubscribeMessage('disk:next')
+  diskNext(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('disk:next', b, async () => { await this.hub.diskNext(s); return null; }); }
+  @SubscribeMessage('disk:reset')
+  diskReset(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('disk:reset', b, async () => { await this.hub.diskReset(s); return null; }); }
 }
 
 /** An activity and its format, in words (« Tarot à 5 », « Demi-disque · Amphithéâtre »). */

@@ -74,6 +74,7 @@ export interface RoomState {
   stickers: StickerView[];
   emoji: EmojiView[];
   activity: ActivityChoice;
+  disk: DiskView;
   serverTime: number;
 }
 
@@ -89,7 +90,24 @@ export type RoomEvent =
   | { type: 'message-updated'; message: MessageView }
   | { type: 'stickers'; stickers: StickerView[] }
   | { type: 'emoji'; emoji: EmojiView[] }
-  | { type: 'activity'; activity: ActivityChoice };
+  | { type: 'activity'; activity: ActivityChoice }
+  | { type: 'disk'; disk: DiskView };
+
+/** The Demi-disque as a player sees it (the host's answer hidden from the others until the reveal): engines' DiskState. */
+export interface DiskView {
+  rules: { topic: string; left: string; right: string; roundSeconds: 15 | 30 | 60; mode: 'ray' | 'amphi' };
+  pending: Partial<DiskView['rules']> | null;
+  round: number;
+  phase: 'lobby' | 'writing' | 'guessing' | 'reveal';
+  word: string;
+  mode: 'ray' | 'amphi';
+  target: number | null;
+  host: string | null;
+  guesses: Record<string, number>;
+  results: Record<string, { distance: number; points: number; perfect: boolean }>;
+  hostPoints: number | null;
+  deadline: number | null;
+}
 
 /** An activity and its format (/activity, the host's choice). Only the activities in READY_ACTIVITIES can be chosen. */
 export const activityChoice = z.object({
@@ -100,7 +118,7 @@ export const activityChoice = z.object({
 });
 export type ActivityChoice = z.infer<typeof activityChoice>;
 /** The activities the V1 can play now (grows with the milestones). */
-export const READY_ACTIVITIES: ActivityChoice['activity'][] = ['chat'];
+export const READY_ACTIVITIES: ActivityChoice['activity'][] = ['chat', 'disk'];
 export type SequencedEvent = RoomEvent & { seq: number };
 
 // ------------------------------------------------------------------ intents (client → server), with their answers
@@ -132,6 +150,13 @@ export const intents = {
   'activity:choose': z.object({ choice: activityChoice }),
   'credit:give': z.object({ to: z.string().uuid(), delta: z.number().int().min(-1000).max(1000).refine(n => n !== 0) }),
   'kick:ask': z.object({ name: z.string().max(20).optional() }),
+  'disk:rules': z.object({ topic: z.string().trim().min(1).max(60).optional(), left: z.string().trim().min(1).max(40).optional(), right: z.string().trim().min(1).max(40).optional(),
+    roundSeconds: z.union([z.literal(15), z.literal(30), z.literal(60)]).optional(), mode: z.enum(['ray', 'amphi']).optional() }),
+  'disk:join': z.object({}),
+  'disk:start': z.object({ word: z.string().trim().min(1).max(40), target: z.number() }),
+  'disk:guess': z.object({ value: z.number() }),
+  'disk:next': z.object({}),
+  'disk:reset': z.object({}),
   'gif:favorites': z.object({ favorites: z.array(z.object({ id: z.string().max(64), provider: z.string().max(16), url: z.url(), w: z.number().int(), h: z.number().int(), title: z.string().max(200) })).max(200) }),
 } as const;
 export type IntentName = keyof typeof intents;
@@ -168,6 +193,12 @@ export interface IntentResults {
   'activity:choose': 'applied' | 'vote';
   'credit:give': null;
   'kick:ask': 'vote';
+  'disk:rules': 'now' | 'pending';
+  'disk:join': null;
+  'disk:start': null;
+  'disk:guess': null;
+  'disk:next': null;
+  'disk:reset': null;
 }
 
 /** GIF results: the provider that answered, or why there is none (no key, key refused, no answer). */
