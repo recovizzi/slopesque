@@ -1,0 +1,43 @@
+# Local development services. Ports bound to 127.0.0.1 only; the dev-only credentials match .env.example.
+# Production uses docker-compose.prod.yml (internal network, secrets from the machine's .env).
+name: slopesque-dev
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: slopesque
+      POSTGRES_PASSWORD: dev-only-postgres
+      POSTGRES_DB: slopesque
+    ports: ['127.0.0.1:55432:5432']
+    volumes: [postgres:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U slopesque -d slopesque']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--save', '', '--appendonly', 'no', '--maxmemory', '128mb', '--maxmemory-policy', 'allkeys-lru']
+    ports: ['127.0.0.1:56379:6379']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  rustfs:
+    image: rustfs/rustfs:1.0.6
+    environment:
+      RUSTFS_ACCESS_KEY: slopesque
+      RUSTFS_SECRET_KEY: dev-only-rustfs-secret
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: ':9000'
+    ports: ['127.0.0.1:59000:9000']
+    volumes: [rustfs:/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:9000/health || curl -fs http://127.0.0.1:9000/health || exit 1']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+volumes:
+  postgres:
+  rustfs:

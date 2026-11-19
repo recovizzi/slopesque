@@ -1,0 +1,20 @@
+node_modules/
+dist/
+.turbo/
+coverage/
+*.tsbuildinfo
+# secrets and local notes: never committed (public repository)
+.env
+.env.*
+!.env.example
+*.pem
+MANQUES.md
+# local data and test output
+.data/
+.cache/
+shots/
+signed/
+release/
+web-ext-artifacts/
+test-results/
+playwright-report/

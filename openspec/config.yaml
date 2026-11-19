@@ -1,0 +1,21 @@
+schema: spec-driven
+
+context: |
+  Slopesque : jeux entre amis dans un panneau flottant d'extension de navigateur (MV3). Un salon s'ouvre sur le Chat ;
+  activités : Demi-disque (et Amphithéâtre), Sondage, Roulette, Cartes (Trou du cul, Tarot), intégrations web.
+  Identité par code utilisateur, sans mot de passe. Monorepo pnpm + Turborepo :
+    - apps/server : NestJS 12 (ESM), Socket.IO, Drizzle + Postgres, Redis (cache facultatif), RustFS (images, S3).
+    - apps/web : React + Vite, construit dans l'extension.
+    - apps/extension : MV3 Chrome / Edge / Firefox, releases GitHub.
+    - packages/shared (types, protocole zod), packages/engines (règles pures des jeux).
+  Le serveur fait foi. Dépôt public : aucun secret. Données jetables, aucune sauvegarde.
+  Langue : specs et UI en français, code et commentaires en anglais. Conventional commits.
+
+rules:
+  proposal:
+    - Écrire en français
+    - Lister les questions ouvertes plutôt que trancher seul une règle de jeu
+  design:
+    - Chaque décision donne sa raison et l'alternative rejetée
+  tasks:
+    - Tâches de 2 h maximum, en jalons jouables, étiquetées par partie du monorepo ([server], [web], [extension]…)

@@ -1,0 +1,5 @@
+# Git hooks (installed by `pnpm install`). The secret scan refuses a commit holding a key (public repository).
+pre-commit:
+  commands:
+    secrets:
+      run: node tools/scan-secrets.mjs --staged

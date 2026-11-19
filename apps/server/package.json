@@ -1,0 +1,43 @@
+{
+  "name": "@slopesque/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json && node scripts-dev.mjs",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run --passWithNoTests",
+    "admin": "node dist/admin.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node dist/db/migrate-cli.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1172.0",
+    "@nestjs/common": "^12.5.1",
+    "@nestjs/core": "^12.5.1",
+    "@nestjs/platform-express": "^12.5.1",
+    "@nestjs/platform-socket.io": "^12.5.1",
+    "@nestjs/schedule": "^12.0.4",
+    "@nestjs/websockets": "^12.5.1",
+    "@slopesque/engines": "workspace:*",
+    "@slopesque/shared": "workspace:*",
+    "drizzle-orm": "^0.45.4",
+    "ioredis": "^6.0.0",
+    "postgres": "^4.1.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "sharp": "^0.35.5",
+    "socket.io": "^4.8.4"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "drizzle-kit": "^0.31.11",
+    "socket.io-client": "^4.8.4",
+    "typescript": "~6.0.3",
+    "vitest": "^5.1.1"
+  }
+}
