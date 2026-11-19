@@ -35,7 +35,7 @@ describe('Tarot', () => {
   it('robots finish deals at 4 and 5, with a result and marks adding up to 0', () => {
     for (const seats of [['a', 'b', 'c', 'd'], ['a', 'b', 'c', 'd', 'e']]) {
       let t = T.deal(seats, null);
-      for (let k = 0; k < 10 && t.phase !== 'done'; k++) { playOut(t); if (t.phase === 'done' && !t.result) t = T.deal(seats, t); }
+      for (let k = 0; k < 10; k++) { playOut(t); if ((t.phase as string) === 'done' && t.result) break; t = T.deal(seats, t); }
       expect(t.phase).toBe('done');
       if (t.result) expect(Object.values(t.result.marks).reduce((a, b) => a + b, 0)).toBe(0);
     }
