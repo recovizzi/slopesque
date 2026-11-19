@@ -1,0 +1,100 @@
+// Accounts (openspec: player-account). Found by the HMAC of the code (with the server's secret), never the code itself;
+// the first unknown code makes an empty account; a replaced code is retired for ever. Unknown codes are limited per IP.
+import { createHmac } from 'node:crypto';
+import { Inject, Injectable } from '@nestjs/common';
+import { eq, sql } from 'drizzle-orm';
+import { canonicalCode, codeStrength, CODE_MIN_LEN } from '@slopesque/engines';
+import { KEY_ALPHABET, LIMITS, type AccountView, type FatalReason, type SavedRoom } from '@slopesque/shared';
+import { ENV, type Env } from '../config/config.module.js';
+import { DB, type Db } from '../db/db.module.js';
+import { accountNames, accounts, retiredCodes } from '../db/schema.js';
+import { CacheService } from '../cache/cache.service.js';
+import { UserError } from '../errors.js';
+
+export type Account = typeof accounts.$inferSelect;
+
+@Injectable()
+export class AccountsService {
+  constructor(@Inject(ENV) private readonly env: Env, @Inject(DB) private readonly db: Db, private readonly cache: CacheService) {}
+
+  hmac(code: string) { return createHmac('sha256', this.env.CODE_HMAC_SECRET).update(canonicalCode(code)).digest('hex'); }
+
+  private async isRetired(h: string) { return !!(await this.db.query.retiredCodes.findFirst({ where: eq(retiredCodes.codeHmac, h) })); }
+
+  /** A connection's code → its account (made if new), or why not. */
+  async authenticate(code: string, ip: string): Promise<{ account: Account } | { reason: FatalReason }> {
+    if (canonicalCode(code).length < CODE_MIN_LEN) return { reason: 'code' };
+    const h = this.hmac(code);
+    const found = await this.db.query.accounts.findFirst({ where: eq(accounts.codeHmac, h) });
+    if (found) {
+      await this.db.update(accounts).set({ lastSeenAt: new Date() }).where(eq(accounts.id, found.id));
+      return { account: found };
+    }
+    if (await this.isRetired(h)) return { reason: 'retired' };
+    if (!(await this.cache.allow(`code:${ip}`, LIMITS.codeAttempts.count, LIMITS.codeAttempts.perMs))) return { reason: 'limited' };
+    const name = `Joueur ${[...crypto.getRandomValues(new Uint32Array(3))].map(v => KEY_ALPHABET[v % KEY_ALPHABET.length]).join('')}`;
+    const [account] = await this.db.insert(accounts).values({ codeHmac: h, name }).onConflictDoNothing().returning();
+    return account ? { account } : this.authenticate(code, ip);   // made at the same moment by another connection
+  }
+
+  async get(id: string) { return (await this.db.query.accounts.findFirst({ where: eq(accounts.id, id) }))!; }
+
+  view(a: Account): AccountView { return { id: a.id, name: a.name, hue: a.hue, quick: a.quick, rooms: a.rooms }; }
+
+  /** « Reprendre un compte » / « Repartir de zéro »: does an account have this code (limited like unknown codes)? */
+  async find(code: string, ip: string) {
+    if (!(await this.cache.allow(`code:${ip}`, LIMITS.codeAttempts.count, LIMITS.codeAttempts.perMs))) throw new UserError('Trop d\'essais : attends une minute.');
+    const h = this.hmac(code);
+    const a = await this.db.query.accounts.findFirst({ where: eq(accounts.codeHmac, h) });
+    return { exists: !!a, retired: !a && (await this.isRetired(h)), name: a?.name ?? null };
+  }
+
+  /** « Renouveler mon code »: the same account under a new code; the old one retired. */
+  async renew(id: string, code: string) {
+    if (codeStrength(code).level < 2) throw new UserError(codeStrength(code).reason);
+    const h = this.hmac(code), me = await this.get(id);
+    if (h === me.codeHmac) throw new UserError('C\'est déjà ton code.');
+    if (await this.isRetired(h) || await this.db.query.accounts.findFirst({ where: eq(accounts.codeHmac, h) })) throw new UserError('Ce code est déjà pris : choisis-en un autre.');
+    await this.db.transaction(async tx => {
+      await tx.insert(retiredCodes).values({ codeHmac: me.codeHmac }).onConflictDoNothing();
+      await tx.update(accounts).set({ codeHmac: h }).where(eq(accounts.id, id));
+    });
+  }
+
+  /** Admin: a random code for an account, shown once; the old one retired. */
+  async resetCode(id: string, code: string) {
+    const me = await this.get(id);
+    await this.db.transaction(async tx => {
+      await tx.insert(retiredCodes).values({ codeHmac: me.codeHmac }).onConflictDoNothing();
+      await tx.update(accounts).set({ codeHmac: this.hmac(code) }).where(eq(accounts.id, id));
+    });
+  }
+
+  async updateProfile(id: string, p: { name?: string; hue?: number | null; quick?: string | null }) {
+    const me = await this.get(id), changes: Partial<Account> = {};
+    if (p.name !== undefined && p.name && p.name !== me.name) {
+      changes.name = p.name;
+      await this.db.insert(accountNames).values({ accountId: id, name: me.name });   // the past pseudo, for accounts:find
+    }
+    if (p.hue !== undefined) changes.hue = p.hue;
+    if (p.quick !== undefined) changes.quick = p.quick;
+    if (Object.keys(changes).length) await this.db.update(accounts).set(changes).where(eq(accounts.id, id));
+    return this.get(id);
+  }
+
+  async saveRooms(id: string, rooms: SavedRoom[]) { await this.db.update(accounts).set({ rooms }).where(eq(accounts.id, id)); }
+
+  /** Admin: accounts by pseudo (current or past), room, last connection; never a code. */
+  async search(o: { name?: string; roomKey?: string; seenAfter?: Date }) {
+    return this.db.execute<{ id: string; name: string; past: string | null; rooms: string | null; created_at: string; last_seen_at: string }>(sql`
+      select a.id, a.name, a.created_at, a.last_seen_at,
+        (select string_agg(distinct n.name, ', ') from account_names n where n.account_id = a.id) as past,
+        (select string_agg(r.key, ', ') from room_members m join rooms r on r.id = m.room_id where m.account_id = a.id) as rooms
+      from accounts a
+      where (${o.name ?? null}::text is null or a.name ilike '%' || ${o.name ?? null} || '%'
+             or exists (select 1 from account_names n where n.account_id = a.id and n.name ilike '%' || ${o.name ?? null} || '%'))
+        and (${o.roomKey ?? null}::text is null or exists (select 1 from room_members m join rooms r on r.id = m.room_id where m.account_id = a.id and r.key = ${o.roomKey ?? null}))
+        and (${o.seenAfter?.toISOString() ?? null}::timestamptz is null or a.last_seen_at >= ${o.seenAfter?.toISOString() ?? null})
+      order by a.last_seen_at desc limit 50`);
+  }
+}

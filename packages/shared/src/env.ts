@@ -12,6 +12,7 @@ export const envSchema = z.object({
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   ALLOWED_ORIGINS: list,
   ALLOW_INSECURE: bool,
+  TRUST_PROXY: bool,   // behind Caddy: the player's address is in X-Forwarded-For
   CODE_HMAC_SECRET: z.string().min(16, 'au moins 16 caractères'),
   DATABASE_URL: z.string().regex(/^postgres(ql)?:\/\//, 'une adresse postgres://…'),
   REDIS_URL: optional,

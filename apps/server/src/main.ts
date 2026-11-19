@@ -3,6 +3,7 @@ import 'reflect-metadata';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.js';
+import { SlopesqueIoAdapter } from './realtime/io-adapter.js';
 import { isInsecureUrl } from '@slopesque/shared';
 import { ENV, type Env } from './config/config.module.js';
 
@@ -10,6 +11,7 @@ const levels = { debug: ['debug', 'log', 'warn', 'error'], info: ['log', 'warn',
 const app = await NestFactory.create(AppModule, { logger: [...levels[(process.env.LOG_LEVEL as keyof typeof levels) ?? 'info'] ?? levels.info] });
 const env = app.get<Env>(ENV);
 app.enableShutdownHooks();
+app.useWebSocketAdapter(new SlopesqueIoAdapter(app, env.ALLOWED_ORIGINS));
 // the extension's pages (and the dev app on :5173) call the API from another origin
 app.enableCors({ origin: env.ALLOWED_ORIGINS.length ? env.ALLOWED_ORIGINS : true });
 await app.listen(env.PORT, '0.0.0.0');
