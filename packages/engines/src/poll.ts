@@ -94,8 +94,6 @@ export function temperatures(poll: Poll): number[] {
 
 const LINE = { x0: 18, x1: 282, y: 20 };
 const SHAPE = { cx: 150, cy: 98, r: 64 };
-const toSvg = (n: number, p: Point): Point =>
-  n === 2 ? [LINE.x0 + (LINE.x1 - LINE.x0) * p[0], LINE.y] : [SHAPE.cx + SHAPE.r * p[0], SHAPE.cy + SHAPE.r * p[1]];
 
 /** Answer at an SVG point of the gradient, or null outside the slider / the shape. */
 export function fromSvg(n: number, x: number, y: number): Point | null {
