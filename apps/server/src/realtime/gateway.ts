@@ -201,6 +201,24 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
   diskNext(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('disk:next', b, async () => { await this.hub.diskNext(s); return null; }); }
   @SubscribeMessage('disk:reset')
   diskReset(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('disk:reset', b, async () => { await this.hub.diskReset(s); return null; }); }
+
+  // ---------------------------------------------------------------- Sondage, Roulette
+  @SubscribeMessage('poll:settings')
+  pollSettings(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('poll:settings', b, async v => { await this.hub.pollSettings(s, v); return null; }); }
+  @SubscribeMessage('poll:publish')
+  pollPublish(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('poll:publish', b, async v => { await this.hub.pollPublish(s, v); return null; }); }
+  @SubscribeMessage('poll:answer')
+  pollAnswer(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('poll:answer', b, async v => { await this.hub.pollAnswer(s, v.answer); return null; }); }
+  @SubscribeMessage('poll:end')
+  pollEnd(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('poll:end', b, async () => { await this.hub.pollEnd(s); return null; }); }
+  @SubscribeMessage('poll:next')
+  pollNext(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('poll:next', b, async () => { await this.hub.pollNext(s); return null; }); }
+  @SubscribeMessage('wheel:set')
+  wheelSet(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('wheel:set', b, async v => { await this.hub.wheelSet(s, v.items); return null; }); }
+  @SubscribeMessage('wheel:spin')
+  wheelSpin(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('wheel:spin', b, async () => { await this.hub.wheelSpin(s); return null; }); }
+  @SubscribeMessage('wheel:edit')
+  wheelEdit(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('wheel:edit', b, async () => { await this.hub.wheelEdit(s); return null; }); }
 }
 
 /** An activity and its format, in words (« Tarot à 5 », « Demi-disque · Amphithéâtre »). */

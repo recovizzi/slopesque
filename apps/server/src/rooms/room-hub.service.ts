@@ -6,7 +6,8 @@ import type { Server, Socket } from 'socket.io';
 import type postgres from 'postgres';
 import { castVote, closeVote, creditWord, defaultHue, startVote, tierOf, type Vote } from '@slopesque/engines';
 import * as D from '@slopesque/engines';
-import { PRESENCE, READY_ACTIVITIES, type ActivityChoice, type EmojiView, type GifRef, type MemberView, type RoomEvent, type RoomState, type StickerView } from '@slopesque/shared';
+import { Poll, Wheel } from '@slopesque/engines';
+import { PRESENCE, READY_ACTIVITIES, type PollAnswer, type PollView, type WheelView, type PollPicView, type ActivityChoice, type EmojiView, type GifRef, type MemberView, type RoomEvent, type RoomState, type StickerView } from '@slopesque/shared';
 import { DB, SQL, type Db } from '../db/db.module.js';
 import { accounts, customEmoji, media, messages, palmares, roomMembers, rooms, stickers } from '../db/schema.js';
 import { sql } from 'drizzle-orm';
@@ -18,7 +19,9 @@ import { ADMIN_CHANNEL, RoomsService, type AdminNotice, type Room } from './room
 import type { Account } from '../accounts/accounts.service.js';
 
 interface MemberRt { sockets: Set<string>; awaySince: number | null; grace: NodeJS.Timeout | null }
-interface RoomRt { room: Room; seq: number; members: Map<string, MemberRt>; vote: { id: number; v: Vote; timer: NodeJS.Timeout } | null; disk: D.DiskState; diskTimer: NodeJS.Timeout | null }
+interface PollRt { phase: PollView['phase']; round: number; seconds: number; secret: boolean; poll: PollView['poll']; answers: Record<string, PollAnswer>; host: string | null; deadline: number | null; timer: NodeJS.Timeout | null }
+interface WheelRt { phase: WheelView['phase']; items: WheelView['items']; spin: WheelView['spin']; needle: number; timer: NodeJS.Timeout | null }
+interface RoomRt { room: Room; seq: number; members: Map<string, MemberRt>; vote: { id: number; v: Vote; timer: NodeJS.Timeout } | null; disk: D.DiskState; diskTimer: NodeJS.Timeout | null; poll: PollRt; wheel: WheelRt }
 export interface SocketData { account: Account; ip: string; roomId: string | null }
 
 @Injectable()
@@ -40,7 +43,11 @@ export class RoomHub implements OnModuleInit {
   private async load(room: Room): Promise<RoomRt> {
     const saved = (room.rules.disk ?? {}) as { rules?: D.DiskRules; round?: number; guessing?: boolean };
     const disk = { ...D.newDisk({ ...D.DEFAULT_RULES, ...saved.rules }), round: saved.round ?? 1, phase: (saved.round ?? 1) > 1 ? 'writing' as const : 'lobby' as const };
-    const rt: RoomRt = { room, seq: 0, members: new Map(), vote: null, disk, diskTimer: null };
+    const ps = (room.rules.poll ?? {}) as { seconds?: number; secret?: boolean; round?: number };
+    const ws = (room.rules.wheel ?? {}) as { items?: WheelView['items']; needle?: number };
+    const rt: RoomRt = { room, seq: 0, members: new Map(), vote: null, disk, diskTimer: null,
+      poll: { phase: 'writing', round: ps.round ?? 1, seconds: ps.seconds ?? 300, secret: ps.secret ?? false, poll: null, answers: {}, host: null, deadline: null, timer: null },
+      wheel: { phase: 'writing', items: ws.items ?? [{ label: '', weight: '' }, { label: '', weight: '' }], spin: null, needle: ws.needle ?? 0, timer: null } };
     if (saved.guessing) { await this.saveDisk(rt); await this.chat.send(room.id, null, 'Le serveur a redémarré : tour annulé.', null, 'system'); }
     return rt;
   }
@@ -104,7 +111,8 @@ export class RoomHub implements OnModuleInit {
   async state(rt: RoomRt, me: string): Promise<RoomState> {
     return { seq: rt.seq, room: { key: rt.room.key, name: rt.room.name, createdAt: rt.room.createdAt.getTime() }, me, hostId: rt.room.hostId,
       members: await this.members(rt), chat: await this.chat.page(rt.room.id, rt.room.createdAt), serverTime: Date.now(),
-      stickers: await this.stickerViews(rt), emoji: await this.emojiViews(rt), activity: this.activity(rt), disk: D.diskView(rt.disk, me) };
+      stickers: await this.stickerViews(rt), emoji: await this.emojiViews(rt), activity: this.activity(rt), disk: D.diskView(rt.disk, me),
+      poll: this.pollView(rt, me), wheel: this.wheelView(rt) };
   }
 
   private async members(rt: RoomRt, only?: string): Promise<MemberView[]> {
@@ -434,6 +442,149 @@ export class RoomHub implements OnModuleInit {
     await this.emitDisk(rt);
     for (const id of rt.members.keys()) await this.emitMember(rt, id);
     await this.say(rt, null, 'La partie a été réinitialisée.');
+  }
+
+  // ---------------------------------------------------------------- Sondage
+  /** What a player sees: while open, who answered and his own answer; at the results, the answers (anonymous when secret). */
+  private pollView(rt: RoomRt, me: string): PollView {
+    const p = rt.poll, open = p.phase === 'open';
+    let answers: Record<string, PollAnswer> | null = null, outcome: PollView['outcome'] = null;
+    if (p.phase === 'results' && p.poll) {
+      const o = Poll.outcome({ ...p.poll, answers: p.answers } as Poll.Poll, p.host ?? '');
+      if (p.secret) {
+        const alias = new Map(Object.keys(p.answers).map((id, i) => [id, `r${i}`]));
+        answers = Object.fromEntries(Object.entries(p.answers).map(([id, a]) => [alias.get(id)!, a]));
+        outcome = { ...o, ranked: o.ranked.map(r => ({ ...r, ids: [] })) };
+      } else { answers = p.answers; outcome = o; }
+    }
+    return { phase: p.phase, round: p.round, seconds: p.seconds, secret: p.secret, poll: p.poll, answered: Object.keys(p.answers),
+      mine: p.answers[me] ?? null, answers: open ? null : answers, outcome, deadline: p.deadline };
+  }
+  private async emitPoll(rt: RoomRt) {
+    rt.seq++;
+    for (const s of await this.io.in(`room:${rt.room.id}`).fetchSockets()) s.emit('event', { type: 'poll', poll: this.pollView(rt, (s.data as SocketData).account.id), seq: rt.seq });
+  }
+  private async saveRules(rt: RoomRt, key: string, value: unknown) {
+    const rules = { ...rt.room.rules, [key]: value };
+    await this.db.update(rooms).set({ rules }).where(eq(rooms.id, rt.room.id));
+    rt.room = { ...rt.room, rules };
+  }
+  private async playingIds(rt: RoomRt) { return new Set((await this.db.select({ id: roomMembers.accountId }).from(roomMembers).where(and(eq(roomMembers.roomId, rt.room.id), eq(roomMembers.playing, true)))).map(r => r.id)); }
+
+  async pollSettings(socket: Socket, v: { seconds?: number; secret?: boolean }) {
+    const rt = this.roomOf(socket);
+    this.hostOnly(rt, socket);
+    if (v.seconds) rt.poll.seconds = v.seconds;
+    if (v.secret !== undefined) rt.poll.secret = v.secret;
+    await this.saveRules(rt, 'poll', { seconds: rt.poll.seconds, secret: rt.poll.secret, round: rt.poll.round });
+    await this.emitPoll(rt);
+  }
+
+  async pollPublish(socket: Socket, v: { kind: 'choices' | 'free' | 'gradient'; question: string; choices: string[]; pics: ({ mediaId?: string; stickerId?: string } | null)[] }) {
+    const rt = this.roomOf(socket);
+    this.hostOnly(rt, socket);
+    if (rt.poll.phase === 'open') throw new UserError('Un sondage est déjà ouvert.');
+    const choices = v.kind === 'free' ? [] : v.choices;
+    const pics: (PollPicView | null)[] = [];
+    if (v.kind === 'choices') for (let i = 0; i < choices.length; i++) {
+      const p = v.pics[i];
+      let pic: PollPicView | null = null;
+      if (p?.mediaId) { const m = await this.picture(p.mediaId, 'poll'); pic = { kind: 'image', src: this.media.url(m.id), w: m.width, h: m.height }; }
+      else if (p?.stickerId) {
+        const [st] = await this.db.select({ m: media }).from(stickers).innerJoin(media, eq(media.id, stickers.mediaId)).where(and(eq(stickers.id, p.stickerId), eq(stickers.roomId, rt.room.id)));
+        if (st) pic = { kind: 'sticker', src: this.media.url(st.m.id), w: st.m.width, h: st.m.height };
+      }
+      pics.push(pic);
+    }
+    const draft = { kind: v.kind, question: v.question, choices, pics };
+    if (!Poll.ready(draft as Poll.PollDraft) || (v.kind !== 'free' && (choices.length < Poll.MIN_CHOICES))) throw new UserError('Il manque la question ou un choix.');
+    if (this.activity(rt).activity !== 'poll') await this.setActivity(rt, { activity: 'poll' });
+    rt.poll = { ...rt.poll, phase: 'open', poll: draft, answers: {}, host: rt.room.hostId, deadline: Date.now() + rt.poll.seconds * 1000, timer: null };
+    rt.poll.timer = setTimeout(() => void this.pollClose(rt), rt.poll.seconds * 1000);
+    await this.say(rt, null, `Sondage ${rt.poll.round} : « ${v.question} »`);
+    await this.emitPoll(rt);
+  }
+
+  async pollAnswer(socket: Socket, answer: PollAnswer) {
+    const rt = this.roomOf(socket), me = (socket.data as SocketData).account.id, p = rt.poll;
+    if (p.phase !== 'open' || !p.poll) throw new UserError('Le sondage est fermé.');
+    if (me !== rt.room.hostId && !(await this.playingIds(rt)).has(me)) throw new UserError('Clique d\'abord « Participer ».');
+    if (me in p.answers) throw new UserError('Tu as déjà répondu.');
+    const ok = p.poll.kind === 'choices' ? typeof answer === 'number' && answer < p.poll.choices.length
+      : p.poll.kind === 'free' ? typeof answer === 'string'
+      : Array.isArray(answer) && answer.every(x => Number.isFinite(x) && Math.abs(x) <= 1.01) && (p.poll.choices.length > 2 || (answer[1] === 0 && answer[0] >= 0));
+    if (!ok) throw new UserError('Réponse invalide.');
+    p.answers[me] = answer;
+    await this.emitPoll(rt);
+    const playing = await this.playingIds(rt);
+    const candidates = this.connected(rt).filter(id => playing.has(id) && id !== p.host);
+    if (candidates.length && candidates.every(id => id in p.answers)) await this.pollClose(rt);   // every candidate answered
+  }
+
+  private async pollClose(rt: RoomRt) {
+    if (rt.poll.phase !== 'open') return;
+    if (rt.poll.timer) clearTimeout(rt.poll.timer);
+    rt.poll = { ...rt.poll, phase: 'results', deadline: null, timer: null };
+    const n = Object.keys(rt.poll.answers).length;
+    await this.say(rt, null, `Sondage terminé : ${n} réponse${n > 1 ? 's' : ''}.`);
+    await this.emitPoll(rt);
+  }
+
+  async pollEnd(socket: Socket) { const rt = this.roomOf(socket); this.hostOnly(rt, socket); await this.pollClose(rt); }
+
+  async pollNext(socket: Socket) {
+    const rt = this.roomOf(socket);
+    this.hostOnly(rt, socket);
+    if (rt.poll.phase === 'open') throw new UserError('Le sondage est encore ouvert.');
+    rt.poll = { ...rt.poll, phase: 'writing', round: rt.poll.round + 1, poll: null, answers: {}, host: null, deadline: null };
+    await this.saveRules(rt, 'poll', { seconds: rt.poll.seconds, secret: rt.poll.secret, round: rt.poll.round });
+    await this.emitPoll(rt);
+  }
+
+  // ---------------------------------------------------------------- Roulette
+  private wheelView(rt: RoomRt): WheelView { const w = rt.wheel; return { phase: w.phase, items: w.items, spin: w.spin, needle: w.needle }; }
+  private emitWheel(rt: RoomRt) { this.emit(rt, { type: 'wheel', wheel: this.wheelView(rt) }); }
+
+  /** The host builds the wheel: everyone sees it as it is typed. */
+  async wheelSet(socket: Socket, items: WheelView['items']) {
+    const rt = this.roomOf(socket);
+    this.hostOnly(rt, socket);
+    if (rt.wheel.phase === 'spinning') throw new UserError('La roue tourne.');
+    rt.wheel = { ...rt.wheel, items, phase: rt.wheel.phase === 'result' ? 'writing' : rt.wheel.phase };
+    await this.saveRules(rt, 'wheel', { items, needle: rt.wheel.needle });
+    this.emitWheel(rt);
+  }
+
+  /** The server draws the angle; every panel animates the same spin, the result comes after it. */
+  async wheelSpin(socket: Socket) {
+    const rt = this.roomOf(socket);
+    this.hostOnly(rt, socket);
+    if (rt.wheel.phase === 'spinning') throw new UserError('La roue tourne déjà.');
+    const why = Wheel.problem(rt.wheel.items);
+    if (why) throw new UserError({ over: 'Le total des poids dépasse 100.', invalid: 'Un poids n\'est pas un nombre.', empty: 'Il faut au moins 2 propositions, toutes écrites.', zero: 'Tous les poids sont à 0.' }[why]);
+    if (this.activity(rt).activity !== 'wheel') await this.setActivity(rt, { activity: 'wheel' });
+    const spin = Wheel.draw(rt.wheel.items, Date.now(), rt.wheel.needle);
+    rt.wheel = { ...rt.wheel, phase: 'spinning', spin, timer: setTimeout(() => void this.wheelStop(rt), Wheel.SPIN_MS) };
+    await this.say(rt, null, 'La roue tourne…');
+    this.emitWheel(rt);
+  }
+
+  private async wheelStop(rt: RoomRt) {
+    const s = rt.wheel.spin;
+    if (rt.wheel.phase !== 'spinning' || !s) return;
+    rt.wheel = { ...rt.wheel, phase: 'result', needle: s.angle, timer: null };
+    await this.saveRules(rt, 'wheel', { items: rt.wheel.items, needle: s.angle });
+    const label = s.items[s.winner]?.label.trim() || `Proposition ${s.winner + 1}`;
+    await this.say(rt, null, `Roulette : « ${label} » (${Math.round(s.shares[s.winner] ?? 0)} % de chances).`);
+    this.emitWheel(rt);
+  }
+
+  async wheelEdit(socket: Socket) {
+    const rt = this.roomOf(socket);
+    this.hostOnly(rt, socket);
+    if (rt.wheel.phase === 'spinning') throw new UserError('La roue tourne.');
+    rt.wheel = { ...rt.wheel, phase: 'writing', spin: null };
+    this.emitWheel(rt);
   }
 
   // ---------------------------------------------------------------- the console's notices
