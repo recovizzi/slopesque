@@ -29,8 +29,16 @@ commandes :
   cul, 4 ou 5 au Tarot ; des robots complètent les places libres) (Texas
   Hold'em et Coinche grisés, à venir) ; Jeux web → Low Tide. L'hôte MUST lancer l'activité choisie tout de suite ;
   un autre joueur MUST la proposer au **vote**.
+  Écrite avec sa suite, elle MUST agir sans fenêtre : `/activity chat`, `/activity sondage`,
+  `/activity cartes tarot` (ou `cartes tarot 5`), `/activity demi-disque amphitheatre` (accents, majuscules et tirets
+  indifférents) ; une activité sans son format (`/activity cartes`) ouvre la fenêtre sur ses formats.
 - **/hote** : demander le rôle d'hôte (voir « Rôle d'hôte » dans game-session).
-- **/credit-social** : changer le crédit social d'un joueur (voir « Crédit social »).
+- **/credit-social** (ou /credit-score) : changer le crédit social d'un joueur (voir « Crédit social ») ; écrite avec sa
+  suite, `/credit-social Léa +100` (ou `+ 100`, `-20`) MUST l'appliquer sans fenêtre, un nom seul ouvre la fenêtre sur
+  ce joueur.
+
+Pendant qu'une commande s'écrit, la liste au-dessus du champ MUST proposer la suite possible (les activités puis leurs
+formats ; les joueurs puis des valeurs) ; Tab ou Entrée prend la proposition, Entrée envoie une commande complète.
 - **/kick** (ou /kick Léa) : faire quitter la table au joueur qui la fait attendre (voir card-games).
 
 #### Scenario: Passer au Tarot à 5 sans être l'hôte
@@ -40,6 +48,32 @@ commandes :
 #### Scenario: L'hôte change d'activité
 - **WHEN** l'hôte écrit /activity et choisit Roulette
 - **THEN** la Roulette commence tout de suite, sans vote
+
+#### Scenario: Commande écrite en entier
+- **WHEN** l'hôte écrit « /activity carte tarot » puis Entrée
+- **THEN** le Tarot commence, sans fenêtre
+
+#### Scenario: Complétion
+- **WHEN** j'écris « /credit-social hu »
+- **THEN** la liste propose « Hugo » ; je le prends, elle propose +10, +50, +100, -10, -50
+
+### Requirement: Défilement et chargement du chat
+Le chat MUST s'ouvrir **en bas** (dernier message visible), à chaque ouverture du panneau ou retour sur le chat, et y
+rester quand un message ou une image arrive si on y était. Plus haut, un **bouton** MUST ramener en bas : dans l'angle
+en bas à gauche des messages, collé au bord et à la partie écriture, seul son coin haut droit arrondi, avec le nombre
+de messages arrivés depuis. Le chat MUST se charger **par morceaux** : le dernier (50 messages) à l'entrée, les
+précédents en remontant, jusqu'au début du salon ou à la limite des 30 jours. Ce qui est chargé MUST rester tant que le
+panneau vit (pas de déchargement), et l'appareil MUST garder les derniers messages du salon (300) : une entrée ne
+demande au serveur que ce qui a suivi (avec une mise à jour des 30 derniers : réactions, votes), pour ne pas tout
+recharger à chaque page ni à chaque ouverture.
+
+#### Scenario: Retour en bas
+- **WHEN** je remonte lire et que deux messages arrivent
+- **THEN** le bouton en bas à gauche affiche 2 ; un clic me ramène au dernier message
+
+#### Scenario: Changer de page
+- **WHEN** le panneau reste ouvert et que je change de page
+- **THEN** le chat réapparaît en bas, et seuls les messages arrivés entre-temps sont demandés au serveur
 
 ### Requirement: Crédit social
 Chaque joueur d'un salon MUST avoir un **crédit social** : une valeur à part, sans rapport avec les scores des jeux et

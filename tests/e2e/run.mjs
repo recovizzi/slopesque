@@ -30,6 +30,7 @@ async function enter(p, name) {
   await frame.locator('.backdrop').click({ force: true }).catch(() => {});
   // a pseudo, so the chat says who is who
   await frame.locator('.bar .avatar').click();
+  check(await until(async () => (await frame.locator('.drawer-right [name="pseudo"]').inputValue()) !== ''), `${name}: the pseudo shown at the first opening of Profil`);
   await frame.locator('.drawer-right [name="pseudo"]').fill(name === 'A' ? 'Léa' : 'Hugo');
   await frame.locator('.drawer-right [name="pseudo"]').press('Enter');
   await frame.locator('.drawer-right [aria-label="Fermer"]').click();
@@ -57,6 +58,9 @@ await b.frame.locator('[name="text"]').fill('merci !');
 await b.frame.locator('[name="text"]').press('Enter');
 const reply = a.frame.locator('.msg.is-reply', { hasText: 'merci' });
 check(await until(async () => (await reply.count()) === 1) && (await reply.locator('.reply-ref').textContent()).includes('salut'), 'A sees B\'s reply with its quote');
+await reply.locator('.reply-ref').hover();
+check(await until(async () => (await a.frame.locator('.quote-pop:not([hidden])').textContent().catch(() => '')).includes('example.com/regles')), 'hovering the quote: the message quoted, whole, in a bubble');
+await a.frame.locator('[name="text"]').hover();
 
 await a.frame.locator('.msg', { hasText: 'merci' }).locator('.msg-body').dblclick();
 check(await until(async () => (await b.frame.locator('.msg', { hasText: 'merci' }).locator('.reaction').count()) === 1), 'a double click reacts; B sees the reaction');
@@ -132,6 +136,13 @@ check(await modal.locator('.credit-apply[data-v="1"] .hiero[data-glyph="1304f"]'
 await modal.locator('.credit-apply[data-v="1"]').click();
 check(await until(async () => (await b.frame.locator('.msg.credit').textContent().catch(() => '')).includes('accorde 20 crédits sociaux à Toi'), 8000), 'credit: said in the chat, B sees it');
 check(await until(async () => (await a.frame.locator('.person', { hasText: 'Hugo' }).locator('.credit-badge').textContent()) === '+20'), 'credit: B\'s badge +20 in the players');
+await a.frame.locator('[name="text"]').fill('/credit-social hu');
+check(await until(async () => (await a.frame.locator('.emoji-suggest li').first().textContent().catch(() => '')).includes('Hugo')), '/credit-social: the players suggested as I type');
+await say(a.frame, '/credit-social Hugo + 5');
+check(await until(async () => (await a.frame.locator('.person', { hasText: 'Hugo' }).locator('.credit-badge').textContent()) === '+25'), '/credit-social Hugo + 5: given at once, without the window');
+await a.frame.locator('[name="text"]').fill('/activity car');
+check(await until(async () => (await a.frame.locator('.emoji-suggest li').first().textContent().catch(() => '')).includes('cartes')), '/activity: the activities suggested as I type');
+await a.frame.locator('[name="text"]').fill('');
 await say(a.frame, '/activity');
 check(await until(async () => (await a.frame.locator('.act-tile').count()) === 6), '/activity: the six kinds of activity');
 await shot(a.page, '08-activity');
@@ -168,8 +179,7 @@ await a.frame.locator('.drawer-left .tab', { hasText: 'Chat' }).click();
 await b.frame.getByRole('button', { name: 'Tour suivant' }).click();
 check(await until(async () => (await b.frame.locator('[name="word"]').count()) === 1), 'next round: the host writes a new word');
 // ---- jalon 6: the Sondage and the Roulette (B hosts)
-await say(b.frame, '/activity');
-await b.frame.locator('.act-tile', { hasText: 'Sondage' }).click();
+await say(b.frame, '/activity sondage');   // written out: no window
 await b.frame.locator('[data-poll="question"]').waitFor();
 await b.frame.locator('[data-poll="question"]').fill('Où partir cet été ?');
 await b.frame.locator('[data-poll="choice"][data-i="0"]').fill('Japon');
@@ -203,6 +213,7 @@ await b.frame.locator('.drawer-right').getByLabel('Joueurs').selectOption('3');
 await b.frame.locator('.drawer-right [aria-label="Fermer"]').click();
 await a.frame.getByRole('button', { name: 'Prendre une place' }).click();   // seated before the deal: the robots wait
 check(await until(async () => (await a.frame.locator('.person, .rank-row', { hasText: 'spectateur' }).count()) === 0), 'cards: seated, A is a player (not a spectator)');
+check(await until(async () => (await b.frame.locator('.cg-seat', { hasText: 'Léa' }).count()) === 1), 'cards: before the deal, B sees A at the table at once');
 await b.frame.getByRole('button', { name: 'Distribuer' }).click();
 check(await until(async () => (await a.frame.locator('.cg-hand .in-hand').count()) >= 17, 8000), 'cards: A sees his hand in a fan');
 check(await a.frame.locator('.cg-seat').count() === 2 && (await a.frame.locator('.cg-seat .seat-bot').count()) === 2, 'cards: two robots on the free seats');
@@ -252,6 +263,17 @@ await shot(a.page, '16-lowtide');
 await say(b.frame, '/activity');
 await b.frame.locator('.act-tile', { hasText: 'Chat' }).click();
 check(await until(async () => (await a.frame.locator('.chat-stage .chat').isVisible())), 'back to the Chat activity');
+const list = a.frame.locator('.chat-stage .chat');
+check(await until(async () => await list.evaluate(el => el.scrollHeight - el.scrollTop - el.clientHeight < 40)), 'chat: opened at its bottom');
+if (await list.evaluate(el => el.scrollHeight > el.clientHeight + 100)) {
+  await list.evaluate(el => { el.scrollTop = 0; });
+  check(await until(async () => (await a.frame.locator('.chat-stage .to-bottom').count()) === 1), 'chat: scrolled up, the button to go back down');
+  await say(b.frame, 'un message pendant que A lit plus haut');
+  check(await until(async () => (await a.frame.locator('.chat-stage .to-bottom b').textContent().catch(() => '')) === '1'), 'chat: the button counts the new messages');
+  await shot(a.page, '16b-chat-bottom-button');
+  await a.frame.locator('.chat-stage .to-bottom').click();
+  check(await until(async () => (await a.frame.locator('.chat-stage .to-bottom').count()) === 0), 'chat: back at the bottom, the button gone');
+} else check(false, 'chat: too short to scroll (the test needs more messages)');
 
 // ---- jalon 9: the shortcut, shown in the Extension tab; « Rester ouvert sur toutes les pages » off by default
 check((await A.sw.evaluate(() => chrome.commands.getAll())).some(c => c.name === 'toggle-panel'), 'extension: the « toggle-panel » command exists');

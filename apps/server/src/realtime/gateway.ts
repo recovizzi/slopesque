@@ -72,7 +72,7 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
   check(@MessageBody() b: unknown) { return this.run('room:check', b, async v => ((await this.rooms.byKey(v.key)) ? 'ok' : 'unknown')); }
 
   @SubscribeMessage('room:join')
-  join(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('room:join', b, v => this.hub.join(s, v.key)); }
+  join(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('room:join', b, v => this.hub.join(s, v.key, v.after)); }
 
   @SubscribeMessage('room:leave')
   leave(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('room:leave', b, async () => { this.hub.leave(s); return null; }); }

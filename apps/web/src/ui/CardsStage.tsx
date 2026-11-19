@@ -9,6 +9,7 @@ import { Tarot as TA } from '@slopesque/engines';
 import { request } from '../net';
 import { useStore } from '../store';
 import { LiveHtml } from './LiveHtml';
+import { useEscape } from './common';
 import * as A from './cards-anim';
 
 /** My hand's fan for the hand's width: the outer cards stay inside, a flat arc (as the maquette). */
@@ -30,6 +31,7 @@ export function CardsStage() {
   const [wonView, setWonView] = useState<string | null>(null);
   const members = new Map(room.members.map(m => [m.id, m]));
   const [sel, setSel] = useState<Set<string>>(new Set()), [rules, setRules] = useState(false), [full, setFull] = useState(false), [note, setNote] = useState('');
+  useEscape(() => setRules(false), rules);
   const mySeat = c.seats.find(s => s.user === me)?.id ?? '';
   useEffect(() => { setSel(new Set()); }, [t?.round, t?.turn, tarot?.deal, tarot?.phase]);
 

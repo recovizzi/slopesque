@@ -4,12 +4,12 @@ import { useState } from 'react';
 import { canonicalCode, codeStrength, CODE_MIN_LEN, newCode, tidyCode, type Strength } from '@slopesque/engines';
 import { checkCode, connect, request } from '../net';
 import { useStore } from '../store';
-import { Icon } from './common';
+import { copyText, Icon } from './common';
 import { ServerField } from './ServerField';
 
 export const SAMPLE_HINT = 'Tape le code affiché sur ton autre appareil (Profil → Compte). Majuscules, minuscules et tirets ne comptent pas.';
 
-async function copy(text: string) { try { await navigator.clipboard.writeText(text); return true; } catch { return false; } }
+const copy = copyText;
 
 export function CodeBox({ code, hidden, onToggle }: { code: string; hidden?: boolean; onToggle?: () => void }) {
   const [copied, setCopied] = useState<'' | 'ok' | 'fail'>('');

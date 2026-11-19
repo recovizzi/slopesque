@@ -34,7 +34,8 @@ export const LIMITS = {
   uploads: { count: 10, perMs: MINUTE },
   codeAttempts: { count: 10, perMs: MINUTE },   // unknown codes, per IP
   maxUploadBytes: 200 * 1024 * 1024,   // not a limit on pictures (any size is compressed), a guard against non-images
-  chatPage: 100,
+  chatPage: 50,                    // a join (or a scroll to the top) loads 50 messages
+  chatRefresh: 30,                 // a join with the device's messages: its last 30 refreshed (reactions, votes)
 } as const;
 
 /** Storage room (openspec: data-retention, Place disponible). */

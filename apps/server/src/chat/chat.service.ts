@@ -1,7 +1,7 @@
 // The chat of a room (openspec: chat-activity, data-retention): messages kept 30 days, read by pages of 100 going up;
 // a reply carries its quote (or says the quoted message is gone); reactions toggle.
 import { Inject, Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
-import { and, desc, eq, inArray, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, lt, lte, sql } from 'drizzle-orm';
 import { HOUR, LIMITS, RETENTION, type ChatPage, type GifRef, type LinkPreview, type MediaView, type MessageView, type Quote } from '@slopesque/shared';
 import { DB, type Db } from '../db/db.module.js';
 import { media, messages, reactions, rooms } from '../db/schema.js';
@@ -42,6 +42,19 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     const views = await this.views(list);
     const old = Date.now() - roomCreatedAt.getTime() > RETENTION.messages;
     return { messages: views, hasMore, start: hasMore ? null : old ? 'purged' : 'begin' };
+  }
+
+  /** A join with the device's last message: what came after it and its last `chatRefresh` messages refreshed, or the
+   *  last page when too much came since (the device starts again from there). */
+  async since(roomId: string, roomCreatedAt: Date, after: number): Promise<ChatPage> {
+    const fresh = await this.db.select().from(messages).where(and(eq(messages.roomId, roomId), gt(messages.id, after)))
+      .orderBy(desc(messages.id)).limit(LIMITS.chatPage + 1);
+    if (fresh.length > LIMITS.chatPage) return this.page(roomId, roomCreatedAt);
+    const kept = await this.db.select().from(messages).where(and(eq(messages.roomId, roomId), lte(messages.id, after)))
+      .orderBy(desc(messages.id)).limit(LIMITS.chatRefresh);
+    const list = [...fresh, ...kept].reverse();
+    const since = kept.length === LIMITS.chatRefresh ? kept[kept.length - 1]!.id - 1 : 0;   // fewer: the room's whole chat
+    return { messages: await this.views(list), hasMore: false, start: null, since };
   }
 
   async views(list: Row[]): Promise<MessageView[]> {

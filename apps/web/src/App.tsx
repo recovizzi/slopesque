@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { MIN_HUE_GAP, RAINBOW, hueColor, hueDistance, newCode } from '@slopesque/engines';
 import { isInsecureUrl, type ActivityChoice, type MemberView } from '@slopesque/shared';
-import { EmojiPop, emojiHtml } from './lib/emoji';
+import { codeOf, EmojiPop, emojiHtml } from './lib/emoji';
 import * as X from './lib/ext';
 import { connect, request, upload } from './net';
 import { useStore } from './store';
@@ -52,7 +52,7 @@ export function App() {
     b.toggle('room-blocked', blocked);
     b.toggle('is-welcome', first);
   }, [leftOpen, rightOpen, blocked, first, room?.activity.activity]);
-  const act = room?.activity.activity ?? 'chat';
+  const act = room?.activity.activity ?? 'chat', scored = act === 'disk' || act === 'cards';   // the others have no points: their players
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
@@ -64,6 +64,15 @@ export function App() {
     addEventListener('keydown', k);
     return () => removeEventListener('keydown', k);
   }, [codeModal, rightOpen]);
+
+  // a vote starts outside the Chat activity: the chat opens on it (the left drawer)
+  const openVote = room?.chat.messages.findLast(m => m.kind === 'vote' && !(m.data?.vote as { result?: string } | undefined)?.result)?.id ?? 0;
+  const seenVote = useRef(0);
+  useEffect(() => {
+    if (!openVote || openVote === seenVote.current) return;
+    seenVote.current = openVote;
+    if (act !== 'chat') { setLeftOpen(true); setLeftTab('chat'); }
+  }, [openVote, act]);
 
   const openList = () => { setRightOpen(true); setTab('extension'); };
   const giveHost = async (m: MemberView) => { const r = await request('host:give', { to: m.id }); if (!r.ok) useStore.getState().set({ note: r.error }); };
@@ -98,15 +107,15 @@ export function App() {
         <People onGiveHost={giveHost} /></> : <>
         <div className="tabs">
           <button className={`tab ${leftTab === 'chat' ? 'on' : ''}`} type="button" onClick={() => setLeftTab('chat')} title="Chat"><Icon name="chat" /><span className="tab-label">Chat</span></button>
-          <button className={`tab ${leftTab === 'ranking' ? 'on' : ''}`} type="button" onClick={() => setLeftTab('ranking')} title="Classement"><Icon name="trophy" /><span className="tab-label">Classement</span></button>
+          <button className={`tab ${leftTab === 'ranking' ? 'on' : ''}`} type="button" onClick={() => setLeftTab('ranking')} title={scored ? 'Classement' : 'Joueurs'}>{scored ? <><Icon name="trophy" /><span className="tab-label">Classement</span></> : <><Icon name="users" /><span className="tab-label">Joueurs</span></>}</button>
           <button className={`tab ${leftTab === 'palmares' ? 'on' : ''}`} type="button" onClick={() => setLeftTab('palmares')} title="Palmarès : victoires et taux de victoire, gardés dans le temps"><Icon name="chart" /><span className="tab-label">Palmarès</span></button>
           <button className="icon-btn" type="button" onClick={() => setLeftOpen(false)} title="Fermer" aria-label="Fermer le panneau"><Icon name="close" /></button></div>
-        {leftTab === 'chat' || act === 'lowtide' && leftTab === 'ranking' ? !blocked && <Chat pop={pop} /> : leftTab === 'palmares' ? <Palmares /> : act === 'disk' || act === 'cards' ? <Ranking onGiveHost={giveHost} /> : <People onGiveHost={giveHost} />}</>)}</aside>
+        {leftTab === 'chat' ? !blocked && <Chat pop={pop} /> : leftTab === 'palmares' ? <Palmares /> : scored ? <Ranking onGiveHost={giveHost} /> : <People onGiveHost={giveHost} />}</>)}</aside>
       <main className="stage">
         <div className="room-page">{page}</div>
         <div className="chat-stage">{!blocked && act === 'chat' && <Chat pop={pop} />}</div>
         {!blocked && act === 'disk' && <DiskStage />}
-        {!blocked && act === 'poll' && <PollStage />}
+        {!blocked && act === 'poll' && <PollStage pop={pop} />}
         {!blocked && act === 'wheel' && <WheelStage />}
         {!blocked && act === 'cards' && <CardsStage />}
         {!blocked && act === 'lowtide' && <WebStage onSettings={() => { setRightOpen(true); setTab('game'); }} />}
@@ -116,7 +125,7 @@ export function App() {
         <div className="tabs">
           {(['profile', 'extension', 'game'] as const).map(t => <button key={t} type="button" className={`tab ${tab === t ? 'on' : ''}`} onClick={() => setTab(t)}>{{ profile: 'Profil', extension: 'Extension', game: 'Partie' }[t]}</button>)}
           <button className="icon-btn" type="button" onClick={() => setRightOpen(false)} title="Fermer" aria-label="Fermer"><Icon name="close" /></button></div>
-        <div className="drawer-body">{tab === 'profile' ? <Profile pop={pop} onCode={() => setCodeModal({ first: false, start: null })} />
+        <div className="drawer-body" key={rightOpen ? 'open' : 'closed'}>{tab === 'profile' ? <Profile pop={pop} onCode={() => setCodeModal({ first: false, start: null })} />
           : tab === 'extension' ? <ExtensionTab setDevice={setDevice} />
           : <GameTab />}</div></>}</aside>
     </div>
@@ -130,8 +139,9 @@ export function App() {
 function Profile({ pop, onCode }: { pop: EmojiPop | null; onCode: () => void }) {
   const account = useStore(s => s.account), room = useStore(s => s.room), set = useStore(s => s.set);
   const [name, setName] = useState(account?.name ?? '');
+  useEffect(() => { if (document.activeElement?.getAttribute('name') !== 'pseudo') setName(account?.name ?? ''); }, [account?.name]);   // the account arrives after
   const me = room?.members.find(m => m.id === account?.id);
-  const [hue, setHue] = useState<number | null>(null), [hueNote, setHueNote] = useState('');
+  const [hue, setHue] = useState<number | null>(null), [hueNote, setHueNote] = useState(''), [quickNote, setQuickNote] = useState('');
   const timer = useRef(0);
   if (!account) return null;
   const others = room?.members.filter(m => m.id !== account.id) ?? [];
@@ -160,9 +170,12 @@ function Profile({ pop, onCode }: { pop: EmojiPop | null; onCode: () => void }) 
       </div>
       <p className="note">{hueNote}</p></div>
     <div className="field"><span>Réaction au double-clic</span>
-      <button className="quick-btn" type="button" onClick={ev => void pop?.open(ev.currentTarget, e => { if (!e.startsWith(':')) void save({ quick: e }); })} title="Changer d'emoji">
-        <Html className="quick-emoji" html={emojiHtml(account.quick || '\u{1F44D}\u{FE0F}', [])} /><small>Changer</small></button>
-      <p className="note">Double-clique sur un message pour réagir avec cet emoji.</p></div>
+      <button className="quick-btn" type="button" onClick={ev => void pop?.open(ev.currentTarget, e => {
+        if (e.startsWith(':')) setQuickNote('Choisis un emoji standard : un emoji personnalisé n\'existe que dans son salon.');
+        else { setQuickNote(''); void save({ quick: e }); }
+      })} title="Changer d'emoji">
+        <Html className="quick-emoji" html={emojiHtml(account.quick || '\u{1F44D}\u{FE0F}', [])} />{codeOf(account.quick || '\u{1F44D}\u{FE0F}') && <code>:{codeOf(account.quick || '\u{1F44D}\u{FE0F}')}:</code>}<small>Changer</small></button>
+      <p className="note">{quickNote ? <b>{quickNote}</b> : 'Double-clique sur un message pour réagir avec cet emoji.'}</p></div>
     <AccountSection onChange={onCode} />
   </>;
 }
@@ -203,6 +216,19 @@ function PhotoField() {
 }
 
 /** Partie: the activity first (the host changes it, the others see it), then its settings. */
+const ACT_HELP: Record<string, string> = {
+  disk: 'Un mot par tour, placé entre deux extrémités ; des points selon la distance à la réponse de l\'hôte.',
+  poll: 'Une question, posée dans la zone de jeu : choix définis, choix libre ou gradient. Pas de points.',
+  wheel: 'Une roue de propositions, chacune avec un poids, construite dans la zone de jeu sous les yeux de tous ; l\'hôte la lance, l\'aiguille désigne le résultat. Pas de points.',
+  chat: 'Pas de jeu : le chat en plein écran, la liste des joueurs à gauche. Les scores sont gardés.',
+  cards: 'Des jeux de cartes à plusieurs : le Trou du cul et le Tarot (Texas Hold\'em et Coinche à venir). Les manches donnent des points au classement.',
+  lowtide: 'Le jeu Low Tide, sur sa propre page, dans la zone de jeu. Pas de points.',
+};
+const GAME_HELP = {
+  tdc: 'Aussi appelé Président. Se débarrasser de ses cartes le premier : les rôles de la manche donnent des points et des échanges de cartes.',
+  tarot: 'À 4 : le preneur contre les trois autres ; à 5, il appelle un Roi. Enchères (Prise, Garde, Garde sans, Garde contre), chien et écart, 21 atouts et l\'Excuse ; les points du preneur dépendent de ses bouts.',
+};
+
 function GameTab() {
   const room = useStore(s => s.room), me = useStore(s => s.account)?.id, set = useStore(s => s.set);
   if (!room) return <p className="note">Entre dans un salon pour voir sa partie.</p>;
@@ -212,9 +238,12 @@ function GameTab() {
   return <>
     <label className="field"><span>Activité</span><select value={act} disabled={!host} onChange={e => void choose(e.target.value as ActivityChoice['activity'])}>
       {Object.entries(names).map(([k, n]) => <option key={k} value={k} disabled={!READY_ACTIVITIES.includes(k as ActivityChoice['activity'])}>{n}{READY_ACTIVITIES.includes(k as ActivityChoice['activity']) ? '' : ' (bientôt)'}</option>)}</select></label>
+    <p className="note">{ACT_HELP[act]}</p>
     {!host && <p className="note">Seul l'hôte change l'activité ; les autres la proposent au vote avec /activity.</p>}
-    <hr />
+    <hr className="sep" />
+    <h3 className="section">{{ disk: 'Paramètres du demi-disque', poll: 'Paramètres du sondage', wheel: 'Paramètres de la roulette', chat: 'Paramètres du chat', lowtide: 'Paramètres de Low Tide', cards: 'Paramètres des cartes' }[act]}</h3>
     {act === 'disk' ? <DiskSettings /> : act === 'poll' ? <PollSettings /> : act === 'lowtide' ? <WebSettings /> : act === 'cards' ? <CardsSettings /> : act === 'wheel' ? <p className="note">Les propositions et leurs poids se règlent dans la zone de jeu : tout le monde voit la roue se construire.</p> : <p className="note">Rien à régler : le chat prend toute la place, la liste des joueurs est à gauche. Les scores ne bougent pas.</p>}
+    {(act === 'disk' || act === 'poll' || act === 'cards') && <p className="note">Les changements faits pendant un tour en cours s'appliquent à sa fin.</p>}
   </>;
 }
 
@@ -249,9 +278,10 @@ function CardsSettings() {
     <label className="field"><span>Jeu</span><select value={game} disabled={!host} onChange={async e => ack(await request('activity:choose', { choice: { activity: 'cards', cardGame: e.target.value as 'tdc' } }))}>
       <option value="tdc">Trou du cul</option><option value="tarot">Tarot</option>
       <option disabled>Texas Hold'em (bientôt)</option><option disabled>Coinche (bientôt)</option></select></label>
+    <p className="note">{GAME_HELP[game]}</p>
     <label className="field"><span>Joueurs</span><select value={players} disabled={!host} onChange={async e => ack(await request('cards:players', { game, players: Number(e.target.value) }))}>
       {CARD_PLAYERS[game].map(n => <option key={n} value={n}>{n} joueurs{game === 'tarot' && n === 5 ? ' (le preneur appelle un Roi)' : ''}</option>)}</select></label>
-    <p className="note">À partir de la donne suivante. Les joueurs qui ont cliqué « Participer » prennent les places, des robots complètent les autres. Les règles se lisent avec le bouton « i » de la table.</p>
+    <p className="note">À partir de la donne suivante. Prends une place à la table avant la donne ; des robots complètent les places libres. Les règles se lisent avec le bouton « i » de la table.</p>
     {game === 'tarot' && <><label className="check"><input type="checkbox" checked={room.cards.showTricks} disabled={!host} onChange={e => void request('tarot:tricks', { show: e.target.checked })} /><span>Revoir les plis gagnés (au survol)</span></label>
       <p className="note">Décoché, la partie est plus dure : personne ne peut revoir les plis déjà joués.</p></>}
   </>;

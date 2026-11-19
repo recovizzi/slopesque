@@ -62,6 +62,9 @@ export interface ChatPage {
   hasMore: boolean;
   /** At the top of the chat when nothing older remains: « Début de la conversation », or older messages deleted. */
   start: 'begin' | 'purged' | null;
+  /** A join with the last message the device kept (`after`): only what follows `since` is sent (the new messages and a
+   *  refresh of the last ones kept); the device keeps the rest. Absent: the page replaces what the device had. */
+  since?: number | null;
 }
 
 export interface RoomState {
@@ -154,7 +157,7 @@ export interface PollView {
 export interface WheelItemView { label: string; weight: string }
 export interface SpinView { items: WheelItemView[]; shares: number[]; angle: number; winner: number; at: number; from: number }
 /** The Roulette: the wheel being built (everyone sees it), the draw decided by the server. */
-export interface WheelView { phase: 'writing' | 'spinning' | 'result'; items: WheelItemView[]; spin: SpinView | null; needle: number }
+export interface WheelView { phase: 'writing' | 'spinning' | 'result'; items: WheelItemView[]; spin: SpinView | null; needle: number; round: number }   // round: the draw's number
 export const POLL_DURATIONS = [180, 300, 900, 1800, 3600, 10800] as const;
 
 /** The Demi-disque as a player sees it (the host's answer hidden from the others until the reveal): engines' DiskState. */
@@ -189,7 +192,7 @@ export type SequencedEvent = RoomEvent & { seq: number };
 export const MAX_TEXT = 500;
 export const intents = {
   'room:check': z.object({ key: z.string().max(16) }),
-  'room:join': z.object({ key: z.string().max(16) }),
+  'room:join': z.object({ key: z.string().max(16), after: z.number().int().nonnegative().optional() }),
   'room:leave': z.object({}),
   'chat:history': z.object({ before: z.number().int().positive() }),
   'chat:send': z.object({ text: z.string().trim().min(1).max(MAX_TEXT), replyTo: z.number().int().positive().nullable().optional() }),
@@ -223,7 +226,8 @@ export const intents = {
   'disk:reset': z.object({}),
   'poll:settings': z.object({ seconds: z.union([z.literal(180), z.literal(300), z.literal(900), z.literal(1800), z.literal(3600), z.literal(10800)]).optional(), secret: z.boolean().optional() }),
   'poll:publish': z.object({ kind: z.enum(['choices', 'free', 'gradient']), question: z.string().trim().min(1).max(120), choices: z.array(z.string().trim().max(40)).max(8),
-    pics: z.array(z.object({ mediaId: z.string().uuid().optional(), stickerId: z.string().uuid().optional() }).nullable()).max(8) }),
+    pics: z.array(z.object({ mediaId: z.string().uuid().optional(), stickerId: z.string().uuid().optional(),
+      gif: z.object({ id: z.string().max(64), provider: z.string().max(16), url: z.url(), w: z.number().int(), h: z.number().int(), title: z.string().max(200) }).optional() }).nullable()).max(8) }),
   'poll:answer': z.object({ answer: z.union([z.number().int().min(0).max(7), z.string().trim().min(1).max(60), z.tuple([z.number(), z.number()])]) }),
   'poll:end': z.object({}),
   'poll:next': z.object({}),

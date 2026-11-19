@@ -58,12 +58,12 @@ export function expandCodes(text: string, custom: CustomEmoji[]) {
   return text.replace(CODE, (m, c: string) => (mine.has(c) ? m : byCode.get(c) ?? m));
 }
 
-export interface Suggestion { code: string; emoji?: string; url?: string; cmd?: string }   // cmd: a chat command, what it does
+export interface Suggestion { code: string; emoji?: string; url?: string; cmd?: string; fill?: string; arg?: boolean }   // cmd: a chat command, what it does; arg: one of its arguments (fill: the message once chosen)
 /** The chat's commands (typed `/` at the start of a message). */
 export const COMMANDS: Suggestion[] = [
-  { code: 'activity', cmd: 'changer d\'activité (vote si tu n\'es pas l\'hôte)' },
+  { code: 'activity', cmd: 'changer d\'activité (/activity cartes tarot ; vote si tu n\'es pas l\'hôte)' },
   { code: 'hote', cmd: 'devenir l\'hôte (vote ; direct s\'il est absent depuis 5 min)' },
-  { code: 'credit-social', cmd: 'donner ou retirer du crédit social à un joueur' },
+  { code: 'credit-social', cmd: 'donner ou retirer du crédit social à un joueur (/credit-social Léa +100)' },
   { code: 'kick', cmd: 'faire quitter la table au joueur qui ne joue plus depuis 30 s (vote)' },
 ];
 /** Emoji whose code starts with (then contains) what is typed after ":", the game's first; one line per emoji. */
@@ -118,7 +118,7 @@ export class SuggestList {
 
   private draw() {
     this.el.innerHTML = this.items.map((s, i) => `<li role="option" data-i="${i}" class="${i === this.index ? 'on' : ''}" aria-selected="${i === this.index}">
-      ${s.cmd !== undefined ? `<span class="sg-code">/${esc(s.code)}</span><span class="sg-hint">${esc(s.cmd)}</span>`
+      ${s.cmd !== undefined ? `<span class="sg-code">${s.arg ? '' : '/'}${esc(s.code)}</span><span class="sg-hint">${esc(s.cmd)}</span>`
         : `<span class="sg-emoji">${s.url ? `<img class="emoji-custom" src="${esc(s.url)}" alt="">` : esc(s.emoji!)}</span><span class="sg-code">:${esc(s.code)}:</span>`}</li>`).join('');
   }
 }

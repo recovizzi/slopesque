@@ -5,7 +5,7 @@ import { newKey, normalizeKey } from '@slopesque/engines';
 import type { SavedRoom } from '@slopesque/shared';
 import { join, request } from '../net';
 import { useStore, type RoomStatus } from '../store';
-import { Icon } from './common';
+import { copyText, Icon, useEscape } from './common';
 
 export const roomName = (r: SavedRoom) => r.name.trim() || r.key;
 
@@ -17,7 +17,7 @@ export async function saveRooms(rooms: SavedRoom[]) {
 
 export function KeyBadge({ k, big }: { k: string; big?: boolean }) {
   const [copied, setCopied] = useState<'' | 'ok' | 'fail'>('');
-  const copy = async () => { try { await navigator.clipboard.writeText(k); setCopied('ok'); } catch { setCopied('fail'); } setTimeout(() => setCopied(''), 1600); };
+  const copy = async () => { setCopied((await copyText(k)) ? 'ok' : 'fail'); setTimeout(() => setCopied(''), 1600); };
   return <button className={`key-badge ${big ? 'big' : ''} ${copied ? `is-${copied}` : ''}`} type="button" onClick={copy}
     title="Clé du salon : cliquer pour la copier" aria-label={`Copier la clé du salon ${k}`}><Icon name="key" /><span>{copied === 'ok' ? 'Copiée ✓' : copied === 'fail' ? 'Copie impossible' : k}</span></button>;
 }
@@ -53,6 +53,7 @@ export function RoomList() {
 }
 
 function RoomModal({ m: start, onClose }: { m: Modal; onClose: () => void }) {
+  useEscape(onClose);
   const rooms = useStore(s => s.account?.rooms ?? []), server = useStore(s => s.device.server);
   const [m, setM] = useState(start);
   const [error, setError] = useState('');

@@ -4,13 +4,15 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { GifRef, MediaView, MemberView, MessageView, Quote } from '@slopesque/shared';
 import { esc } from '../lib/html';
-import { COMMANDS, DEFAULT_REACTIONS, emojiHtml, expandCodes, loadCodes, NAME, placeFloating, suggest, suggestName, SuggestList, useRecent, withCustom, type CustomEmoji, type EmojiPop } from '../lib/emoji';
+import { COMMANDS, DEFAULT_REACTIONS, emojiHtml, expandCodes, loadCodes, NAME, placeFloating, suggest, suggestName, SuggestList, useRecent, withCustom, type CustomEmoji, type EmojiPop, type Suggestion } from '../lib/emoji';
 import { GifPop, useGif } from '../lib/gif';
 import { localGif } from '../lib/gif-cache';
+import { wireQuotes } from './hover';
+import { argSuggestions, parseActivity, parseCredit } from '../lib/commands';
 import { linkify, previewHtml, type Preview } from '../lib/links';
-import { request, ServerGifs, upload } from '../net';
+import { request, ServerGifs, toggleGifFavorite, upload } from '../net';
 import { useStore } from '../store';
-import { Avatar, Html, Icon, Who } from './common';
+import { Avatar, colorOf, Html, Icon, Who } from './common';
 import { ActivityPicker } from './ActivityPicker';
 import { CreditBadge, CreditCard, CreditModal } from './Credit';
 import { VoteCard } from './Vote';
@@ -60,7 +62,7 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
   const [playing, setPlaying] = useState<number | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [menu, setMenu] = useState(false);
-  const [modal, setModal] = useState<{ kind: 'activity'; at: string | null } | { kind: 'credit' } | null>(null);
+  const [modal, setModal] = useState<{ kind: 'activity'; at: string | null } | { kind: 'credit'; to?: string } | null>(null);
   const [showStickers, setShowStickers] = useState(false);
   const [picked, setPicked] = useState<Picked | 'loading' | null>(null);
   const [naming, setNaming] = useState<string | null>(null), [nameError, setNameError] = useState('');
@@ -73,18 +75,45 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
   const who = (id: string | null) => { const m = id ? members.get(id) : null; return m ? <Who name={id === account.id ? 'Toi' : m.name} hue={m.hue} /> : null; };
   const recent = device.recent.length ? device.recent : DEFAULT_REACTIONS;
 
-  // the chat follows the last message when it was there (or when I just wrote)
-  const atBottom = useRef(true);
+  // the chat opens at its bottom and follows the last message when it was there (or when I just wrote); higher up, a
+  // button brings it back down (with the number of messages arrived since)
+  const atBottom = useRef(true), lastSeen = useRef(0);
+  const [away, setAway] = useState(false), [unread, setUnread] = useState(0);
   const count = room.chat.messages.length, last = room.chat.messages.at(-1);
+  const toBottom = (smooth = false) => { const el = listRef.current; if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' }); };
   useLayoutEffect(() => {
     const el = listRef.current;
     if (el && (atBottom.current || last?.from === account.id)) el.scrollTop = el.scrollHeight;
+    else if (last && lastSeen.current && last.id > lastSeen.current) { const fresh = room.chat.messages.filter(m => m.id > lastSeen.current).length; setUnread(n => n + fresh); }
+    if (last) lastSeen.current = last.id;
   }, [count, last?.id, account.id]);
+  useEffect(() => {   // shown (a drawer opening), resized, a picture loaded: still at the bottom if it was
+    const el = listRef.current!;
+    const stay = () => { if (atBottom.current) el.scrollTop = el.scrollHeight; };
+    const ro = new ResizeObserver(stay);
+    ro.observe(el);
+    el.addEventListener('load', stay, true);
+    return () => { ro.disconnect(); el.removeEventListener('load', stay, true); };
+  }, []);
+
+  useEffect(() => {   // a reply's quote hovered: the message quoted, whole (or what the reply kept of it)
+    return wireQuotes(boxRef.current!, id => {
+      const st = useStore.getState(), list = st.room?.chat.messages ?? [], m = list.find(x => x.id === id);
+      const q = m ?? list.find(x => x.reply?.id === id)?.reply;
+      if (!q || ('gone' in q && q.gone)) return '<div class="msg-body"><i>Ce message n\'existe plus.</i></div>';
+      const p = q.from ? st.room?.members.find(x => x.id === q.from) : null;
+      const who = p ? `<b style="color:${colorOf(p.hue)}">${esc(q.from === st.account?.id ? 'Toi' : p.name)}</b> ` : '';
+      const media = m?.media;
+      const body = media ? (media.src ? `<img src="${esc(media.src)}" width="${media.w}" height="${media.h}" alt="">` : '<i>Image plus disponible</i>')
+        : q.kind === 'media' || q.kind === 'image' || q.kind === 'sticker' || q.kind === 'gif' ? quoteHtml(q, custom) : withCustom(esc(q.text), custom);
+      return `<div class="msg-body">${who}${body}</div>`;
+    });
+  }, [custom]);
 
   useEffect(() => {
     void loadCodes();
     const box = boxRef.current!;
-    suggestRef.current = new SuggestList(box, s => complete(s.code));
+    suggestRef.current = new SuggestList(box, s => complete(s));
     // the reaction bar goes under the message where the pointer came in
     const over = (e: MouseEvent) => {
       const body = (e.target as Element).closest?.('.msg-body'), from = e.relatedTarget instanceof Node ? e.relatedTarget : null;
@@ -107,13 +136,7 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
   useEffect(() => { pop?.setCustom(custom); });
   useEffect(() => { if (!note) return; const t = setTimeout(() => set({ note: '' }), 8000); return () => clearTimeout(t); }, [note, set]);   // a note goes after 8 s
 
-  function toggleFavorite(g: GifRef) {
-    const st = useStore.getState(), acc = st.account!;
-    const list = acc.gifFavorites ?? [], on = list.some(x => x.id === g.id);
-    const next = on ? list.filter(x => x.id !== g.id) : [g, ...list].slice(0, 500);
-    st.set({ account: { ...acc, gifFavorites: next } });
-    void request('gif:favorites', { favorites: next });
-  }
+  const toggleFavorite = toggleGifFavorite;
 
   async function sendGif(g: GifRef) {
     setDevice({ gifRecent: useGif(useStore.getState().device.gifRecent, g) });
@@ -153,9 +176,20 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
     const [word = '', ...rest] = text.slice(1).trim().split(/\s+/), arg = rest.join(' ');
     const cmd = word.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     setDraft(''); set({ note: '' });
-    if (cmd === 'activity' || cmd === 'activite') setModal({ kind: 'activity', at: null });
-    else if (cmd === 'credit-social' || cmd === 'credit' || cmd === 'creditsocial') setModal({ kind: 'credit' });
-    else if (cmd === 'hote' || cmd === 'host') {
+    if (cmd === 'activity' || cmd === 'activite') {
+      if (!arg) { setModal({ kind: 'activity', at: null }); return; }
+      const a = parseActivity(arg);
+      if (!a) set({ note: `Activité inconnue : « ${arg} ». Par exemple : /activity chat, /activity sondage, /activity cartes tarot, /activity demi-disque amphitheatre.` });
+      else if ('kind' in a) setModal({ kind: 'activity', at: a.kind });
+      else await pickActivity(a.choice);
+    } else if (cmd === 'credit-social' || cmd === 'credit' || cmd === 'creditsocial' || cmd === 'credit-score') {
+      if (!arg) { setModal({ kind: 'credit' }); return; }
+      const c = parseCredit(arg, room.members.filter(m => m.id !== account.id));
+      if (!c.to) { set({ note: `Joueur inconnu : « ${c.name} ». Par exemple : /credit-social ${room.members.find(m => m.id !== account.id)?.name ?? 'Léa'} +100.` }); return; }
+      if (c.delta === null || c.delta === 0) { setModal({ kind: 'credit', to: c.to.id }); return; }
+      const r = await request('credit:give', { to: c.to.id, delta: c.delta });
+      if (!r.ok) set({ note: r.error });
+    } else if (cmd === 'hote' || cmd === 'host') {
       const r = await request('host:ask');
       set({ note: !r.ok ? r.error : r.value === 'already' ? 'Tu es déjà l\'hôte.' : '' });
     } else if (cmd === 'kick') {
@@ -184,9 +218,37 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
     inputRef.current?.focus();
   }
 
-  function complete(code: string) {
-    const input = inputRef.current!, at = input.selectionStart ?? draft.length;
-    if (draft.startsWith('/')) { setDraft(`/${code}`); suggestRef.current?.hide(); requestAnimationFrame(() => input.focus()); return; }
+  /** An emoji from the window: at the caret (replacing the selection), the caret after it. */
+  function insertAtCaret(e: string) {
+    const input = inputRef.current!, v = input.value, a = input.selectionStart ?? v.length, b = input.selectionEnd ?? a;
+    const next = v.slice(0, a) + e + v.slice(b);
+    setDraft(next);
+    requestAnimationFrame(() => { input.focus(); input.setSelectionRange(a + e.length, a + e.length); });
+  }
+
+  // the + menu, the stickers and a file being sent: closed by Escape (one at a time) or a click elsewhere (the menu)
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if (menu) setMenu(false);
+      else if (picked) { setPicked(null); setNaming(null); }
+      else if (showStickers) setShowStickers(false);
+      else return;
+      e.preventDefault();
+    };
+    const click = (e: PointerEvent) => { if (menu && !(e.target as Element).closest?.('.plus-wrap')) setMenu(false); };
+    addEventListener('keydown', key);
+    addEventListener('pointerdown', click);
+    return () => { removeEventListener('keydown', key); removeEventListener('pointerdown', click); };
+  }, [menu, picked, showStickers]);
+
+  function complete(s: Suggestion) {
+    const input = inputRef.current!, at = input.selectionStart ?? draft.length, code = s.code;
+    if (s.fill !== undefined) {   // an argument: the message so far, then what can follow it
+      if (s.fill === draft) { suggestRef.current?.hide(); void command(draft); return; }
+      onType(s.fill); requestAnimationFrame(() => { input.focus(); input.setSelectionRange(s.fill!.length, s.fill!.length); }); return;
+    }
+    if (draft.startsWith('/')) { onType(`/${code} `); requestAnimationFrame(() => input.focus()); return; }
     const before = draft.slice(0, at).replace(/:([a-z0-9_+-]*)$/, `:${code}: `);
     setDraft(before + draft.slice(at));
     suggestRef.current?.hide();
@@ -195,6 +257,8 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
 
   function onType(v: string) {
     setDraft(v);
+    const args = argSuggestions(v, useStore.getState().room?.members ?? [], account.id);
+    if (args) { if (args.length) suggestRef.current?.show(args, inputRef.current!); else suggestRef.current?.hide(); return; }
     const c = v.match(/^\/([a-z-]*)$/i);
     if (c) { const items = COMMANDS.filter(x => x.code.startsWith(c[1]!.toLowerCase())); if (items.length) { suggestRef.current?.show(items, inputRef.current!); return; } }
     const m = v.slice(0, inputRef.current?.selectionStart ?? v.length).match(/(?:^|\s):([a-z0-9_+-]{2,})$/);
@@ -207,8 +271,9 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
     if (s?.isOpen) {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); s.move(e.key === 'ArrowDown' ? 1 : -1); return; }
       const cur = s.current();
-      if (e.key === 'Enter' && cur?.cmd !== undefined && draft.trim().toLowerCase() === `/${cur.code}`) { s.hide(); return; }   // a command written out: sent
-      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); if (cur) complete(cur.code); return; }
+      if (e.key === 'Enter' && cur?.cmd !== undefined && !cur.arg && draft.trim().toLowerCase() === `/${cur.code}`) { s.hide(); return; }   // a command written out: sent
+      if (e.key === 'Enter' && cur?.arg && cur.fill?.trim() === draft.trim()) { s.hide(); return; }   // its arguments written out: sent
+      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); if (cur) complete(cur); return; }
       if (e.key === 'Escape') { e.stopPropagation(); s.hide(); return; }
     }
     if (e.key === 'Escape' && replyTo) { e.stopPropagation(); setReplyTo(null); }
@@ -233,7 +298,7 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
 
   const replyRef = (q: Quote) => q.gone
     ? <span className="reply-ref is-gone">{Icon({ name: 'replied' })}<span className="reply-quote"><i>Message de plus de 30 jours, supprimé</i></span></span>
-    : <button type="button" className="reply-ref" onClick={() => jump(q.id)} title="Aller au message cité">{Icon({ name: 'replied' })}
+    : <button type="button" className="reply-ref" data-msg={q.id} onClick={() => jump(q.id)} title="Aller au message cité">{Icon({ name: 'replied' })}
       <span className="reply-who">{who(q.from)}</span><Html className="reply-quote" html={quoteHtml(q, custom)} /></button>;
 
   const textHtml = (m: MessageView) => {
@@ -253,7 +318,7 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
       if (li) void react(+li.dataset.msg!, account.quick || QUICK);
     }}
     onMouseDown={e => { if (e.detail > 1 && (e.target as Element).closest('.msg-body')) e.preventDefault(); }}>
-    <ul className="chat" ref={listRef} data-chat onScroll={e => { const el = e.currentTarget; atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40; if (el.scrollTop < 40) void more(); }}>
+    <ul className="chat" ref={listRef} data-chat onScroll={e => { const el = e.currentTarget; atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40; setAway(!atBottom.current); if (atBottom.current) setUnread(0); if (el.scrollTop < 40) void more(); }}>
       {room.chat.hasMore ? <li className="msg sys chat-start">{loadingMore ? 'Chargement…' : <button className="btn ghost sm" type="button" onClick={more}>Messages plus anciens</button>}</li>
         : room.chat.start && <li className="msg sys chat-start">{room.chat.start === 'begin' ? 'Début de la conversation' : 'Les messages de plus de 30 jours ont été supprimés'}</li>}
       {room.chat.messages.map(m => m.kind === 'vote' && m.data?.vote ? <VoteCard key={m.id} id={m.id} v={m.data.vote as Vote} members={members} me={account.id} />
@@ -273,10 +338,13 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
           {Object.keys(m.reactions).length > 0 && <div className="reactions">{Object.entries(m.reactions).map(([e, ids]) => {
             const names = ids.map(id => (id === account.id ? 'Toi' : members.get(id)?.name ?? '?')).join(', ');
             return <button key={e} className={`reaction ${ids.includes(account.id) ? 'mine' : ''}`} type="button" onClick={() => void react(m.id, e)} data-names={names}
-              title={names} aria-pressed={ids.includes(account.id)} aria-label={`${e} : ${ids.length} réaction${ids.length > 1 ? 's' : ''}`}><Html html={emojiHtml(e, custom)} />{ids.length > 1 && <b>{ids.length}</b>}</button>;
+              aria-pressed={ids.includes(account.id)} aria-label={`${e} : ${ids.length} réaction${ids.length > 1 ? 's' : ''}`}><Html html={emojiHtml(e, custom)} />{ids.length > 1 && <b>{ids.length}</b>}</button>;
           })}</div>}
         </li>)}
     </ul>
+    {away && <div className="to-bottom-anchor"><button className={`to-bottom ${unread ? 'has-new' : ''}`} type="button" onClick={() => { toBottom(true); setUnread(0); }}
+      title={unread ? `${unread} nouveau${unread > 1 ? 'x' : ''} message${unread > 1 ? 's' : ''} : revenir en bas` : 'Revenir en bas du chat'} aria-label="Revenir en bas du chat">
+      <Icon name="down" />{unread > 0 && <b>{unread > 99 ? '99+' : unread}</b>}</button></div>}
     {picked ? <UploadPanel p={picked} naming={naming} nameError={nameError} onCancel={() => { setPicked(null); setNaming(null); }} onUse={use}
         onNaming={v => { setNaming(v); setNameError(''); }} onEmoji={() => { if (picked !== 'loading') { setNaming(suggestName(picked.file.name, custom.map(c => c.name))); setNameError(''); } }} />
       : showStickers && <StickerPanel onClose={() => setShowStickers(false)} onSent={() => setShowStickers(false)} />}
@@ -293,14 +361,14 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
           <button type="button" role="menuitem" onClick={() => { setMenu(false); fileRef.current?.click(); }}><Icon name="file" />Fichier</button>
           <button type="button" role="menuitem" onClick={() => { setMenu(false); setPicked(null); setShowStickers(!showStickers); }}><Icon name="sticker" />Sticker</button>
           <button type="button" role="menuitem" onClick={() => { setMenu(false); gifRef.current?.open(plusRef.current!, g => void sendGif(g)); }}><Icon name="gif" />GIF</button>
-          <button type="button" role="menuitem" onClick={() => { setMenu(false); void pop?.open(plusRef.current!, e => { setDraft(d => d + e); inputRef.current?.focus(); }, { keepOpen: true }); }}><Icon name="smile" />Emoji</button></div>}</div>
+          <button type="button" role="menuitem" onClick={() => { setMenu(false); void pop?.open(plusRef.current!, insertAtCaret, { keepOpen: true }); }}><Icon name="smile" />Emoji</button></div>}</div>
     </form>
     <input ref={fileRef} type="file" accept="image/*" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void choose(f); }} />
     <div className="drop-hint" aria-hidden="true"><Icon name="file" />Dépose ton image</div>
     {modal?.kind === 'activity' && <ActivityPicker kind={modal.at} current={room.activity.activity} host={room.hostId === account.id}
       busy={room.chat.messages.some(m => m.kind === 'vote' && !(m.data?.vote as Vote | undefined)?.result)}
       onKind={k => setModal({ kind: 'activity', at: k })} onPick={c => void pickActivity(c)} onClose={() => setModal(null)} />}
-    {modal?.kind === 'credit' && <CreditModal members={room.members} me={account.id} onClose={() => setModal(null)} />}
+    {modal?.kind === 'credit' && <CreditModal members={room.members} me={account.id} initial={modal.to ?? null} onClose={() => setModal(null)} />}
   </div>;
 }
 
@@ -344,10 +412,11 @@ export function People({ onGiveHost }: { onGiveHost: (m: MemberView) => void }) 
     {room.activity.activity === 'chat' && <CreditBadge v={p.credit} />}
     <span className="role">{p.id === room.hostId ? <><span className="crown"><Icon name="crown" /></span>hôte</> : p.playing ? 'joueur' : 'membre'}</span>
     {room.hostId === me && p.id !== me && <button className="icon-btn sm" type="button" onClick={() => onGiveHost(p)} title={`Donner le rôle d'hôte à ${p.name}`} aria-label="Donner le rôle d'hôte"><Icon name="crown" /></button>}
-  </li>)}</ol></>;
+  </li>)}</ol>
+    <p className="note people-note">Pas de classement dans cette activité : les scores sont gardés tels quels jusqu'à une réinitialisation de la partie (onglet Partie).</p></>;
 }
 
-function PresenceIcon({ m, host }: { m: MemberView; host: boolean }) {
+export function PresenceIcon({ m, host }: { m: MemberView; host: boolean }) {
   const [, tick] = useState(0);
   useEffect(() => { if (m.presence === 'here') return; const t = setInterval(() => tick(n => n + 1), 30_000); return () => clearInterval(t); }, [m.presence]);
   if (m.presence === 'here' || m.awaySince === null) return null;

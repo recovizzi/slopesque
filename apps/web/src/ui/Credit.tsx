@@ -12,7 +12,7 @@ import h13024 from '../hieroglyphs/13024.png';
 import h1304f from '../hieroglyphs/1304f.png';
 import h1302d from '../hieroglyphs/1302d.png';
 import { request } from '../net';
-import { Avatar, Icon, Who } from './common';
+import { Avatar, Icon, useEscape, Who } from './common';
 
 const SRC: Record<string, string> = { '1301d': h1301d, '13013': h13013, '1300f': h1300f, '13012': h13012, '13020': h13020, '13024': h13024, '1304f': h1304f, '1302d': h1302d };
 
@@ -37,8 +37,9 @@ export function CreditCard({ data, members, me }: { data: { by: string; to: stri
 }
 
 /** The /credit-social window: the players and their credit; one chosen (not me); − or + the amount typed. */
-export function CreditModal({ members, me, onClose }: { members: MemberView[]; me: string; onClose: () => void }) {
-  const [to, setTo] = useState<string | null>(null), [amount, setAmount] = useState('10'), [error, setError] = useState('');
+export function CreditModal({ members, me, initial = null, onClose }: { members: MemberView[]; me: string; initial?: string | null; onClose: () => void }) {
+  const [to, setTo] = useState<string | null>(initial), [amount, setAmount] = useState('10'), [error, setError] = useState('');
+  useEscape(onClose);
   const n = amountOf(amount), target = members.find(p => p.id === to), ready = !!target && n !== null;
   const apply = async (sign: 1 | -1) => { if (!ready) return; const r = await request('credit:give', { to, delta: sign * n! }); if (r.ok) onClose(); else setError(r.error); };
   const btn = (sign: 1 | -1) => <button type="button" className={`btn credit-apply ${sign < 0 ? 'is-take' : 'is-give'}`} disabled={!ready} onClick={() => void apply(sign)} data-v={sign}

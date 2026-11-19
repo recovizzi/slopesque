@@ -13,3 +13,12 @@
 .server-field .btn.sm { margin-top: 0; }
 .room-card .server-field { max-width: 380px; }
 .cards-stage { position: relative; }
+/* the chat: back to its bottom — a tab in the bottom-left corner of the messages, against their left edge and the
+   writing part, only its top-right corner rounded */
+.to-bottom-anchor { position: relative; height: 0; }
+.to-bottom { position: absolute; left: 0; bottom: 0; z-index: 6; display: inline-flex; align-items: center; gap: 4px; height: 32px; min-width: 36px;
+  padding: 0 10px 0 9px; border: 1px solid var(--border); border-left: 0; border-bottom: 0; border-radius: 0 12px 0 0; background: var(--surface);
+  color: var(--muted); cursor: pointer; box-shadow: 2px -2px 8px rgb(0 0 0 / .08); }
+.to-bottom:hover, .to-bottom:focus-visible { color: var(--text); background: var(--surface-2); outline: none; }
+.to-bottom.has-new { color: var(--accent); }
+.to-bottom b { font-size: 12px; }

@@ -11,6 +11,7 @@ export const icon = {
   send: svg('<path d="M4 12l16-8-6 16-2.5-6.5z"/>'),
   trophy: svg('<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 6h3a3 3 0 0 1-3 4M7 6H4a3 3 0 0 0 3 4"/>'),
   reset: svg('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>'),
+  down: svg('<path d="M12 5v14M6 13l6 6 6-6"/>'),
   plus: svg('<path d="M12 5v14M5 12h14"/>'),
   file: svg('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 14l2 2 4-4"/>'),
   sticker: svg('<path d="M20 12V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6z"/><path d="M20 12a8 8 0 0 0-8 8"/><path d="M9 10h.01M15 10h.01"/>'),

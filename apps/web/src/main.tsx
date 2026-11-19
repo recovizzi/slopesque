@@ -1,5 +1,6 @@
 // The panel's app. Inside the extension (or with ?preview, or in `pnpm dev`) the game; opened as a plain web page,
 // « Installer l'extension ».
+import { wireTip } from './ui/hover';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './style.css';
@@ -26,6 +27,7 @@ if (inExtension || import.meta.env.DEV || params.has('preview')) {
     if (document.hidden) hidden = window.setTimeout(() => { disconnect(); useStore.getState().set({ conn: 'idle' }); }, PRESENCE.hiddenTabMs);
     else if (useStore.getState().conn === 'idle' && useStore.getState().device.code && !useStore.getState().fatal) connect();
   });
+  wireTip();   // the names behind a count, on hover (reactions, answers)
   createRoot(root).render(<StrictMode><App /></StrictMode>);
 } else {
   document.body.classList.add('install');

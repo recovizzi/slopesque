@@ -11,10 +11,10 @@ import { LiveHtml } from './LiveHtml';
 export function Palmares() {
   const room = useStore(s => s.room)!, me = useStore(s => s.account)!.id;
   const act = room.activity.activity;
-  const game: S.StatGame | 'all' = act === 'disk' ? 'disk' : act === 'cards' ? 'tdc' : 'all';
+  const game: S.StatGame | 'all' = act === 'disk' ? 'disk' : act === 'cards' ? (room.activity.cardGame === 'tarot' ? 'tarot' : 'tdc') : 'all';   // the game being played
   const [events, setEvents] = useState<PalmaresEvent[]>([]);
   const [filter, setFilter] = useState<S.Filter>({ game, sort: S.SORTS[game][0]!.key as string, period: 'all' });
-  const tick = `${room.disk.round}:${room.disk.phase}:${room.cards.tdc?.round}:${room.cards.tdc?.turn === null}`;
+  const tick = `${room.disk.round}:${room.disk.phase}:${room.cards.tdc?.round}:${room.cards.tdc?.turn === null}:${room.cards.tarot?.deal}:${room.cards.tarot?.phase === 'done'}`;
   useEffect(() => { void request('palmares:get').then(r => { if (r.ok) setEvents(r.value); }); }, [tick]);
   const html = S.palmaresHtml({ events: events.map(e => ({ ...e, color: hueColor(e.hue) })) as unknown as S.StatEvent[], filter, me, present: new Set(room.members.map(m => m.id)) });
   return <LiveHtml html={html} onInput={el => {

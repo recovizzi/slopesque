@@ -9,6 +9,7 @@ import { Disk, type Ray } from '../lib/disk';
 import { request } from '../net';
 import { useStore } from '../store';
 import { Icon, Who } from './common';
+import { PresenceIcon } from './Chat';
 
 export function DiskStage() {
   const room = useStore(s => s.room)!, account = useStore(s => s.account)!, skew = useStore(s => s.clockSkew);
@@ -21,6 +22,9 @@ export function DiskStage() {
   const boxRef = useRef<HTMLDivElement>(null), disk = useRef<Disk | null>(null), amphi = useRef<Amphi | null>(null);
   const mode = d.phase === 'guessing' || d.phase === 'reveal' ? d.mode : d.rules.mode;
   const pickRef = useRef(setPick);
+  useEffect(() => {   // Amphithéâtre: someone validated the seat I had picked first
+    if (d.phase === 'guessing' && mode === 'amphi' && pick !== null && !(me in d.guesses) && Object.values(d.guesses).includes(pick)) { setPick(null); setNote('Ce siège vient d\'être pris.'); }
+  }, [d.guesses]);
 
   useEffect(() => {   // the SVGs, made once
     const box = boxRef.current!;
@@ -148,7 +152,7 @@ export function Ranking({ onGiveHost }: { onGiveHost: (m: MemberView) => void })
     <span className="step-name">{p.name}</span><span className="step-score">{p.score}</span><div className="step-block" style={{ '--c': hueColor(p.hue) } as React.CSSProperties}>{rank}</div></div>; })}</div>
     <ol className="ranking">{ranked.map((p, i) => <li key={p.id} className={`rank-row ${p.id === me ? 'is-me' : ''}`}>
       <span className="rank-n">{i + 1}</span><span className="dot" style={{ '--c': hueColor(p.hue) } as React.CSSProperties} />
-      <span className="rank-name">{p.name}{p.id === room.hostId && <> <span className="crown" title="Hôte"><Icon name="crown" /></span></>}{!p.playing && p.id !== room.hostId && <> <i>(spectateur)</i></>}</span>
+      <span className="rank-name">{p.name}<PresenceIcon m={p} host={p.id === room.hostId} />{p.id === room.hostId && <> <span className="crown" title="Hôte"><Icon name="crown" /></span></>}{!p.playing && p.id !== room.hostId && <> <i>(spectateur)</i></>}</span>
       <span className="rank-score">{p.score}</span>
       {room.hostId === me && p.id !== me && <button className="icon-btn sm" type="button" onClick={() => onGiveHost(p)} title={`Donner le rôle d'hôte à ${p.name}`} aria-label="Donner le rôle d'hôte"><Icon name="crown" /></button>}</li>)}</ol></>;
 }

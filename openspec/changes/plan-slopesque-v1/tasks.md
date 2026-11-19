@@ -105,15 +105,16 @@ chaque jalon, les tâches sont groupées par partie du monorepo (`[racine]`, `[i
 - [x] 10b.3 [infra] Ports peu utilisés (bande 23xxx, sous les ports éphémères) : serveur de dev 23100, pile et machine 23180, Postgres 23432, Redis 23379, RustFS 23900, tests 23192–23199
 - [x] 10b.4 [server] GIF : chaîne KLIPY → GIPHY → KLIPY avec pub (`KLIPY_API_KEY_WITH_AD`, paramètres `ad-*`) ; format KLIPY vérifié avec une vraie clé ; taille `sm`
 - [x] 10b.5 [web] GIF gardés sur l'appareil de chaque joueur (Cache API, 300 au plus), jamais par le serveur
-- [ ] 10b.6 [web] Chat : bulle de citation au survol, info-bulle des noms (réactions, résultats du Sondage), emoji inséré au curseur, Échap / clic dehors ferment le menu +, les stickers, l'envoi d'image ; le chat s'ouvre quand un vote commence ; code `:nom:` et refus expliqué dans le champ des réactions rapides
-- [ ] 10b.7 [web] Échap global dans l'ordre de la maquette (code, /activity, /credit-social, réponse, fenêtres des salons, règles, fenêtres, menus du Sondage, panneaux du chat, tiroir) ; copie de clé de secours (`execCommand`)
-- [ ] 10b.8 [web] Joueurs : onglet « Joueurs » (sans points) avec sa note, icônes d'absence dans le classement, rôle d'hôte proposé aux seuls joueurs ; Low Tide : l'onglet montre les joueurs, pas le chat
-- [ ] 10b.9 [web+server] Demi-disque : lobby et « Commencer la partie » ; Amphithéâtre : « Ce siège vient d'être pris. » dès qu'il l'est
-- [ ] 10b.10 [web+server] Sondage : déposer une image sur un choix, Entrée valide la réponse libre, note des résultats secrets selon le réglage ; images / GIF / emoji des choix
-- [ ] 10b.11 [web+server] Roulette : numéro du tirage, « Participer » pour un spectateur
-- [ ] 10b.12 [web+server] Partie (toutes activités) : titre et aide de l'activité, description du jeu de cartes, note « Tour en cours », « Réinitialiser la partie » partout, résumé en lecture seule pour qui n'est pas l'hôte
-- [ ] 10b.13 [web] Palmarès : ouvert sur le jeu de cartes choisi, rafraîchi après une donne de Tarot
+- [x] 10b.6 [web] Chat : bulle de citation au survol, info-bulle des noms (réactions, résultats du Sondage), emoji inséré au curseur, Échap / clic dehors ferment le menu +, les stickers, l'envoi d'image ; le chat s'ouvre quand un vote commence ; code `:nom:` et refus expliqué dans le champ des réactions rapides
+- [x] 10b.7 [web] Échap global dans l'ordre de la maquette (code, /activity, /credit-social, réponse, fenêtres des salons, règles, fenêtres, menus du Sondage, panneaux du chat, tiroir) ; copie de clé de secours (`execCommand`)
+- [x] 10b.8 [web] Joueurs : onglet « Joueurs » (sans points) avec sa note, icônes d'absence dans le classement ; Low Tide : l'onglet montre les joueurs, pas le chat — reste à confirmer : le rôle d'hôte proposé aux seuls joueurs
+- [ ] 10b.9 [web+server] Amphithéâtre : « Ce siège vient d'être pris. » dès qu'il l'est (fait) — à confirmer : le lobby du Demi-disque et « Commencer la partie »
+- [x] 10b.10 [web+server] Sondage : déposer une image sur un choix, Entrée valide la réponse libre, note des résultats secrets selon le réglage, Échap / clic dehors ; GIF (lien) et emoji (dans le texte) des choix
+- [ ] 10b.11 [web+server] Roulette : numéro du tirage (fait) — à confirmer : « Participer » pour un spectateur
+- [ ] 10b.12 [web+server] Partie : titre et aide de l'activité, description du jeu de cartes, note sur le tour en cours (fait) — à confirmer : « Réinitialiser la partie » partout, résumé en lecture seule pour qui n'est pas l'hôte
+- [x] 10b.13 [web] Palmarès : ouvert sur le jeu de cartes choisi, rafraîchi après une donne de Tarot
 - [ ] 10b.14 [web] Tarot : images des atouts du salon (= 8.3)
+- [x] 10b.15 [web+server] Retours du 2026-11-19 : pseudo affiché dès l'ouverture du Profil ; la table montrée à tous quand on prend ou quitte une place avant la donne ; `/activity cartes tarot`, `/credit-social Léa +100` et leur complétion ; chat ouvert en bas, bouton pour y revenir, chargement par morceaux gardé sur l'appareil (seuls les nouveaux messages demandés)
 
 ## 11. Jalon 11 : releases et déploiement
 

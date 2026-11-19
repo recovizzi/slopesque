@@ -2,7 +2,7 @@
 // (where there is one) its exact format. The host launches it at once; another player proposes it to a vote. An
 // activity the V1 can't play yet is shown greyed (« bientôt »).
 import { READY_ACTIVITIES, type ActivityChoice } from '@slopesque/shared';
-import { Icon } from './common';
+import { Icon, useEscape } from './common';
 
 // small pictures (80 × 52), clear at a glance, the same colours in both themes
 const ART = {
@@ -38,6 +38,7 @@ const kindOf = (a: string) => (a === 'lowtide' ? 'web' : a);
 export function ActivityPicker({ kind, current, host, busy, onKind, onPick, onClose }: { kind: string | null; current: string; host: boolean; busy: boolean;
   onKind: (k: string | null) => void; onPick: (c: ActivityChoice) => void; onClose: () => void }) {
   const k = KINDS.find(x => x.id === kind);
+  useEscape(onClose);
   const how = host ? 'Tu es l\'hôte : l\'activité change tout de suite.' : busy ? 'Un vote est déjà en cours dans le chat : attends sa fin.'
     : 'Ton choix sera proposé au vote dans le chat : 2 minutes, la majorité l\'emporte, et la moitié des joueurs connectés doit voter.';
   return <><div className="modal-backdrop" onClick={onClose} />

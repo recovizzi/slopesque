@@ -67,6 +67,13 @@ describe.skipIf(!up)('realtime', () => {
     await ask(b, 'chat:react', { id: m.message.id, emoji: '👍' });
     expect(((await reacted) as Extract<SequencedEvent, { type: 'reactions' }>).reactions['👍']).toHaveLength(1);
 
+    // a join with the device's last message: only what follows it (and the last ones kept, refreshed), not a page
+    const again = await ask<RoomState>(b, 'room:join', { key, after: r.message.id });
+    expect(again.ok && again.value.chat.since).toBe(0);   // fewer than 30 messages: the whole chat refreshed
+    expect(again.ok && again.value.chat.messages.find(x => x.id === m.message.id)?.reactions['👍']).toHaveLength(1);
+    const full = await ask<RoomState>(b, 'room:join', { key });
+    expect(full.ok && full.value.chat.since).toBeUndefined();
+
     // renew: the same account under a new code; the old one is refused for ever
     const renewed = newCode();
     expect((await ask(a, 'account:renew', { code: renewed })).ok).toBe(true);

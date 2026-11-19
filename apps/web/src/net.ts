@@ -1,8 +1,9 @@
 // The connection to the server (openspec: realtime-sync): Socket.IO with my code in `auth`, reconnection from 0.5 s to
 // 10 s, the room joined again after each reconnection (full state), events applied in order.
 import { io, type Socket } from 'socket.io-client';
-import { PROTOCOL_VERSION, type Ack, type UploadResult, type FatalReason, type Hello, type IntentName, type IntentResults, type RoomState, type SequencedEvent } from '@slopesque/shared';
+import { PROTOCOL_VERSION, type Ack, type UploadResult, type FatalReason, type GifRef, type Hello, type IntentName, type IntentResults, type RoomState, type SequencedEvent } from '@slopesque/shared';
 import { useStore } from './store';
+import { loadChat, mergeChat, saveChat } from './lib/chat-cache';
 
 let socket: Socket | null = null;
 const FATAL: FatalReason[] = ['protocol', 'code', 'retired', 'replaced'];
@@ -32,7 +33,7 @@ export function connect() {
   s.on('fatal', (f: { reason: FatalReason }) => { s.close(); set({ conn: 'idle', fatal: f.reason }); });
   s.on('event', (e: SequencedEvent) => { if (useStore.getState().apply(e) === 'gap') void join(useStore.getState().device.roomKey, true); });
   s.on('room-gone', () => set({ room: null, roomStatus: 'unknown' }));
-  s.on('state', (st: RoomState) => set({ room: st, roomStatus: 'ok' }));   // the console changed the room: its full state again
+  s.on('state', (st: RoomState) => { const had = useStore.getState().room; set({ room: { ...st, chat: mergeChat(had?.room.key === st.room.key ? had.chat : null, st.chat) }, roomStatus: 'ok' }); });   // the console changed the room: its full state again
 }
 
 export function disconnect() { socket?.close(); socket = null; }
@@ -47,11 +48,14 @@ export async function join(key: string, again = false) {
   const st = useStore.getState();
   if (!again) st.set({ roomStatus: 'loading', room: null });
   st.setDevice({ roomKey: key });
-  const r = await request('room:join', { key });
+  // the messages this panel or this device already has: only what follows is asked
+  const cur = useStore.getState().room, me = useStore.getState().account?.id ?? '', server = useStore.getState().device.server;
+  const had = cur?.room.key === key ? cur.chat : loadChat(server, key, me);
+  const r = await request('room:join', { key, ...(had?.messages.length ? { after: had.messages.at(-1)!.id } : {}) });
   if (useStore.getState().device.roomKey !== key) return;   // another room asked since
   if (r.ok) {
-    const st = useStore.getState();
-    st.set({ room: r.value as RoomState, roomStatus: 'ok' });
+    const st = useStore.getState(), v = r.value as RoomState;
+    st.set({ room: { ...v, chat: mergeChat(had, v.chat) }, roomStatus: 'ok' });
     const acc = st.account;
     if (acc?.rooms.some(x => x.key === key && x.pending)) {   // an admin created it since: no longer pending
       const rooms = acc.rooms.map(x => (x.key === key ? { ...x, pending: false } : x));
@@ -99,4 +103,22 @@ export class ServerGifs {
     this.provider = r.value.provider;
     return { items: r.value.items, hasNext: r.value.next !== null, provider: r.value.provider, error: r.value.error };
   }
+}
+
+// the room's chat kept on this device (a second after it changed): the next opening only asks for what follows
+let saving = 0;
+useStore.subscribe((st, prev) => {
+  if (!st.room || !st.account || st.room.chat === prev.room?.chat) return;
+  clearTimeout(saving);
+  saving = window.setTimeout(() => { const s = useStore.getState(); if (s.room && s.account) saveChat(s.device.server, s.room.room.key, s.account.id, s.room.chat); }, 1000);
+});
+
+/** A GIF into my favourites, or out (kept with my account, 500 at most). */
+export function toggleGifFavorite(g: GifRef) {
+  const st = useStore.getState(), acc = st.account;
+  if (!acc) return;
+  const list = acc.gifFavorites ?? [], on = list.some(x => x.id === g.id);
+  const next = on ? list.filter(x => x.id !== g.id) : [g, ...list].slice(0, 500);
+  st.set({ account: { ...acc, gifFavorites: next } });
+  void request('gif:favorites', { favorites: next });
 }

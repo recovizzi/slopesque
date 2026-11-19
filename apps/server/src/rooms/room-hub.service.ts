@@ -21,7 +21,7 @@ import type { Account } from '../accounts/accounts.service.js';
 
 interface MemberRt { sockets: Set<string>; awaySince: number | null; grace: NodeJS.Timeout | null }
 interface PollRt { phase: PollView['phase']; round: number; seconds: number; secret: boolean; poll: PollView['poll']; answers: Record<string, PollAnswer>; host: string | null; deadline: number | null; timer: NodeJS.Timeout | null }
-interface WheelRt { phase: WheelView['phase']; items: WheelView['items']; spin: WheelView['spin']; needle: number; timer: NodeJS.Timeout | null }
+interface WheelRt { phase: WheelView['phase']; items: WheelView['items']; spin: WheelView['spin']; needle: number; round: number; timer: NodeJS.Timeout | null }
 interface CardsRt { game: 'tdc' | 'tarot'; players: number; settings: { tdc: number; tarot: number }; showTricks: boolean; tarot: Tarot.Tarot | null; settled: boolean; seats: Table.CardSeat[]; tdc: Tdc.Tdc | null; paid: Record<string, string | null>; turnSince: number; robot: NodeJS.Timeout | null; late: NodeJS.Timeout | null }
 interface RoomRt { cards: CardsRt; room: Room; seq: number; members: Map<string, MemberRt>; vote: { id: number; v: Vote; timer: NodeJS.Timeout } | null; disk: D.DiskState; diskTimer: NodeJS.Timeout | null; poll: PollRt; wheel: WheelRt }
 export interface SocketData { account: Account; ip: string; roomId: string | null }
@@ -46,16 +46,16 @@ export class RoomHub implements OnModuleInit {
     const saved = (room.rules.disk ?? {}) as { rules?: D.DiskRules; round?: number; guessing?: boolean };
     const disk = { ...D.newDisk({ ...D.DEFAULT_RULES, ...saved.rules }), round: saved.round ?? 1, phase: (saved.round ?? 1) > 1 ? 'writing' as const : 'lobby' as const };
     const ps = (room.rules.poll ?? {}) as { seconds?: number; secret?: boolean; round?: number };
-    const ws = (room.rules.wheel ?? {}) as { items?: WheelView['items']; needle?: number };
+    const ws = (room.rules.wheel ?? {}) as { items?: WheelView['items']; needle?: number; round?: number };
     const rt: RoomRt = { cards: { game: 'tdc', players: 4, settings: { tdc: 4, tarot: 4, ...((room.rules.cards as object | undefined) ?? {}) }, showTricks: true, tarot: null, settled: false, seats: [], tdc: null, paid: {}, turnSince: 0, robot: null, late: null }, room, seq: 0, members: new Map(), vote: null, disk, diskTimer: null,
       poll: { phase: 'writing', round: ps.round ?? 1, seconds: ps.seconds ?? 300, secret: ps.secret ?? false, poll: null, answers: {}, host: null, deadline: null, timer: null },
-      wheel: { phase: 'writing', items: ws.items ?? [{ label: '', weight: '' }, { label: '', weight: '' }], spin: null, needle: ws.needle ?? 0, timer: null } };
+      wheel: { phase: 'writing', items: ws.items ?? [{ label: '', weight: '' }, { label: '', weight: '' }], spin: null, needle: ws.needle ?? 0, round: ws.round ?? 1, timer: null } };
     if (saved.guessing) { await this.saveDisk(rt); await this.chat.send(room.id, null, 'Le serveur a redémarré : tour annulé.', null, 'system'); }
     return rt;
   }
 
   // ---------------------------------------------------------------- join / leave
-  async join(socket: Socket, key: string): Promise<RoomState> {
+  async join(socket: Socket, key: string, after?: number): Promise<RoomState> {
     const room = await this.rooms.byKey(key);
     if (!room) throw new UserError('unknown');
     const data = socket.data as SocketData, me = data.account.id;
@@ -84,7 +84,7 @@ export class RoomHub implements OnModuleInit {
     await socket.join(`room:${room.id}`);
     if (!existing) await this.say(rt, null, `${data.account.name} rejoint le salon.`);
     if (!wasHere || !existing) await this.emitMember(rt, me);
-    return this.state(rt, me);
+    return this.state(rt, me, after);
   }
 
   /** The socket leaves its room; the player is away after the grace if it was his last connection there. */
@@ -110,9 +110,9 @@ export class RoomHub implements OnModuleInit {
   }
 
   // ---------------------------------------------------------------- state
-  async state(rt: RoomRt, me: string): Promise<RoomState> {
+  async state(rt: RoomRt, me: string, after?: number): Promise<RoomState> {
     return { seq: rt.seq, room: { key: rt.room.key, name: rt.room.name, createdAt: rt.room.createdAt.getTime() }, me, hostId: rt.room.hostId,
-      members: await this.members(rt), chat: await this.chat.page(rt.room.id, rt.room.createdAt), serverTime: Date.now(),
+      members: await this.members(rt), chat: after ? await this.chat.since(rt.room.id, rt.room.createdAt, after) : await this.chat.page(rt.room.id, rt.room.createdAt), serverTime: Date.now(),
       stickers: await this.stickerViews(rt), emoji: await this.emojiViews(rt), activity: this.activity(rt), disk: D.diskView(rt.disk, me),
       poll: this.pollView(rt, me), wheel: this.wheelView(rt), cards: this.cardsView(rt, me), web: (rt.room.rules.web as Record<string, string> | undefined) ?? {} };
   }
@@ -501,7 +501,7 @@ export class RoomHub implements OnModuleInit {
     await this.emitPoll(rt);
   }
 
-  async pollPublish(socket: Socket, v: { kind: 'choices' | 'free' | 'gradient'; question: string; choices: string[]; pics: ({ mediaId?: string; stickerId?: string } | null)[] }) {
+  async pollPublish(socket: Socket, v: { kind: 'choices' | 'free' | 'gradient'; question: string; choices: string[]; pics: ({ mediaId?: string; stickerId?: string; gif?: GifRef } | null)[] }) {
     const rt = this.roomOf(socket);
     this.hostOnly(rt, socket);
     if (rt.poll.phase === 'open') throw new UserError('Un sondage est déjà ouvert.');
@@ -510,7 +510,8 @@ export class RoomHub implements OnModuleInit {
     if (v.kind === 'choices') for (let i = 0; i < choices.length; i++) {
       const p = v.pics[i];
       let pic: PollPicView | null = null;
-      if (p?.mediaId) { const m = await this.picture(p.mediaId, 'poll'); pic = { kind: 'image', src: this.media.url(m.id), w: m.width, h: m.height }; }
+      if (p?.gif) pic = { kind: 'gif', src: p.gif.url, w: p.gif.w, h: p.gif.h };   // a link to its provider, as in the chat
+      else if (p?.mediaId) { const m = await this.picture(p.mediaId, 'poll'); pic = { kind: 'image', src: this.media.url(m.id), w: m.width, h: m.height }; }
       else if (p?.stickerId) {
         const [st] = await this.db.select({ m: media }).from(stickers).innerJoin(media, eq(media.id, stickers.mediaId)).where(and(eq(stickers.id, p.stickerId), eq(stickers.roomId, rt.room.id)));
         if (st) pic = { kind: 'sticker', src: this.media.url(st.m.id), w: st.m.width, h: st.m.height };
@@ -563,7 +564,7 @@ export class RoomHub implements OnModuleInit {
   }
 
   // ---------------------------------------------------------------- Roulette
-  private wheelView(rt: RoomRt): WheelView { const w = rt.wheel; return { phase: w.phase, items: w.items, spin: w.spin, needle: w.needle }; }
+  private wheelView(rt: RoomRt): WheelView { const w = rt.wheel; return { phase: w.phase, items: w.items, spin: w.spin, needle: w.needle, round: w.round }; }
   private emitWheel(rt: RoomRt) { this.emit(rt, { type: 'wheel', wheel: this.wheelView(rt) }); }
 
   /** The host builds the wheel: everyone sees it as it is typed. */
@@ -571,7 +572,8 @@ export class RoomHub implements OnModuleInit {
     const rt = this.roomOf(socket);
     this.hostOnly(rt, socket);
     if (rt.wheel.phase === 'spinning') throw new UserError('La roue tourne.');
-    rt.wheel = { ...rt.wheel, items, phase: rt.wheel.phase === 'result' ? 'writing' : rt.wheel.phase };
+    const after = rt.wheel.phase === 'result';   // changed after a draw: the next one
+    rt.wheel = { ...rt.wheel, items, phase: after ? 'writing' : rt.wheel.phase, round: rt.wheel.round + (after ? 1 : 0) };
     await this.saveRules(rt, 'wheel', { items, needle: rt.wheel.needle });
     this.emitWheel(rt);
   }
@@ -594,7 +596,7 @@ export class RoomHub implements OnModuleInit {
     const s = rt.wheel.spin;
     if (rt.wheel.phase !== 'spinning' || !s) return;
     rt.wheel = { ...rt.wheel, phase: 'result', needle: s.angle, timer: null };
-    await this.saveRules(rt, 'wheel', { items: rt.wheel.items, needle: s.angle });
+    await this.saveRules(rt, 'wheel', { items: rt.wheel.items, needle: s.angle, round: rt.wheel.round + 1 });
     const label = s.items[s.winner]?.label.trim() || `Proposition ${s.winner + 1}`;
     await this.say(rt, null, `Roulette : « ${label} » (${Math.round(s.shares[s.winner] ?? 0)} % de chances).`);
     this.emitWheel(rt);
@@ -604,7 +606,7 @@ export class RoomHub implements OnModuleInit {
     const rt = this.roomOf(socket);
     this.hostOnly(rt, socket);
     if (rt.wheel.phase === 'spinning') throw new UserError('La roue tourne.');
-    rt.wheel = { ...rt.wheel, phase: 'writing', spin: null };
+    rt.wheel = { ...rt.wheel, phase: 'writing', spin: null, round: rt.wheel.round + (rt.wheel.phase === 'result' ? 1 : 0) };   // the next draw
     this.emitWheel(rt);
   }
 
@@ -696,7 +698,7 @@ export class RoomHub implements OnModuleInit {
   private async afterMove(rt: RoomRt, before: string | null = null) {
     if (rt.cards.game === 'tarot') return this.afterTarot(rt, before);
     const c = rt.cards, t = c.tdc;
-    if (!t) return;
+    if (!t) { await this.emitCards(rt); return; }   // before the first deal: the seats changed
     if (t.turn !== before) c.turnSince = Date.now();
     if (c.robot) { clearTimeout(c.robot); c.robot = null; }
     if (c.late) { clearTimeout(c.late); c.late = null; }
@@ -823,7 +825,7 @@ export class RoomHub implements OnModuleInit {
   /** After a step: the deal's end (each mark to the last player of each seat), the robots (on their seat's view). */
   private async afterTarot(rt: RoomRt, before: string | null = null, pause = 1) {
     const c = rt.cards, t = c.tarot;
-    if (!t) return;
+    if (!t) { await this.emitCards(rt); return; }   // before the first deal: the seats changed
     if (t.turn !== before) c.turnSince = Date.now();
     if (c.robot) { clearTimeout(c.robot); c.robot = null; }
     if (c.late) { clearTimeout(c.late); c.late = null; }
