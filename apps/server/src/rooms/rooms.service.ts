@@ -9,7 +9,8 @@ import { UserError } from '../errors.js';
 
 export type Room = typeof rooms.$inferSelect;
 export const ADMIN_CHANNEL = 'slopesque_admin';
-export type AdminNotice = { type: 'room-deleted'; key: string } | { type: 'code-reset'; accountId: string } | { type: 'room-changed'; key: string };
+export type AdminNotice = { type: 'room-deleted'; key: string } | { type: 'code-reset'; accountId: string } | { type: 'room-changed'; key: string }
+  | { type: 'message-removed'; roomId: string; id: number } | { type: 'members-changed'; roomId: string };
 
 @Injectable()
 export class RoomsService {

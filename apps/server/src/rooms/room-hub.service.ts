@@ -345,6 +345,18 @@ export class RoomHub implements OnModuleInit {
         this.log.log(`salon ${n.key} supprimé par un admin`);
       }
     } else if (n.type === 'code-reset') this.kickAccount(n.accountId, null);
+    else if (n.type === 'message-removed') { const rt = this.live.get(n.roomId); if (rt) this.emit(rt, { type: 'message-removed', id: n.id }); }
+    else if (n.type === 'members-changed' || n.type === 'room-changed') {
+      for (const rt of this.live.values()) if ('roomId' in n ? rt.room.id === n.roomId : rt.room.key === n.key) void this.resync(rt);
+    }
+  }
+
+  /** Something changed behind the room's back (the console): each player gets the room's full state again. */
+  private async resync(rt: RoomRt) {
+    const [fresh] = await this.db.select().from(rooms).where(eq(rooms.id, rt.room.id));
+    if (fresh) rt.room = fresh;
+    rt.seq++;
+    for (const s of await this.io.in(`room:${rt.room.id}`).fetchSockets()) s.emit('state', await this.state(rt, (s.data as SocketData).account.id));
   }
 
   /** The account's code was replaced: its connections end (« Ce code a été remplacé »), except `keep`. */

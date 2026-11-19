@@ -9,7 +9,9 @@ import { eq } from 'drizzle-orm';
 import { newCode, normalizeKey } from '@slopesque/engines';
 import { CoreModule } from './app.module.js';
 import { DB, type Db } from './db/db.module.js';
-import { accounts, adminLog } from './db/schema.js';
+import { accounts, adminLog, customEmoji, media, messages, roomMembers, stickers, trumpArt } from './db/schema.js';
+import { and, sql } from 'drizzle-orm';
+import { MediaService } from './media/media.service.js';
 import { AccountsService } from './accounts/accounts.service.js';
 import { RoomsService } from './rooms/rooms.service.js';
 import { ChatService } from './chat/chat.service.js';
@@ -24,7 +26,11 @@ const HELP: Record<string, [string, string]> = {
   'accounts:find': ['[--name …] [--room XXXX-XXXX] [--seen-after AAAA-MM-JJ]', 'comptes correspondants (uuid, pseudos, salons, dates), jamais de code'],
   'accounts:show': ['<uuid>', 'le détail d\'un compte'],
   'accounts:reset-code': ['<uuid> [--yes]', 'donne au compte un code tiré au hasard, affiché une seule fois ; l\'ancien est retiré'],
-  'purge:run': ['', 'lance la purge planifiée tout de suite (messages de plus de 30 jours)'],
+  'credit:reset': ['<clé> [--account <uuid>] [--yes]', 'remet à zéro le crédit social d\'un joueur, ou de tout le salon'],
+  'messages:delete': ['<id> [--yes]', 'retire un message (modération) : « Message retiré par un admin »'],
+  'media:delete': ['<id> [--yes]', 'retire une image, un sticker ou un emoji (modération), partout où il sert'],
+  'media:stats': ['', 'place occupée par usage, images du chat qui expirent dans les 24 h'],
+  'purge:run': ['', 'lance la purge planifiée tout de suite (messages de plus de 30 jours, images expirées)'],
   'services:check': ['', 'état de Postgres, Redis, RustFS, des clés externes et de la place'],
 };
 
@@ -108,10 +114,58 @@ try {
       console.log(`Nouveau code de ${a.name} (affiché une seule fois, à transmettre) :\n\n    ${fresh}\n`);
       break;
     }
+    case 'credit:reset': {
+      const room = await rooms.byKey(args[0] ?? '');
+      if (!room) throw new UserError('Aucun salon avec cette clé.');
+      const who = str('account');
+      if (!(await confirm(`Remettre à zéro le crédit social ${who ? `du compte ${who}` : 'de tout le salon'} ${room.key} ?`))) { console.log('Annulé.'); break; }
+      const done = await db.update(roomMembers).set({ credit: 0 }).where(and(eq(roomMembers.roomId, room.id), who ? eq(roomMembers.accountId, who) : undefined)).returning();
+      await rooms.notify({ type: 'members-changed', roomId: room.id });
+      await log(room.key, { account: who ?? null, players: done.length });
+      console.log(`Crédit social remis à zéro : ${done.length} joueur(s).`);
+      break;
+    }
+    case 'messages:delete': {
+      const id = Number(args[0]);
+      const [m] = Number.isInteger(id) ? await db.select().from(messages).where(eq(messages.id, id)) : [];
+      if (!m) throw new UserError('Aucun message avec cet identifiant.');
+      console.log(`« ${m.text.slice(0, 120)}${m.mediaKind ? ` [${m.mediaKind}]` : ''} »`);
+      if (!(await confirm('Retirer ce message ?'))) { console.log('Annulé.'); break; }
+      await db.update(messages).set({ kind: 'system', text: 'Message retiré par un admin.', authorId: null, mediaId: null, mediaKind: null, gif: null, data: null }).where(eq(messages.id, id));
+      await rooms.notify({ type: 'members-changed', roomId: m.roomId });
+      await log(String(id));
+      console.log('Message retiré.');
+      break;
+    }
+    case 'media:delete': {
+      const row = await app.get(MediaService).get(args[0] ?? '');
+      if (!row) throw new UserError('Aucune image avec cet identifiant.');
+      if (!(await confirm(`Retirer cette image (${row.usage}, ${row.width} × ${row.height}) partout où elle sert ?`))) { console.log('Annulé.'); break; }
+      const affected = (await db.execute<{ room_id: string }>(sql`select distinct room_id from stickers where media_id = ${row.id} union select distinct room_id from custom_emoji where media_id = ${row.id}
+        union select distinct room_id from room_members where photo_id = ${row.id} union select distinct room_id from trump_art where media_id = ${row.id} union select distinct room_id from messages where media_id = ${row.id}`)).map(r => r.room_id);
+      await db.delete(stickers).where(eq(stickers.mediaId, row.id));
+      await db.delete(customEmoji).where(eq(customEmoji.mediaId, row.id));
+      await db.delete(trumpArt).where(eq(trumpArt.mediaId, row.id));
+      await db.update(roomMembers).set({ photoId: null }).where(eq(roomMembers.photoId, row.id));
+      await db.update(media).set({ expiresAt: new Date(0), usage: 'chat' }).where(eq(media.id, row.id));
+      await app.get(MediaService).sweep([row.id]);
+      for (const roomId of affected) await rooms.notify({ type: 'members-changed', roomId });
+      await log(row.id, { usage: row.usage });
+      console.log('Image retirée.');
+      break;
+    }
+    case 'media:stats': {
+      const rows = await db.execute<{ usage: string; n: number; bytes: string; soon: number }>(sql`select usage, count(*)::int as n, sum(bytes)::text as bytes,
+        count(*) filter (where expires_at < now() + interval '24 hours')::int as soon from media group by usage order by usage`);
+      const u = await app.get(StorageService).usage();
+      for (const r of rows) console.log(`${r.usage.padEnd(8)} ${String(r.n).padStart(6)} fichier(s)  ${(Number(r.bytes) / 1024 / 1024).toFixed(1).padStart(8)} Mo${r.soon ? `  (${r.soon} expirent dans les 24 h)` : ''}`);
+      console.log(`Total (Postgres + images) : ${(u.usedBytes / 1024 ** 3).toFixed(2)} Go sur ${(u.quotaBytes / 1024 ** 3).toFixed(0)} Go (${(u.ratio * 100).toFixed(1)} %). Sauvegardes : aucune.`);
+      break;
+    }
     case 'purge:run': {
-      const n = await app.get(ChatService).purge();
-      await log(null, { messages: n });
-      console.log(`Purge : ${n} message(s) supprimé(s).`);
+      const n = await app.get(ChatService).purge(), pics = await app.get(MediaService).sweep();
+      await log(null, { messages: n, pictures: pics });
+      console.log(`Purge : ${n} message(s), ${pics} image(s) supprimé(s).`);
       break;
     }
     case 'services:check': {

@@ -32,6 +32,7 @@ export function connect() {
   s.on('fatal', (f: { reason: FatalReason }) => { s.close(); set({ conn: 'idle', fatal: f.reason }); });
   s.on('event', (e: SequencedEvent) => { if (useStore.getState().apply(e) === 'gap') void join(useStore.getState().device.roomKey, true); });
   s.on('room-gone', () => set({ room: null, roomStatus: 'unknown' }));
+  s.on('state', (st: RoomState) => set({ room: st, roomStatus: 'ok' }));   // the console changed the room: its full state again
 }
 
 export function disconnect() { socket?.close(); socket = null; }
