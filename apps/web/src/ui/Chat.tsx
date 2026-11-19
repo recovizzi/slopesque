@@ -103,6 +103,7 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
   }, []);
 
   useEffect(() => { pop?.setCustom(custom); });
+  useEffect(() => { if (!note) return; const t = setTimeout(() => set({ note: '' }), 8000); return () => clearTimeout(t); }, [note, set]);   // a note goes after 8 s
 
   function toggleFavorite(g: GifRef) {
     const st = useStore.getState(), acc = st.account!;

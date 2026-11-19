@@ -11,6 +11,7 @@ import { Chat, People } from './ui/Chat';
 import { Avatar, Html, Icon } from './ui/common';
 import { KeyBadge, RoomList, RoomPage } from './ui/Rooms';
 import { DiskSettings, DiskStage, Ranking } from './ui/DiskStage';
+import { PollSettings, PollStage, WheelStage } from './ui/PollWheel';
 import { READY_ACTIVITIES } from '@slopesque/shared';
 
 const EMBED = new URLSearchParams(location.search).has('embed');
@@ -37,6 +38,8 @@ export function App() {
   useEffect(() => {
     const b = document.body.classList;
     b.toggle('activity-chat', !room || room.activity.activity === 'chat');
+    b.toggle('activity-poll', room?.activity.activity === 'poll');
+    b.toggle('activity-wheel', room?.activity.activity === 'wheel');
     b.toggle('left-open', leftOpen);
     b.toggle('right-open', rightOpen);
     b.toggle('room-blocked', blocked);
@@ -90,11 +93,13 @@ export function App() {
           <button className={`tab ${leftTab === 'chat' ? 'on' : ''}`} type="button" onClick={() => setLeftTab('chat')} title="Chat"><Icon name="chat" /><span className="tab-label">Chat</span></button>
           <button className={`tab ${leftTab === 'ranking' ? 'on' : ''}`} type="button" onClick={() => setLeftTab('ranking')} title="Classement"><Icon name="trophy" /><span className="tab-label">Classement</span></button>
           <button className="icon-btn" type="button" onClick={() => setLeftOpen(false)} title="Fermer" aria-label="Fermer le panneau"><Icon name="close" /></button></div>
-        {leftTab === 'chat' ? !blocked && <Chat pop={pop} /> : <Ranking onGiveHost={giveHost} />}</>)}</aside>
+        {leftTab === 'chat' ? !blocked && <Chat pop={pop} /> : act === 'disk' ? <Ranking onGiveHost={giveHost} /> : <People onGiveHost={giveHost} />}</>)}</aside>
       <main className="stage">
         <div className="room-page">{page}</div>
         <div className="chat-stage">{!blocked && act === 'chat' && <Chat pop={pop} />}</div>
         {!blocked && act === 'disk' && <DiskStage />}
+        {!blocked && act === 'poll' && <PollStage />}
+        {!blocked && act === 'wheel' && <WheelStage />}
       </main>
       <div className="backdrop" onClick={() => setRightOpen(false)} />
       <aside className="drawer drawer-right">{!first && <>
@@ -200,7 +205,7 @@ function GameTab() {
       {Object.entries(names).map(([k, n]) => <option key={k} value={k} disabled={!READY_ACTIVITIES.includes(k as ActivityChoice['activity'])}>{n}{READY_ACTIVITIES.includes(k as ActivityChoice['activity']) ? '' : ' (bientôt)'}</option>)}</select></label>
     {!host && <p className="note">Seul l'hôte change l'activité ; les autres la proposent au vote avec /activity.</p>}
     <hr />
-    {act === 'disk' ? <DiskSettings /> : <p className="note">Rien à régler : le chat prend toute la place, la liste des joueurs est à gauche. Les scores ne bougent pas.</p>}
+    {act === 'disk' ? <DiskSettings /> : act === 'poll' ? <PollSettings /> : act === 'wheel' ? <p className="note">Les propositions et leurs poids se règlent dans la zone de jeu : tout le monde voit la roue se construire.</p> : <p className="note">Rien à régler : le chat prend toute la place, la liste des joueurs est à gauche. Les scores ne bougent pas.</p>}
   </>;
 }
 

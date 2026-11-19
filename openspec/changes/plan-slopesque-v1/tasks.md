@@ -62,10 +62,10 @@ chaque jalon, les tâches sont groupées par partie du monorepo (`[racine]`, `[i
 
 ## 6. Jalon 6 : Sondage et Roulette
 
-- [ ] 6.1 [engines] Sondage (types, résultats, secret) et Roulette (poids, parts, tirage), avec tests
-- [ ] 6.2 [server] Sondage et Roulette (tirage décidé par le serveur, animé par les clients)
-- [ ] 6.3 [web] Sondage (préparation, vote, résultats, gradient) et Roulette (éditeur, roue)
-- [ ] 6.4 [e2e] Un sondage secret (pas de noms dans le trafic) et un tirage vu identique par tous
+- [x] 6.1 [engines] Sondage (types, résultats, secret) et Roulette (poids, parts, tirage), avec tests
+- [x] 6.2 [server] Sondage et Roulette (tirage décidé par le serveur, animé par les clients)
+- [x] 6.3 [web] Sondage (préparation, vote, résultats, gradient) et Roulette (éditeur, roue)
+- [x] 6.4 [e2e] Un sondage secret (pas de noms dans le trafic) et un tirage vu identique par tous
 
 ## 7. Jalon 7 : Cartes, Trou du cul
 
