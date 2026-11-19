@@ -31,7 +31,7 @@ export function suggestName(file: string, taken: string[]) {
 
 // ------------------------------------------------------------------ :codes:
 interface Code { code: string; emoji: string }
-let codes: Code[] = [];
+const codes: Code[] = [];
 const byCode = new Map<string, string>(), firstCode = new Map<string, string>();
 let loading: Promise<void> | null = null;
 

@@ -46,3 +46,37 @@ jobs:
           node -e "const h=require('./health.json'); const s=h.services; if (s.postgres!=='ok'||s.redis!=='ok'||s.storage!=='ok') { console.error('service down', s); process.exit(1); }"
       - name: Secret scan (gitleaks, whole history)
         run: node tools/scan-secrets.mjs
+
+  e2e:
+    # two players with the built extension (Chromium) against the built server and its services
+    runs-on: ubuntu-26.04
+    needs: check
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env: { POSTGRES_USER: slopesque, POSTGRES_PASSWORD: dev-only-postgres, POSTGRES_DB: slopesque }
+        ports: ['55432:5432']
+        options: --health-cmd "pg_isready -U slopesque" --health-interval 2s --health-retries 30
+      redis:
+        image: redis:7-alpine
+        ports: ['56379:6379']
+      rustfs:
+        image: rustfs/rustfs:1.0.6
+        env: { RUSTFS_ACCESS_KEY: slopesque, RUSTFS_SECRET_KEY: dev-only-rustfs-secret, RUSTFS_VOLUMES: /data }
+        ports: ['59000:9000']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm --filter @slopesque/e2e exec playwright install --with-deps chromium
+      - run: pnpm --filter @slopesque/e2e e2e
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-shots
+          path: tests/e2e/shots/

@@ -1,7 +1,7 @@
 // The connection to the server (openspec: realtime-sync): Socket.IO with my code in `auth`, reconnection from 0.5 s to
 // 10 s, the room joined again after each reconnection (full state), events applied in order.
 import { io, type Socket } from 'socket.io-client';
-import { PROTOCOL_VERSION, type Ack, type FatalReason, type Hello, type IntentName, type IntentResults, type RoomState, type SequencedEvent } from '@slopesque/shared';
+import { LIMITS, PROTOCOL_VERSION, type Ack, type UploadResult, type FatalReason, type Hello, type IntentName, type IntentResults, type RoomState, type SequencedEvent } from '@slopesque/shared';
 import { useStore } from './store';
 
 let socket: Socket | null = null;
@@ -68,4 +68,34 @@ export async function checkCode(server: string, code: string): Promise<Ack<Inten
     const r = await fetch(`${server.replace(/\/+$/, '')}/api/account/check`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code }), signal: AbortSignal.timeout(8000) });
     return await r.json();
   } catch { return { ok: false, error: `Serveur injoignable : ${server}` }; }
+}
+
+export type Usage = 'chat' | 'sticker' | 'emoji' | 'photo' | 'poll' | 'trump';
+/** Sends a picture: a ticket over the WebSocket, then the file as the body of POST /api/media (the server converts it
+ *  for its usage and keeps one copy per file). */
+export async function upload(usage: Usage, file: Blob): Promise<UploadResult> {
+  if (!file.type.startsWith('image/')) return { ok: false, error: 'Ce fichier n\'est pas une image : seules les images peuvent être envoyées.' };
+  if (file.size > LIMITS.maxUploadBytes) return { ok: false, error: 'Image trop lourde (15 Mo au plus).' };
+  const t = await request('media:ticket', { usage });
+  if (!t.ok) return t;
+  try {
+    const r = await fetch(t.value.url, { method: 'POST', headers: { 'x-ticket': t.value.ticket, 'content-type': file.type }, body: file });
+    return await r.json();
+  } catch { return { ok: false, error: 'Envoi impossible : le serveur ne répond pas.' }; }
+}
+
+/** The GIF window's source: our server; a search's next pages stay with the provider of its first page. */
+export class ServerGifs {
+  requests = 0;
+  private provider: string | null = null;
+  async trending(page: number) { return this.get('gif:trending', { page }); }
+  async search(q: string, page: number) { return this.get('gif:search', { q, page }); }
+  private async get(name: 'gif:search' | 'gif:trending', body: { page: number; q?: string }) {
+    if (body.page === 0) this.provider = null;
+    this.requests++;
+    const r = await request(name, { ...body, provider: this.provider });
+    if (!r.ok) return { items: [], hasNext: false, provider: null, error: 'down' as const };
+    this.provider = r.value.provider;
+    return { items: r.value.items, hasNext: r.value.next !== null, provider: r.value.provider, error: r.value.error };
+  }
 }

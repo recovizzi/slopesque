@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from 'react';
 import { MIN_HUE_GAP, RAINBOW, hueColor, hueDistance, newCode } from '@slopesque/engines';
 import { isInsecureUrl, type MemberView } from '@slopesque/shared';
 import { EmojiPop, emojiHtml } from './lib/emoji';
-import { connect, request } from './net';
+import { connect, request, upload } from './net';
 import { useStore } from './store';
 import { AccountSection, CodeModal, Welcome, type CodeMode } from './ui/Account';
 import { Chat, People } from './ui/Chat';
-import { Html, Icon } from './ui/common';
+import { Avatar, Html, Icon } from './ui/common';
 import { KeyBadge, RoomList, RoomPage } from './ui/Rooms';
 
 const EMBED = new URLSearchParams(location.search).has('embed');
@@ -72,7 +72,8 @@ export function App() {
       {!first && <div className="header-tools">
         {device.roomKey && <KeyBadge k={device.roomKey} />}
         {account && <button className={`avatar${me?.photo ? ' has-photo' : ''}`} type="button" onClick={() => { setRightOpen(!rightOpen); setTab('profile'); }}
-          style={{ '--c': hueColor(me?.hue ?? account.hue ?? 222) } as React.CSSProperties} title={`${account.name} — profil et paramètres`} aria-label="Profil et paramètres">{account.name.slice(0, 1).toUpperCase()}</button>}
+          style={{ '--c': hueColor(me?.hue ?? account.hue ?? 222) } as React.CSSProperties} title={`${account.name} — profil et paramètres`} aria-label="Profil et paramètres">
+          {me?.photo ? <img src={me.photo} alt="" draggable={false} /> : account.name.slice(0, 1).toUpperCase()}</button>}
       </div>}
       {EMBED && <button className="icon-btn" type="button" onClick={() => parent.postMessage({ scd: 'close' }, '*')} title="Fermer" aria-label="Fermer"><Icon name="close" /></button>}
     </header>
@@ -114,7 +115,8 @@ function Profile({ pop, onCode }: { pop: EmojiPop | null; onCode: () => void }) 
   const shown = hue ?? me?.hue ?? account.hue ?? 222;
   const pos = (v: number) => `calc(11px + (100% - 22px) * ${(v / 359).toFixed(4)})`;
   return <>
-    <label className="field"><span>Pseudo</span><input value={name} maxLength={20} onChange={e => setName(e.target.value)}
+    <PhotoField />
+    <label className="field"><span>Pseudo</span><input name="pseudo" value={name} maxLength={20} onChange={e => setName(e.target.value)}
       onBlur={() => { if (name.trim() && name.trim() !== account.name) void save({ name: name.trim() }); }} onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} /></label>
     <div className="field"><span>Couleur</span>
       <div className="hue" style={{ '--h': shown } as React.CSSProperties}>
@@ -152,6 +154,28 @@ function ExtensionTab({ setDevice }: { setDevice: (p: Partial<ReturnType<typeof 
     <label className="field"><span>Thème</span><select value={device.theme} onChange={e => setDevice({ theme: e.target.value as 'auto' })}>
       <option value="auto">Système</option><option value="light">Clair</option><option value="dark">Sombre</option></select></label>
   </>;
+}
+
+/** Profil: my photo in this room (or my letter), a small ✕ to remove it, a button to choose one. */
+function PhotoField() {
+  const account = useStore(s => s.account), room = useStore(s => s.room);
+  const [note, setNote] = useState(''), [busy, setBusy] = useState(false);
+  const file = useRef<HTMLInputElement>(null);
+  const me = room?.members.find(m => m.id === account?.id);
+  if (!me) return null;
+  const choose = async (f: File) => {
+    setBusy(true);
+    const up = await upload('photo', f);
+    const r = up.ok ? await request('photo:set', { mediaId: up.value.id }) : up;
+    setBusy(false);
+    setNote(r.ok ? '' : r.error);
+  };
+  return <div className="field"><span>Photo de profil <small>dans ce salon</small></span>
+    <div className="photo-row"><span className="photo-wrap"><Avatar name={me.name} hue={me.hue} photo={me.photo} size="lg" />
+      {me.photo && <button className="photo-del" type="button" onClick={() => void request('photo:set', { mediaId: null })} title="Retirer la photo : ta lettre sur ta couleur revient" aria-label="Retirer la photo"><Icon name="close" /></button>}</span>
+      <button className="btn ghost sm" type="button" disabled={busy} onClick={() => file.current?.click()}><Icon name="camera" />{busy ? 'Envoi…' : me.photo ? 'Changer de photo' : 'Ajouter une photo'}</button></div>
+    <input ref={file} type="file" accept="image/*" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void choose(f); }} />
+    <p className="note">{note ? <b>{note}</b> : 'Propre à ce salon : chaque salon a la sienne. Coupée en carré, au milieu de l\'image ; l\'ancienne est supprimée.'}</p></div>;
 }
 
 /** The server refused my code, or this version of the extension. */

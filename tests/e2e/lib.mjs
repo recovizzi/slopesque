@@ -18,6 +18,8 @@ export const failures = () => failed;
 export const until = async (fn, ms = 5000) => { const end = Date.now() + ms; while (Date.now() < end) { try { if (await fn()) return true; } catch { /* not yet */ } await new Promise(r => setTimeout(r, 100)); } return false; };
 
 let server = null;
+process.on('exit', () => server?.kill());
+process.on('uncaughtException', e => { console.error(e); server?.kill(); process.exit(1); });
 export async function startServer() {
   server = spawn(process.execPath, ['dist/main.js'], { cwd: serverDir, env, stdio: ['ignore', 'inherit', 'inherit'] });
   if (!(await until(async () => (await fetch(`${SERVER}/api/health`)).ok, 15000))) throw new Error('the server did not start');

@@ -28,7 +28,7 @@ const upsertMember = (list: MemberView[], m: MemberView) => (list.some(x => x.id
 const mapMessage = (list: MessageView[], id: number, f: (m: MessageView) => MessageView) => list.map(m => (m.id === id ? f(m) : m));
 
 export const useStore = create<State>((set, get) => ({
-  device: { code: '', server: '', theme: 'auto', roomKey: '', recent: [] },
+  device: { code: '', server: '', theme: 'auto', roomKey: '', recent: [], gifRecent: [] },
   conn: 'idle', fatal: null, insecure: false, account: null, room: null, roomStatus: 'none', clockSkew: 0, note: '',
   setDevice: p => { const device = { ...get().device, ...p }; set({ device }); void saveDevice(device); },
   set: p => set(p),
@@ -42,6 +42,9 @@ export const useStore = create<State>((set, get) => ({
     else if (e.type === 'reactions') next.chat = { ...room.chat, messages: mapMessage(room.chat.messages, e.id, m => ({ ...m, reactions: e.reactions })) };
     else if (e.type === 'member') next.members = upsertMember(room.members, e.member);
     else if (e.type === 'host') next.hostId = e.hostId;
+    else if (e.type === 'message-updated') next.chat = { ...room.chat, messages: mapMessage(room.chat.messages, e.message.id, () => e.message) };
+    else if (e.type === 'stickers') next.stickers = e.stickers;
+    else if (e.type === 'emoji') next.emoji = e.emoji;
     set({ room: next });
     return 'ok';
   },

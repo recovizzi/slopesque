@@ -87,7 +87,7 @@ function RoomModal({ m: start, onClose }: { m: Modal; onClose: () => void }) {
   const buttons = (ok: string, danger = false) => <div className="modal-buttons"><button className="btn ghost" type="button" onClick={onClose}>Annuler</button>
     <button className={`btn ${danger ? 'danger-fill' : ''}`} disabled={busy}>{busy ? 'Vérification…' : ok}</button></div>;
   const err = error && <p className="alert" role="alert">{error}</p>;
-  let title = '', body: React.ReactNode;
+  let title: string, body: React.ReactNode;
   if (m.kind === 'add') {
     title = 'Ajouter un salon';
     body = <><label className="field"><span>Clé du salon</span><input name="roomKey" value={m.key} onChange={e => setM({ ...m, key: e.target.value })} maxLength={9} placeholder="XXXX-XXXX" autoComplete="off" spellCheck={false} className="mono" autoFocus /></label>

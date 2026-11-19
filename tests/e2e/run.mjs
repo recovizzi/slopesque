@@ -25,8 +25,8 @@ async function enter(p, name) {
   await frame.locator('.backdrop').click({ force: true }).catch(() => {});
   // a pseudo, so the chat says who is who
   await frame.locator('.bar .avatar').click();
-  await frame.locator('.drawer-right .field input').first().fill(name === 'A' ? 'Léa' : 'Hugo');
-  await frame.locator('.drawer-right .field input').first().press('Enter');
+  await frame.locator('.drawer-right [name="pseudo"]').fill(name === 'A' ? 'Léa' : 'Hugo');
+  await frame.locator('.drawer-right [name="pseudo"]').press('Enter');
   await frame.locator('.drawer-right [aria-label="Fermer"]').click();
   return { page, frame, code };
 }
@@ -57,6 +57,55 @@ await a.frame.locator('.msg', { hasText: 'merci' }).locator('.msg-body').dblclic
 check(await until(async () => (await b.frame.locator('.msg', { hasText: 'merci' }).locator('.reaction').count()) === 1), 'a double click reacts; B sees the reaction');
 await shot(a.page, '02-chat-light');
 await shot(b.page, '03-chat-dark');
+
+// ---- jalon 3: pictures (image, sticker, custom emoji), GIF window without a key, profile photo
+const png = async (frame, w, h, color) => Buffer.from(await frame.evaluate(([w, h, color]) => {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const x = c.getContext('2d'); x.fillStyle = color; x.fillRect(0, 0, w, h); x.fillStyle = '#fff'; x.beginPath(); x.arc(w / 2, h / 2, Math.min(w, h) / 3, 0, 7); x.fill();
+  return c.toDataURL('image/png').split(',')[1];
+}, [w, h, color]), 'base64');
+const chooseFile = async (frame, name, buffer) => {
+  await frame.locator('[aria-label="Fichier, sticker, GIF, emoji"]').click();
+  const [chooser] = await Promise.all([frame.page().waitForEvent('filechooser'), frame.getByRole('menuitem', { name: 'Fichier' }).click()]);
+  await chooser.setFiles({ name, mimeType: 'image/png', buffer });
+  await frame.locator('.chat-panel.upload .upload-choice').waitFor();
+};
+await chooseFile(a.frame, 'paysage.png', await png(a.frame, 1400, 900, '#2a6f97'));
+await a.frame.getByRole('button', { name: /^Image/ }).click();
+const pic = b.frame.locator('.msg img.msg-image');
+check(await until(async () => (await pic.count()) === 1, 8000), 'image: sent by A, shown to B');
+check(await pic.evaluate(i => i.complete && i.naturalWidth === 1400 && i.src.includes('/media/')), 'image: served by our server (/media), 1400 px kept under 1600');
+
+await chooseFile(a.frame, 'Bravo Léa.png', await png(a.frame, 400, 400, '#ef476f'));
+await a.frame.getByRole('button', { name: /^Sticker/ }).click();
+check(await until(async () => (await b.frame.locator('.msg img.msg-sticker').count()) === 1, 8000), 'sticker: sent, shown to B');
+await b.frame.locator('[aria-label="Fichier, sticker, GIF, emoji"]').click();
+await b.frame.getByRole('menuitem', { name: 'Sticker' }).click();
+check(await until(async () => (await b.frame.locator('.sticker-grid .sticker-item').count()) === 1), 'sticker: in the room\'s library, for B too');
+await b.frame.locator('.chat-panel.stickers [aria-label="Fermer"]').click();
+
+await chooseFile(a.frame, 'Super Chat.png', await png(a.frame, 300, 300, '#06d6a0'));
+await a.frame.getByRole('button', { name: /^Emoji/ }).click();
+check(await a.frame.locator('[name="emojiName"]').inputValue() === 'super_chat', 'emoji: its name suggested from the file (super_chat)');
+await a.frame.getByRole('button', { name: 'Ajouter aux emoji' }).click();
+check(await until(async () => (await b.frame.locator('.msg.sys', { hasText: "a ajouté l'emoji" }).locator('img.emoji-custom').count()) === 1, 8000), 'emoji: added for the room, said in the chat');
+await b.frame.locator('[name="text"]').fill('trop bien :super_chat:');
+await b.frame.locator('[name="text"]').press('Enter');
+check(await until(async () => (await a.frame.locator('.msg', { hasText: 'trop bien' }).locator('img.emoji-custom').count()) === 1, 8000), 'emoji: :super_chat: shown as its picture');
+
+await a.frame.locator('[aria-label="Fichier, sticker, GIF, emoji"]').click();
+await a.frame.getByRole('menuitem', { name: 'GIF' }).click();
+check(await until(async () => (await a.frame.locator('.gif-pop .gif-status').textContent()).includes('aucune clé')), 'GIF: without a key, the window says why');
+await a.page.keyboard.press('Escape');
+
+await a.frame.locator('.bar .avatar').click();
+const [ph] = await Promise.all([a.page.waitForEvent('filechooser'), a.frame.getByRole('button', { name: 'Ajouter une photo' }).click()]);
+await ph.setFiles({ name: 'moi.png', mimeType: 'image/png', buffer: await png(a.frame, 640, 480, '#ffd166') });
+check(await until(async () => (await b.frame.locator('.person', { hasText: 'Léa' }).locator('.avatar.has-photo img').count()) === 1, 8000), 'photo: A\'s photo shown to B in the players');
+check(await a.frame.locator('.photo-wrap .avatar img').evaluate(i => i.naturalWidth === 256 && i.naturalHeight === 256), 'photo: a 256 px square');
+await shot(a.page, '05-photo');
+await a.frame.locator('.drawer-right [aria-label="Fermer"]').click();
+await shot(b.page, '06-pictures-dark');
 
 // the server restarts: the panels say « Reconnexion… », then come back with the chat kept
 await stopServer();
