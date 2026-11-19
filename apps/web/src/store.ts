@@ -50,6 +50,7 @@ export const useStore = create<State>((set, get) => ({
     else if (e.type === 'poll') next.poll = e.poll;
     else if (e.type === 'wheel') next.wheel = e.wheel;
     else if (e.type === 'cards') next.cards = e.cards;
+    else if (e.type === 'web') next.web = e.web;
     set({ room: next });
     return 'ok';
   },

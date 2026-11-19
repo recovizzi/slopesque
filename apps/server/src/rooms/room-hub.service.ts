@@ -114,7 +114,7 @@ export class RoomHub implements OnModuleInit {
     return { seq: rt.seq, room: { key: rt.room.key, name: rt.room.name, createdAt: rt.room.createdAt.getTime() }, me, hostId: rt.room.hostId,
       members: await this.members(rt), chat: await this.chat.page(rt.room.id, rt.room.createdAt), serverTime: Date.now(),
       stickers: await this.stickerViews(rt), emoji: await this.emojiViews(rt), activity: this.activity(rt), disk: D.diskView(rt.disk, me),
-      poll: this.pollView(rt, me), wheel: this.wheelView(rt), cards: this.cardsView(rt, me) };
+      poll: this.pollView(rt, me), wheel: this.wheelView(rt), cards: this.cardsView(rt, me), web: (rt.room.rules.web as Record<string, string> | undefined) ?? {} };
   }
 
   private async members(rt: RoomRt, only?: string): Promise<MemberView[]> {
@@ -592,6 +592,19 @@ export class RoomHub implements OnModuleInit {
     if (rt.wheel.phase === 'spinning') throw new UserError('La roue tourne.');
     rt.wheel = { ...rt.wheel, phase: 'writing', spin: null };
     this.emitWheel(rt);
+  }
+
+  // ---------------------------------------------------------------- integrations (Low Tide)
+  /** The host saves an integration's address (checked in his panel: the page declares the integration's name). */
+  async setWeb(socket: Socket, integration: string, url: string) {
+    const rt = this.roomOf(socket);
+    this.hostOnly(rt, socket);
+    const u = new URL(url), local = u.hostname === 'localhost' || u.hostname === '127.0.0.1';
+    if (u.protocol !== 'https:' && !(u.protocol === 'http:' && local)) throw new UserError('L\'adresse doit commencer par https:// (http:// seulement pour localhost).');
+    const web = { ...((rt.room.rules.web as Record<string, string> | undefined) ?? {}), [integration]: u.href };
+    await this.saveRules(rt, 'web', web);
+    this.emit(rt, { type: 'web', web });
+    await this.say(rt, null, `Nouvelle adresse pour Low Tide : ${u.host}`);
   }
 
   // ---------------------------------------------------------------- Palmarès

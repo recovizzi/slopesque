@@ -84,8 +84,8 @@ chaque jalon, les tâches sont groupées par partie du monorepo (`[racine]`, `[i
 
 ## 9. Jalon 9 : intégrations et extension complète
 
-- [ ] 9.1 [server] Intégrations : adresse vérifiée par le serveur (nom déclaré), diffusée au salon
-- [ ] 9.2 [web] Low Tide dans la zone de jeu (page qui ne répond pas, Réessayer)
+- [x] 9.1 [server] Intégrations : adresse vérifiée par le panneau de l'hôte (nom déclaré, permission du site), enregistrée et diffusée par le serveur (https seulement) — pas de lecture côté serveur (SSRF)
+- [x] 9.2 [web] Low Tide dans la zone de jeu (page qui ne répond pas, Réessayer)
 - [x] 9.3 [extension] Raccourci clavier (`commands`), affichage et changement (Firefox sur place, Chrome / Edge par la page du navigateur)
 - [x] 9.4 [extension] « Rester ouvert sur toutes les pages » : permission à l'activation, scripts de contenu enregistrés, état partagé
 - [x] 9.5 [extension] Plusieurs onglets : seul l'onglet visible connecté, coupure après 30 s caché

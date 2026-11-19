@@ -78,6 +78,7 @@ export interface RoomState {
   poll: PollView;
   wheel: WheelView;
   cards: CardsView;
+  web: Record<string, string>;   // each integration's address, checked by the host (default: its own)
   serverTime: number;
 }
 
@@ -97,7 +98,8 @@ export type RoomEvent =
   | { type: 'disk'; disk: DiskView }
   | { type: 'poll'; poll: PollView }
   | { type: 'wheel'; wheel: WheelView }
-  | { type: 'cards'; cards: CardsView };
+  | { type: 'cards'; cards: CardsView }
+  | { type: 'web'; web: Record<string, string> };
 
 export interface PlayingCard { id: string; r: number; s: 'S' | 'H' | 'D' | 'C' }
 export interface CardSeatView { id: string; user: string | null; credit: string | null; bot: string }
@@ -165,7 +167,7 @@ export const activityChoice = z.object({
 });
 export type ActivityChoice = z.infer<typeof activityChoice>;
 /** The activities the V1 can play now (grows with the milestones). */
-export const READY_ACTIVITIES: ActivityChoice['activity'][] = ['chat', 'disk', 'poll', 'wheel', 'cards'];
+export const READY_ACTIVITIES: ActivityChoice['activity'][] = ['chat', 'disk', 'poll', 'wheel', 'cards', 'lowtide'];
 export type SequencedEvent = RoomEvent & { seq: number };
 
 // ------------------------------------------------------------------ intents (client → server), with their answers
@@ -214,6 +216,7 @@ export const intents = {
   'wheel:spin': z.object({}),
   'wheel:edit': z.object({}),
   'palmares:get': z.object({}),
+  'web:set': z.object({ integration: z.enum(['lowtide']), url: z.url().max(300) }),
   'cards:deal': z.object({}),
   'cards:play': z.object({ cards: z.array(z.string().max(4)).min(1).max(4) }),
   'cards:pass': z.object({}),
@@ -270,6 +273,7 @@ export interface IntentResults {
   'wheel:spin': null;
   'wheel:edit': null;
   'palmares:get': PalmaresEvent[];
+  'web:set': null;
   'cards:deal': null;
   'cards:play': null;
   'cards:pass': null;

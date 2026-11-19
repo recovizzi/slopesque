@@ -1,6 +1,6 @@
 // End-to-end: two players with the real extension, the real server and its services (`pnpm services:up`, `pnpm build`).
 // Jalon 2: first launch, a room made by the admin, text chat (link, reply, reaction), presence, a server restart.
-import { admin, check, failures, player, prepareShots, shot, startServer, stopServer, until } from './lib.mjs';
+import { WEB, admin, check, failures, player, prepareShots, shot, startServer, stopServer, until } from './lib.mjs';
 
 prepareShots();
 await startServer();
@@ -202,6 +202,21 @@ check(await until(async () => (await a.frame.locator('.cg-results li', { hasText
 await shot(a.page, '14-cards-results');
 await a.frame.locator('[data-action="table-join"]').click();
 check(await until(async () => (await b.frame.locator('.msg.sys', { hasText: 'reprend sa place' }).count()) >= 1 || (await b.frame.locator('.msg.sys', { hasText: 'prend la place' }).count()) >= 1, 8000), 'cards: A takes a seat back');
+// ---- jalon 9: Low Tide, its address checked by the host
+await say(b.frame, '/activity');
+await b.frame.locator('.act-tile', { hasText: 'Jeux web' }).click();
+await b.frame.locator('.act-format', { hasText: 'Low Tide' }).click();
+await b.frame.locator('.bar .avatar').click();
+await b.frame.locator('.drawer-right .tab', { hasText: 'Partie' }).click();
+await b.frame.locator('[name="webUrl"]').fill(`${WEB.other}/`);
+await b.frame.getByRole('button', { name: 'Vérifier et enregistrer' }).click();
+check(await until(async () => (await b.frame.locator('.drawer-right .alert').textContent().catch(() => '')).includes('Autre jeu'), 10000), 'Low Tide: a page declaring another name is refused');
+await b.frame.locator('[name="webUrl"]').fill(`${WEB.ok}/`);
+await b.frame.getByRole('button', { name: 'Vérifier et enregistrer' }).click();
+check(await until(async () => (await b.frame.locator('.ok-note').count()) === 1, 10000), 'Low Tide: the right page is saved for the room');
+await b.frame.locator('.drawer-right [aria-label="Fermer"]').click();
+check(await until(async () => (await a.frame.locator('iframe.web-frame').getAttribute('src').catch(() => '')) === `${WEB.ok}/`, 10000), 'Low Tide: A plays it in the game area');
+await shot(a.page, '16-lowtide');
 await say(b.frame, '/activity');
 await b.frame.locator('.act-tile', { hasText: 'Chat' }).click();
 check(await until(async () => (await a.frame.locator('.chat-stage .chat').isVisible())), 'back to the Chat activity');

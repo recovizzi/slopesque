@@ -59,18 +59,29 @@ const fontEnv = await emojiFont();
 const PAGE = `<!doctype html><html lang="fr"><body style="margin:0;font:16px system-ui;background:#e9eef3">
   <div style="padding:40px;max-width:620px;color:#556"><h1>Une page quelconque</h1>${'<p>Lorem ipsum dolor sit amet. '.repeat(12)}</p></div></body></html>`;
 
+export const WEB = { ok: 'https://lowtide.test', other: 'https://autre.test', down: 'https://down.test' };
+
 /** A browser with the extension (a copy allowed on the test page), as a new player. */
 export async function player(scheme = 'light') {
   const ext = fs.mkdtempSync(path.join(os.tmpdir(), 'slp-ext-'));
   fs.cpSync(path.join(ROOT, 'apps/extension/dist/extension'), ext, { recursive: true });
   const mf = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-  fs.writeFileSync(path.join(ext, 'manifest.json'), JSON.stringify({ ...mf, host_permissions: ['https://example.org/*'] }));
+  fs.writeFileSync(path.join(ext, 'manifest.json'), JSON.stringify({ ...mf, host_permissions: ['https://example.org/*', ...Object.values(WEB).map(o => `${o}/*`)] }));
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'slp-profile-'));
   const ctx = await chromium.launchPersistentContext(profile, {
     env: fontEnv, headless: false, colorScheme: scheme, viewport: { width: 1280, height: 760 }, locale: 'fr-FR',
     args: ['--headless=new', `--disable-extensions-except=${ext}`, `--load-extension=${ext}`],
   });
   await ctx.route('https://example.org/**', r => r.fulfill({ contentType: 'text/html', body: PAGE }));
+  // the integration's test sites (served here: the tests don't depend on a tunnel): Low Tide, another game, a site down
+  const game = (title, bg) => `<!doctype html><html><head><title>${title}</title><link rel="manifest" href="index.manifest.json"></head>
+    <body style="margin:0;height:100vh;display:grid;place-items:center;background:${bg};color:#fff;font:700 28px system-ui">${title} (page de test)</body></html>`;
+  for (const [origin, title, bg] of [[WEB.ok, 'Low Tide', '#2a6f97'], [WEB.other, 'Autre jeu', '#7a2e2e']]) {
+    await ctx.route(`${origin}/**`, r => (r.request().url().endsWith('manifest.json')
+      ? r.fulfill({ contentType: 'application/json', body: JSON.stringify({ name: title }) })
+      : r.fulfill({ contentType: 'text/html', body: game(title, bg) })));
+  }
+  await ctx.route(`${WEB.down}/**`, r => r.abort());
   const sw = ctx.serviceWorkers()[0] ?? await ctx.waitForEvent('serviceworker');
   for (let k = 0; k < 40 && !(await sw.evaluate(() => !!globalThis.chrome?.storage?.local)); k++) await new Promise(r => setTimeout(r, 100));
   // the server of this test, before the app reads its settings
