@@ -154,7 +154,7 @@ export class GifPop {
     this.hasNext = res.hasNext;
     this.add(res.items);
     this.el.dataset.requests = String(this.source.requests);
-    if (res.provider) this.el.querySelector('.gif-credit')!.textContent = `GIF via ${res.provider}`;
+    if (res.provider) this.el.querySelector('.gif-credit')!.textContent = `GIF via ${res.provider.replace('-PUB', '')}`;
     const why = { 'no-key': 'GIF indisponibles : aucune clé n\'est configurée sur le serveur.', refused: 'Le service de GIF refuse la clé du serveur.', down: 'Le service de GIF ne répond pas : réessaie plus tard.' };
     this.setStatus(res.error ? why[res.error] : this.shown.length ? (res.hasNext ? '' : 'Plus de résultats.') : q ? `Aucun GIF pour « ${q} ».` : 'Aucun GIF.');
     if (this.hasNext && this.grid.scrollHeight <= this.grid.clientHeight + LOAD_AHEAD) void this.more();   // fill the window

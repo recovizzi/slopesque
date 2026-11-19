@@ -12,3 +12,4 @@
 .server-field .row input { flex: 1; min-width: 0; }
 .server-field .btn.sm { margin-top: 0; }
 .room-card .server-field { max-width: 380px; }
+.cards-stage { position: relative; }

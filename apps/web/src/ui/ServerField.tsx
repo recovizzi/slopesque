@@ -22,7 +22,7 @@ export function ServerField({ onSaved }: { onSaved?: () => void }) {
   };
   return <div className="field server-field"><span>Serveur</span>
     <form className="row" onSubmit={e => { e.preventDefault(); void save(); }}>
-      <input name="server" value={v} onChange={e => { setV(e.target.value); setState(''); }} spellCheck={false} autoComplete="off" inputMode="url" placeholder="http://localhost:3100" />
+      <input name="server" value={v} onChange={e => { setV(e.target.value); setState(''); }} spellCheck={false} autoComplete="off" inputMode="url" placeholder="http://localhost:23100" />
       <button className="btn ghost sm" disabled={state === 'checking'}>{state === 'checking' ? 'Vérification…' : 'Vérifier'}</button></form>
     <p className={state === 'down' ? 'alert' : 'note'} role={state === 'down' ? 'alert' : undefined}>
       {state === 'ok' ? 'Serveur joignable ✓' : state === 'down' ? `Aucune réponse de ${v.trim()} : vérifie l'adresse (et le port).` : 'L\'adresse du serveur de ton groupe (demande-la à celui qui l\'héberge).'}</p></div>;

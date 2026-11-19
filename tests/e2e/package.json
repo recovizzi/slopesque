@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "e2e": "node run.mjs"
+    "e2e": "node run.mjs && node cards.mjs"
   },
   "devDependencies": {
     "@slopesque/engines": "workspace:*",

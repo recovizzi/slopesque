@@ -140,7 +140,9 @@ flottant arrondi injecté dans l'onglet courant), avec un design propre au proje
 19. **GIF** (décidé le 2026-11-17) : fenêtre GIF flottante (comme les emoji) avec recherche, Tendances / Résultats,
    Récents (50), Favoris (500), pages de 24 chargées en défilant (deux colonnes, chaque GIF dans la plus courte : rien
    ne bouge quand une page arrive). Message = lien vers le fichier du fournisseur (MP4 / WebP, plus léger qu'un
-   .gif) + son identifiant : rien de stocké chez nous, chaque joueur le charge (le fournisseur voit son adresse IP).
+   .gif) + son identifiant : rien de stocké chez nous, chaque joueur le charge (le fournisseur voit son adresse IP)
+   et le **garde sur son appareil** (décidé le 2026-11-19 : cache du navigateur, les 300 derniers ; jamais redistribué
+   par le serveur).
    Récents et favoris sur l'appareil (références, pas de fichiers). Recherche après 400 ms sans frappe, 2 caractères
    au moins, réponses périmées ignorées. Côté serveur : interface `GifProvider`, **chaîne de secours** dans l'ordre
    KLIPY sans pub → GIPHY sans pub → KLIPY avec pub (on commence sans pub, on passe au fournisseur suivant quand les
@@ -153,6 +155,7 @@ flottant arrondi injecté dans l'onglet courant), avec un design propre au proje
    sur demande), « Powered by GIPHY » obligatoire, pas de mélange de fournisseurs dans une grille ; KLIPY : clé de
    test 100 / h, production illimitée, pubs optionnelles (interrupteur par application, paramètres `ad-*` à
    envoyer, résultats `type: "ad"`), marque KLIPY à afficher. Contenu : `rating` au plus `r` chez les deux.
+   Clés (2026-11-19) : `KLIPY_API_KEY`, `GIPHY_API_KEY`, `KLIPY_API_KEY_WITH_AD`, dans cet ordre.
    *Rejeté* : masquer les pubs d'une clé « avec pub » (contraire à leur modèle, clé coupée) ; télécharger les GIF
    chez nous (stockage, droits) ; appeler le fournisseur depuis l'extension (la clé serait publique).
 
@@ -406,6 +409,9 @@ flottant arrondi injecté dans l'onglet courant), avec un design propre au proje
     passent-elles par une modération ? Le palmarès d'un ancien compte (après « repartir de zéro ») reste-t-il visible
     sous son dernier pseudo ? Aperçus de lien : quels sites en oEmbed, et faut-il pouvoir retirer l'aperçu de son
     message ? [à décider ; non ; non ; oui ; la liste de la spec ; non]
+22. **Pubs KLIPY** (clé `KLIPY_API_KEY_WITH_AD`, dernier recours) : leur format n'a pas encore été vu (aucune pub
+    renvoyée le 2026-11-19) et la CSP de l'extension bloque les scripts tiers. Les montrer dans un cadre isolé de la
+    fenêtre GIF, ou renoncer à cette clé ? [pubs demandées, journalisées, pas montrées]
 
 ## Risks / Trade-offs
 

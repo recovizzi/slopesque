@@ -718,7 +718,8 @@ export class RoomHub implements OnModuleInit {
       for (const u of settled.freed) { const [m] = await this.members(rt, u); await this.say(rt, null, `${m?.name ?? '?'} a quitté la table : un robot prend sa place.`); }
     } else if (t.turn !== null) {
       const s = c.seats.find(x => x.id === t.turn);
-      if (!s?.user) c.robot = setTimeout(() => void this.robotPlays(rt), this.env.ROBOT_DELAY_MS);   // a robot plays this seat
+      const opens = !t.trick.length && t.lastTrick.length > 0;   // a trick just taken: seen a moment before the next lead
+      if (!s?.user) c.robot = setTimeout(() => void this.robotPlays(rt), this.env.ROBOT_DELAY_MS * (opens ? 1.6 : 1));   // a robot plays this seat
       else c.late = setTimeout(() => void this.emitCards(rt), KICK_AFTER_MS + 200);   // 30 s: the « Exclure ? » button appears
     }
     await this.emitCards(rt);
@@ -814,11 +815,13 @@ export class RoomHub implements OnModuleInit {
     if (before === 'bid' && t.phase !== 'bid') await this.say(rt, null, t.taker ? `${await name(t.taker)} prend : ${Tarot.BIDS[t.bid!].name}.` : t.note);
     if ('call' in act && t.called) await this.say(rt, null, `${await name(seat)} appelle ${Tarot.cardName(t.called)}.`);
     if (!revealed && t.revealed && t.partner) await this.say(rt, null, `${await name(t.partner)} joue ${Tarot.cardName(t.called!)} : ${t.partner === t.taker ? 'seul contre 4' : `partenaire de ${await name(t.taker!)}`}.`);
-    await this.afterTarot(rt, turn);
+    // the tables show it before the robots go on: the take (2 s), the called card (2,8 s), the trick taken (2 s)
+    const pause = before === 'bid' && t.taker ? 2.6 : 'call' in act ? 3.4 : 'play' in act && !t.trick.length ? 2.4 : 1;
+    await this.afterTarot(rt, turn, pause);
   }
 
   /** After a step: the deal's end (each mark to the last player of each seat), the robots (on their seat's view). */
-  private async afterTarot(rt: RoomRt, before: string | null = null) {
+  private async afterTarot(rt: RoomRt, before: string | null = null, pause = 1) {
     const c = rt.cards, t = c.tarot;
     if (!t) return;
     if (t.turn !== before) c.turnSince = Date.now();
@@ -842,7 +845,7 @@ export class RoomHub implements OnModuleInit {
       c.robot = setTimeout(() => { if (rt.cards.tarot === t) void this.tarotDeal(rt, c.players as 4 | 5).catch(() => {}); }, Math.max(1500, this.env.ROBOT_DELAY_MS));
     } else if (t.phase !== 'done' && t.turn !== null) {
       const who = t.phase === 'dog' ? t.taker : t.turn, s = c.seats.find(x => x.id === who);
-      if (who && !s?.user) c.robot = setTimeout(() => void this.tarotRobot(rt), Math.max(this.env.ROBOT_DELAY_MS, t.phase === 'dog' ? this.env.ROBOT_DELAY_MS * 2 : 0));
+      if (who && !s?.user) c.robot = setTimeout(() => void this.tarotRobot(rt), this.env.ROBOT_DELAY_MS * Math.max(pause, t.phase === 'dog' ? 2 : 1));
       else if (s?.user) c.late = setTimeout(() => void this.emitCards(rt), KICK_AFTER_MS + 200);
     }
     await this.emitCards(rt);

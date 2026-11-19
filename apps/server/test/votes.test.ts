@@ -7,8 +7,8 @@ import { io, type Socket } from 'socket.io-client';
 import { newCode } from '@slopesque/engines';
 import { PROTOCOL_VERSION, type Ack, type MessageView, type RoomState, type SequencedEvent } from '@slopesque/shared';
 
-const PORT = 3196, URL = `http://localhost:${PORT}`;
-const up = await new Promise<boolean>(res => { const s = net.connect(55432, 'localhost').on('connect', () => { s.destroy(); res(true); }).on('error', () => res(false)); });
+const PORT = 23196, URL = `http://localhost:${PORT}`;
+const up = await new Promise<boolean>(res => { const s = net.connect(23432, 'localhost').on('connect', () => { s.destroy(); res(true); }).on('error', () => res(false)); });
 const env = { ...process.env, PORT: String(PORT), PUBLIC_URL: URL, LOG_LEVEL: 'warn', CODE_ATTEMPTS_PER_MINUTE: '1000' };
 let server: ChildProcess | null = null;
 const start = async () => {

@@ -7,7 +7,7 @@ describe('parseEnv', () => {
   it('accepts the development values', () => {
     const { env, problems } = parseEnv(base);
     expect(problems).toEqual([]);
-    expect(env?.PORT).toBe(3100);
+    expect(env?.PORT).toBe(23100);
     expect(env?.REDIS_URL).toBeNull();
   });
   it('refuses development secrets, http and no origins in production', () => {

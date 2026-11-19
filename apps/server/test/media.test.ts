@@ -8,9 +8,9 @@ import sharp from 'sharp';
 import { newCode } from '@slopesque/engines';
 import { PROTOCOL_VERSION, type Ack, type GifPage, type RoomState, type SequencedEvent, type UploadResult } from '@slopesque/shared';
 
-const PORT = 3197, URL = `http://localhost:${PORT}`;
-const up = await new Promise<boolean>(res => { const s = net.connect(55432, 'localhost').on('connect', () => { s.destroy(); res(true); }).on('error', () => res(false)); });
-const env = { ...process.env, PORT: String(PORT), PUBLIC_URL: URL, LOG_LEVEL: 'warn', CODE_ATTEMPTS_PER_MINUTE: '1000', KLIPY_API_KEY: '', GIPHY_API_KEY: '' };
+const PORT = 23197, URL = `http://localhost:${PORT}`;
+const up = await new Promise<boolean>(res => { const s = net.connect(23432, 'localhost').on('connect', () => { s.destroy(); res(true); }).on('error', () => res(false)); });
+const env = { ...process.env, PORT: String(PORT), PUBLIC_URL: URL, LOG_LEVEL: 'warn', CODE_ATTEMPTS_PER_MINUTE: '1000', KLIPY_API_KEY: '', GIPHY_API_KEY: '', KLIPY_API_KEY_WITH_AD: '' };
 let server: ChildProcess;
 const admin = (...args: string[]) => execFileSync(process.execPath, ['dist/admin.js', ...args], { env, encoding: 'utf8' });
 const ask = <T>(s: Socket, ev: string, body: unknown = {}) => s.emitWithAck(ev, body) as Promise<Ack<T>>;

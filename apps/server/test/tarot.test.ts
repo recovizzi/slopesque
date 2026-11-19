@@ -7,8 +7,8 @@ import { io, type Socket } from 'socket.io-client';
 import { newCode } from '@slopesque/engines';
 import { PROTOCOL_VERSION, type Ack, type CardsView, type RoomState } from '@slopesque/shared';
 
-const PORT = 3192, URL = `http://localhost:${PORT}`;
-const up = await new Promise<boolean>(res => { const s = net.connect(55432, 'localhost').on('connect', () => { s.destroy(); res(true); }).on('error', () => res(false)); });
+const PORT = 23192, URL = `http://localhost:${PORT}`;
+const up = await new Promise<boolean>(res => { const s = net.connect(23432, 'localhost').on('connect', () => { s.destroy(); res(true); }).on('error', () => res(false)); });
 const env = { ...process.env, PORT: String(PORT), PUBLIC_URL: URL, LOG_LEVEL: 'warn', CODE_ATTEMPTS_PER_MINUTE: '1000', ROBOT_DELAY_MS: '5' };
 let server: ChildProcess;
 const ask = <T>(s: Socket, ev: string, body: unknown = {}) => s.emitWithAck(ev, body) as Promise<Ack<T>>;
@@ -40,7 +40,8 @@ describe.skipIf(!up)('Tarot', () => {
     const done = cards(host, v => v.tarot?.phase === 'done' && !!v.tarot.result);
     await ask(a, 'table:leave');
     const end = await done;
-    expect(end.paid[mine.id]).toBe(me);
+    // everyone passed → a new deal after I left: that deal's seat is the robot's (no mark for me)
+    expect(end.paid[mine.id]).toBe(end.tarot!.deal === c.tarot!.deal ? me : null);
     expect(Object.values(end.tarot!.result!.marks).reduce((x, y) => x + y, 0)).toBe(0);
   }, 30_000);
 });

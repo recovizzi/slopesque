@@ -9,6 +9,7 @@ import { Tarot as TA } from '@slopesque/engines';
 import { request } from '../net';
 import { useStore } from '../store';
 import { LiveHtml } from './LiveHtml';
+import * as A from './cards-anim';
 
 /** My hand's fan for the hand's width: the outer cards stay inside, a flat arc (as the maquette). */
 function fan(n: number, box: HTMLElement | null) {
@@ -22,12 +23,13 @@ const fmtClock = (ms: number) => { const s = Math.floor(ms / 1000), h = Math.flo
 
 export function CardsStage() {
   const room = useStore(s => s.room)!, me = useStore(s => s.account)!.id;
-  const c: CardsView = room.cards, want = room.activity.cardGame ?? 'tdc';   // the game the host chose (the table may still hold the other)
+  const [c, setShown] = useState<CardsView>(room.cards), [showLast, setShowLast] = useState(false), [announce, setAnnounce] = useState('');
+  const box = useRef<HTMLDivElement>(null), shown = useRef(c), queue = useRef<CardsView[]>([]), busy = useRef(false), hidden = useRef(new Set<string>());
+  const want = room.activity.cardGame ?? 'tdc';   // the game the host chose (the table may still hold the other)
   const t = c.game === 'tdc' && want === 'tdc' ? c.tdc : null, tarot = c.game === 'tarot' && want === 'tarot' ? c.tarot : null;
   const [wonView, setWonView] = useState<string | null>(null);
   const members = new Map(room.members.map(m => [m.id, m]));
   const [sel, setSel] = useState<Set<string>>(new Set()), [rules, setRules] = useState(false), [full, setFull] = useState(false), [note, setNote] = useState('');
-  const box = useRef<HTMLDivElement>(null);
   const mySeat = c.seats.find(s => s.user === me)?.id ?? '';
   useEffect(() => { setSel(new Set()); }, [t?.round, t?.turn, tarot?.deal, tarot?.phase]);
 
@@ -38,7 +40,7 @@ export function CardsStage() {
   const free = c.seats.filter(s => !s.user), mine = free.find(s => s.credit === me);
   const late = c.late ? { seat: c.late.seat, secs: c.late.secs, vote: room.chat.messages.some(m => m.kind === 'vote' && !(m.data?.vote as { result?: string } | undefined)?.result) } : null;
   const html = tarot ? TV.tarotTableHtml({ t: tarot as unknown as TA.Tarot, me: mySeat, playing: !!mySeat, host: room.hostId === me, selected: sel,
-      fan: fan((tarot.hands[mySeat]?.length ?? 0), box.current), who, art: {}, showLast: false, wonView, showTricks: c.showTricks })
+      fan: fan((tarot.hands[mySeat]?.length ?? 0), box.current), who, art: {}, showLast, wonView, showTricks: c.showTricks })
     : t ? K.tableHtml({ t: t as unknown as K.TableCtx['t'], me: mySeat, playing: !!mySeat, host: room.hostId === me, selected: sel, fan: fan(t.hands[mySeat]?.length ?? 0, box.current),
     who, elapsed: '', late: late && late.seat !== mySeat ? late : null,
     seats: { free: free.length, total: c.seats.length, mine: !!mine, takes: free[0] ? who(free[0].id).name : '', full,
@@ -56,6 +58,38 @@ export function CardsStage() {
           : `<button class="btn cg-join ${full ? 'is-error' : ''}" type="button" data-action="table-join">${freeSeats || !seats.length ? 'Prendre une place' : `Table complète (${n}/${n})`}</button>`}</div></div></div>`;
     })();
 
+  useEffect(() => {   // the server's views, shown one after the other with their animations
+    queue.current.push(room.cards);
+    void play();
+  }, [room.cards]);
+  const show = (v: CardsView, last = false) => { shown.current = v; setShown(v); setShowLast(last); };
+  async function play() {
+    if (busy.current) return;
+    busy.current = true;
+    try {
+      while (queue.current.length) {
+        const el = box.current;
+        if (!el || queue.current.length > 6 || document.hidden || A.reduced()) { show(queue.current.at(-1)!); queue.current = []; break; }   // too far behind: the last view
+        const next = queue.current.shift()!, prev = shown.current, step = A.diff(prev, next);
+        const seat = prev.seats.find(s => s.user === me)?.id ?? '';
+        const from = step.played.map(p => A.sources(el, p, p.by === seat));
+        from.forEach(f => f.forEach((_, id) => hidden.current.add(id)));
+        show(next, !!step.gather);
+        if (from.length) { await A.painted(); for (const f of from) { await A.flyIn(el, f); f.forEach((_, id) => hidden.current.delete(id)); } }
+        hidden.current.clear();
+        if (step.gather) { await A.wait(700); await A.gather(el, step.gather, step.gather === seat); setShowLast(false); }
+        const name = (id: string) => { const s = next.seats.find(x => x.id === id), u = s?.user ?? s?.credit; return u === me ? 'Toi' : (u && useStore.getState().room?.members.find(m => m.id === u)?.name) || s?.bot || '?'; };
+        if (step.take) { setAnnounce(TV.takeAnnounce(name(step.take.seat), step.take.bid as Exclude<TA.Bid, 'pass'>)); await A.wait(2000); setAnnounce(''); }
+        if (step.call) {
+          const mine = step.call.taker !== seat && !!next.tarot?.hands[seat]?.some(x => x.id === step.call!.card.id);
+          setAnnounce(TV.callAnnounce(name(step.call.taker), step.call.card as TA.TCard, {}, mine)); await A.wait(2800); setAnnounce('');
+        }
+      }
+    } finally { busy.current = false; }
+  }
+  useLayoutEffect(() => {   // the cards on their way stay hidden at their place until they land
+    for (const id of hidden.current) box.current?.querySelector<HTMLElement>(`.on-table[data-card="${CSS.escape(id)}"]`)?.style.setProperty('visibility', 'hidden');
+  });
   useLayoutEffect(() => {   // the exact fan for the hand's width, after each redraw
     const hand = box.current?.querySelector<HTMLElement>('[data-hand]'), cards = hand ? [...hand.querySelectorAll<HTMLElement>('.in-hand')] : [];
     if (!hand || !cards.length) return;
@@ -107,6 +141,7 @@ export function CardsStage() {
     onMouseLeave={() => setWonView(null)}>
     <LiveHtml className="cards-holder" html={html} onAction={(a, el) => void onAction(a, el)} />
     {note && <p className="alert cards-note" role="alert">{note}</p>}
+    {announce && <div className="announce-layer"><LiveHtml className="announce" html={announce} /></div>}
     {rules && <LiveHtml html={c.game === 'tarot' ? TV.tarotRulesHtml({}) : K.rulesHtml()} onAction={(a, el) => void onAction(a, el)} />}
   </div>;
 }

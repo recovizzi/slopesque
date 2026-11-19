@@ -17,7 +17,7 @@ export class HealthController {
     let postgres: 'ok' | 'down' = 'ok';
     try { await this.db.execute(sql`select 1`); } catch { postgres = 'down'; }
     const usage = postgres === 'ok' ? await this.storage.usage().catch(() => null) : null;
-    const gifs = this.env.KLIPY_API_KEY || this.env.GIPHY_API_KEY ? 'configured' : 'off';
+    const gifs = this.env.KLIPY_API_KEY || this.env.GIPHY_API_KEY || this.env.KLIPY_API_KEY_WITH_AD ? 'configured' : 'off';
     return {
       status: postgres === 'ok' ? 'ok' : 'down',
       protocol: PROTOCOL_VERSION,

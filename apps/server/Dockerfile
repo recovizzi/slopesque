@@ -25,6 +25,6 @@ COPY --from=build /repo/apps/server/dist ./dist
 COPY --from=build /repo/apps/server/drizzle ./drizzle
 RUN printf '#!/bin/sh\nexec node /app/dist/admin.js "$@"\n' > /usr/local/bin/admin && chmod +x /usr/local/bin/admin
 USER node
-EXPOSE 3100
-HEALTHCHECK --interval=15s --timeout=3s --start-period=20s CMD wget -qO- http://127.0.0.1:3100/api/health > /dev/null || exit 1
+EXPOSE 23100
+HEALTHCHECK --interval=15s --timeout=3s --start-period=20s CMD wget -qO- http://127.0.0.1:23100/api/health > /dev/null || exit 1
 CMD ["node", "dist/main.js"]

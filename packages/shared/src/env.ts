@@ -8,8 +8,8 @@ const list = z.string().default('').transform(v => v.split(',').map(s => s.trim(
 
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  PORT: z.coerce.number().int().min(1).max(65535).default(3100),
-  PUBLIC_URL: z.url().default('http://localhost:3100'),
+  PORT: z.coerce.number().int().min(1).max(65535).default(23100),
+  PUBLIC_URL: z.url().default('http://localhost:23100'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   ALLOWED_ORIGINS: list,
   ALLOW_INSECURE: bool,
@@ -27,6 +27,7 @@ export const envSchema = z.object({
   ROBOT_DELAY_MS: z.coerce.number().int().min(0).default(900),   // a card robot's thinking time (tests lower it)
   CODE_ATTEMPTS_PER_MINUTE: z.coerce.number().int().positive().default(10),   // unknown codes per IP (tests raise it)
   KLIPY_API_KEY: optional,
+  KLIPY_API_KEY_WITH_AD: optional,   // the last resort of the GIF chain: KLIPY with its ads
   GIPHY_API_KEY: optional,
 });
 export type Env = z.infer<typeof envSchema>;

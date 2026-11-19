@@ -250,7 +250,7 @@ export function tarotView(t: Tarot, seat: string | null): Tarot {
   const taker = seat !== null && seat === t.taker;
   return { ...t,
     hands: Object.fromEntries(Object.entries(t.hands).map(([id, h]) => [id, id === seat ? h : back(h)])),
-    chien: taker && t.phase === 'dog' ? t.chien : back(t.chien),
+    chien: t.phase === 'dog' ? t.chien : back(t.chien),   // Prise, Garde: the chien is shown to everyone
     ecart: taker || t.phase === 'done' ? t.ecart : back(t.ecart),
     partner: t.revealed || t.phase === 'done' || (seat !== null && seat === t.partner) ? t.partner : null };
 }

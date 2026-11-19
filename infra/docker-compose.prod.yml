@@ -11,13 +11,13 @@ services:
     env_file: .env
     environment:
       NODE_ENV: production
-      PORT: '3100'
+      PORT: '23100'
       DATABASE_URL: postgres://slopesque:${POSTGRES_PASSWORD}@postgres:5432/slopesque
       REDIS_URL: redis://redis:6379
       S3_ENDPOINT: http://rustfs:9000
       S3_ACCESS_KEY: slopesque
       S3_SECRET_KEY: ${RUSTFS_SECRET_KEY}
-    ports: ['${PUBLIC_PORT:-8080}:3100']
+    ports: ['${PUBLIC_PORT:-23180}:23100']
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }

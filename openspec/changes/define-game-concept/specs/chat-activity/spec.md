@@ -285,7 +285,7 @@ Entrée) et au moins 2 caractères avant d'envoyer une requête. Les résultats 
 approchant du bas de la liste (300 px), la page suivante MUST être demandée, sans déplacer les GIF déjà affichés.
 Un clic MUST envoyer le GIF ; une étoile MUST l'ajouter aux Favoris ou l'en retirer. Le message MUST contenir un
 lien vers le fichier du fournisseur (et son identifiant), pas le fichier : chaque joueur le charge depuis le
-fournisseur. Récents (50 au plus, le dernier envoyé en tête) et Favoris (500 au plus) MUST être gardés sur
+fournisseur et le MUST garder sur son appareil (le serveur ne stocke ni ne redistribue aucun GIF). Récents (50 au plus, le dernier envoyé en tête) et Favoris (500 au plus) MUST être gardés sur
 l'appareil du joueur. Un GIF dans le chat, envoyé par n'importe quel joueur, MUST montrer au survol une étoile
 pour l'ajouter à ses propres Favoris ou l'en retirer (allumée quand il y est). La fenêtre MUST indiquer le
 fournisseur (attribution demandée par KLIPY et GIPHY).

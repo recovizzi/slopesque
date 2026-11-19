@@ -181,7 +181,7 @@ try {
       const cache = app.get(CacheService), storage = app.get(StorageService);
       await cache.onModuleInit();
       const s3 = await storage.check(), u = await storage.usage();
-      console.log(`Postgres : ok\nRedis : ${cache.state}\nRustFS : ${s3}\nGIF : ${process.env.KLIPY_API_KEY || process.env.GIPHY_API_KEY ? 'configurés' : 'aucune clé'}\nPlace : ${(u.ratio * 100).toFixed(1)} % de ${(u.quotaBytes / 1024 ** 3).toFixed(0)} Go\nSauvegardes : aucune`);
+      console.log(`Postgres : ok\nRedis : ${cache.state}\nRustFS : ${s3}\nGIF : ${['KLIPY_API_KEY', 'GIPHY_API_KEY', 'KLIPY_API_KEY_WITH_AD'].filter(k => process.env[k]).join(', ') || 'aucune clé'}\nPlace : ${(u.ratio * 100).toFixed(1)} % de ${(u.quotaBytes / 1024 ** 3).toFixed(0)} Go\nSauvegardes : aucune`);
       break;
     }
   }

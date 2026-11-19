@@ -15,17 +15,17 @@ concept, les règles des jeux). La maquette de référence (comportements, captu
 | `packages/shared` | constantes, schéma de l'environnement, protocole (zod + types) |
 | `packages/engines` | règles pures testées : code, clés, couleurs, liens, votes, crédit, Demi-disque, Sondage, Roulette, Trou du cul, places à table, Tarot (vues par place) |
 | `tests/e2e` | Playwright : deux joueurs avec la vraie extension contre le serveur (`E2E_STACK=1` : contre la pile de production locale) |
-| `infra` | `docker-compose.yml` (dev, 127.0.0.1 : Postgres 55432, Redis 56379, RustFS 59000), `docker-compose.prod.yml` (un seul port public) |
+| `infra` | `docker-compose.yml` (dev, 127.0.0.1 : Postgres 23432, Redis 23379, RustFS 23900), `docker-compose.prod.yml` (un seul port public) |
 | `tools` | `dev.mjs`, `doctor.mjs`, `stack.mjs`, `deploy.mjs`, `scan-secrets.mjs` |
 
 ## Commandes
 
 ```sh
-pnpm dev                 # services Docker, paquets, serveur :3100, web :5173 (surveillés)
+pnpm dev                 # services Docker, paquets, serveur :23100, web :5173 (surveillés)
 pnpm doctor              # état des services et des clés
 pnpm check               # typecheck + lint + tests (turbo ; les tests serveur ont besoin de `pnpm services:up`)
 pnpm build && pnpm --filter @slopesque/e2e e2e   # bout en bout (deux navigateurs)
-pnpm stack:up / stack:admin <cmd> / stack:logs / stack:down   # la pile de production sur le Docker local (:8080)
+pnpm stack:up / stack:admin <cmd> / stack:logs / stack:down   # la pile de production sur le Docker local (:23180)
 pnpm admin <cmd>         # console d'admin (dev)
 pnpm db:generate         # nouvelle migration après un changement de src/db/schema.ts
 pnpm deploy:prod         # déploiement (lancé par l'utilisateur : SSH + sudo)

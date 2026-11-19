@@ -98,6 +98,23 @@ chaque jalon, les tâches sont groupées par partie du monorepo (`[racine]`, `[i
 - [x] 10.3 [racine] `pnpm stack:up` / `stack:down` : la pile de production sur le Docker local, l'extension réglée sur `http://localhost:<port>`
 - [x] 10.4 [e2e] Les tests de bout en bout contre la pile de production locale
 
+## 10 bis. Jalon 10 bis : au niveau de la maquette (avant la première release)
+
+- [x] 10b.1 [web] Animations des cartes (Trou du cul, Tarot) : cartes qui volent de la place ou de la main vers le tapis, pli du Tarot montré puis envoyé à son gagnant, annonces (preneur, Roi appelé) ; le serveur laisse aux tables le temps de les montrer (`ROBOT_DELAY_MS` × 1,6 à 3,4) ; e2e `tests/e2e/cards.mjs`
+- [x] 10b.2 [engines] Tarot : le chien montré à tous pendant l'écart (Prise, Garde)
+- [x] 10b.3 [infra] Ports peu utilisés (bande 23xxx, sous les ports éphémères) : serveur de dev 23100, pile et machine 23180, Postgres 23432, Redis 23379, RustFS 23900, tests 23192–23199
+- [x] 10b.4 [server] GIF : chaîne KLIPY → GIPHY → KLIPY avec pub (`KLIPY_API_KEY_WITH_AD`, paramètres `ad-*`) ; format KLIPY vérifié avec une vraie clé ; taille `sm`
+- [x] 10b.5 [web] GIF gardés sur l'appareil de chaque joueur (Cache API, 300 au plus), jamais par le serveur
+- [ ] 10b.6 [web] Chat : bulle de citation au survol, info-bulle des noms (réactions, résultats du Sondage), emoji inséré au curseur, Échap / clic dehors ferment le menu +, les stickers, l'envoi d'image ; le chat s'ouvre quand un vote commence ; code `:nom:` et refus expliqué dans le champ des réactions rapides
+- [ ] 10b.7 [web] Échap global dans l'ordre de la maquette (code, /activity, /credit-social, réponse, fenêtres des salons, règles, fenêtres, menus du Sondage, panneaux du chat, tiroir) ; copie de clé de secours (`execCommand`)
+- [ ] 10b.8 [web] Joueurs : onglet « Joueurs » (sans points) avec sa note, icônes d'absence dans le classement, rôle d'hôte proposé aux seuls joueurs ; Low Tide : l'onglet montre les joueurs, pas le chat
+- [ ] 10b.9 [web+server] Demi-disque : lobby et « Commencer la partie » ; Amphithéâtre : « Ce siège vient d'être pris. » dès qu'il l'est
+- [ ] 10b.10 [web+server] Sondage : déposer une image sur un choix, Entrée valide la réponse libre, note des résultats secrets selon le réglage ; images / GIF / emoji des choix
+- [ ] 10b.11 [web+server] Roulette : numéro du tirage, « Participer » pour un spectateur
+- [ ] 10b.12 [web+server] Partie (toutes activités) : titre et aide de l'activité, description du jeu de cartes, note « Tour en cours », « Réinitialiser la partie » partout, résumé en lecture seule pour qui n'est pas l'hôte
+- [ ] 10b.13 [web] Palmarès : ouvert sur le jeu de cartes choisi, rafraîchi après une donne de Tarot
+- [ ] 10b.14 [web] Tarot : images des atouts du salon (= 8.3)
+
 ## 11. Jalon 11 : releases et déploiement
 
 - [x] 11.1 [ci] Release sur tag (méthode `jethub`) : zip, `.crx` et `.xpi` non listé si leurs secrets existent (sinon sautés avec la raison), notes d'installation

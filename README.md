@@ -25,7 +25,7 @@ Prérequis : Node 22+, pnpm 10, Docker.
 
 ```sh
 pnpm install
-pnpm dev        # services Docker + serveur (http://localhost:3100) + app (http://localhost:5173)
+pnpm dev        # services Docker + serveur (http://localhost:23100) + app (http://localhost:5173)
 pnpm doctor     # ce qui marche, ce qui est en mode dégradé, ce qu'il faut faire
 pnpm check      # types, lint, tests (les tests du serveur utilisent les services Docker)
 pnpm build
@@ -39,12 +39,12 @@ Sans `.env`, tout tourne avec les valeurs de développement de [`.env.example`](
 
 | | `pnpm dev` (développement) | `pnpm stack:up` (la version de production, sur Docker) |
 |---|---|---|
-| Serveur | sur ta machine, **http://localhost:3100**, relancé à chaque modification | dans Docker, **http://localhost:8080** |
+| Serveur | sur ta machine, **http://localhost:23100**, relancé à chaque modification | dans Docker, **http://localhost:23180** |
 | Données | conteneurs `slopesque-dev-*` (Postgres, Redis, RustFS) | conteneurs `slopesque-*`, base et images à part |
 | Console d'admin | `pnpm admin <commande>` | `pnpm stack:admin <commande>` |
 
 Ce sont **deux serveurs différents, avec deux bases** : un salon créé avec `pnpm stack:admin` n'existe que sur
-`:8080`, un salon créé avec `pnpm admin` que sur `:3100`. Dans l'extension, l'adresse du serveur (premier lancement,
+`:23180`, un salon créé avec `pnpm admin` que sur `:23100`. Dans l'extension, l'adresse du serveur (premier lancement,
 ou onglet Extension) doit être celle du serveur où le salon a été créé.
 
 Valider un salon qu'un joueur a « créé » (il attend, avec sa clé) : `pnpm admin rooms:validate ABCD-EFGH --name "Son nom"`
@@ -53,14 +53,14 @@ Valider un salon qu'un joueur a « créé » (il attend, avec sa clé) : `pnpm a
 ## La version de production sur ta machine
 
 ```sh
-pnpm stack:up                                   # construit et lance la pile (port 8080), écrit infra/.env avec des secrets tirés au hasard
+pnpm stack:up                                   # construit et lance la pile (port 23180), écrit infra/.env avec des secrets tirés au hasard
 pnpm stack:admin rooms:create --name "Mon salon"   # crée un salon, affiche sa clé
 pnpm stack:logs                                 # journaux du serveur
 pnpm stack:down
 ```
 
 Dans l'extension (chargée depuis `apps/extension/dist/extension`) : onglet **Extension** → **Serveur** →
-`http://localhost:8080`, puis « + Ajouter » avec la clé du salon. Seul le port du serveur est exposé ; Postgres, Redis
+`http://localhost:23180`, puis « + Ajouter » avec la clé du salon. Seul le port du serveur est exposé ; Postgres, Redis
 et RustFS restent sur le réseau interne de Docker.
 
 ## Exploitation

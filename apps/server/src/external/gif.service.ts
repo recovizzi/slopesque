@@ -1,4 +1,5 @@
-// GIFs (openspec: chat-activity, Fournisseurs de GIF; external-services): KLIPY then GIPHY as a fallback chain, the
+// GIFs (openspec: chat-activity, Fournisseurs de GIF; external-services): KLIPY, then GIPHY, then KLIPY with ads as a
+// fallback chain (design.md decision 19), the
 // keys on the server only; a search and its next pages stay with one provider; results kept in Redis (search 1 h,
 // trending 15 min) for every player; a failing provider is skipped 5 min. Without any key the window says so.
 import { Inject, Injectable, Logger } from '@nestjs/common';
@@ -20,14 +21,20 @@ async function getJson(url: string) {
   try { return await r.json() as any; } catch { throw new ProviderError('down', 'réponse invalide'); }
 }
 
-const klipy = (key: string): Provider => ({
-  name: 'KLIPY',
+// ads: asked only with the key « avec pub »; how to show them in the extension (its CSP blocks their scripts, their
+// format not seen yet) is an open question: they are logged, not shown
+const AD = { 'ad-min-width': '50', 'ad-max-width': '380', 'ad-min-height': '50', 'ad-max-height': '250', 'ad-language': 'fr' };
+let adSeen = false;
+const klipy = (key: string, ads: boolean): Provider => ({
+  name: ads ? 'KLIPY-PUB' : 'KLIPY',
   async fetch(q, page) {
     const base = `https://api.klipy.com/api/v1/${encodeURIComponent(key)}/gifs/${q ? 'search' : 'trending'}`;
-    const j = await getJson(`${base}?${new URLSearchParams({ ...(q ? { q } : {}), page: String(page + 1), per_page: String(PER_PAGE), locale: 'fr_FR', customer_id: 'slopesque' })}`);
+    const j = await getJson(`${base}?${new URLSearchParams({ ...(q ? { q } : {}), page: String(page + 1), per_page: String(PER_PAGE), locale: 'fr_FR', customer_id: 'slopesque', ...(ads ? AD : {}) })}`);
     const list: any[] = j?.data?.data ?? [];
+    const ad = list.find(x => x?.type === 'ad');
+    if (ad && !adSeen) { adSeen = true; new Logger('GIF').warn(`KLIPY : une pub reçue (champs : ${Object.keys(ad).join(', ')}) ; pas encore affichée`); }
     const items = list.filter(x => x?.type !== 'ad').map((x): GifRef | null => {
-      const f = x?.file?.md ?? x?.file?.sm ?? x?.file?.hd;
+      const f = x?.file?.sm ?? x?.file?.md ?? x?.file?.hd;   // sm: ~200 px wide, the weight of a chat GIF
       const pick = f?.webp ?? f?.gif;
       return pick?.url ? { id: String(x.id ?? x.slug), provider: 'KLIPY', url: pick.url, w: Number(pick.width) || 240, h: Number(pick.height) || 180, title: String(x.title ?? 'GIF') } : null;
     }).filter((x): x is GifRef => !!x);
@@ -55,8 +62,9 @@ export class GifService {
   private readonly providers: Provider[];
 
   constructor(@Inject(ENV) env: Env, private readonly cache: CacheService) {
-    this.providers = [env.KLIPY_API_KEY && klipy(env.KLIPY_API_KEY), env.GIPHY_API_KEY && giphy(env.GIPHY_API_KEY)].filter((p): p is Provider => !!p);
-    if (!this.providers.length) this.log.warn('aucune clé (KLIPY_API_KEY, GIPHY_API_KEY) : la fenêtre GIF le dira');
+    this.providers = [env.KLIPY_API_KEY && klipy(env.KLIPY_API_KEY, false), env.GIPHY_API_KEY && giphy(env.GIPHY_API_KEY),
+      env.KLIPY_API_KEY_WITH_AD && klipy(env.KLIPY_API_KEY_WITH_AD, true)].filter((p): p is Provider => !!p);
+    if (!this.providers.length) this.log.warn('aucune clé (KLIPY_API_KEY, GIPHY_API_KEY, KLIPY_API_KEY_WITH_AD) : la fenêtre GIF le dira');
   }
 
   get configured() { return this.providers.map(p => p.name); }

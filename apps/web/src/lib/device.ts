@@ -13,7 +13,7 @@ export interface Device {
   gifRecent: GifRef[];          // the GIFs I sent last (50 at most)
 }
 
-export const DEFAULT_SERVER = (import.meta.env.VITE_SERVER_URL as string | undefined) ?? 'http://localhost:3100';
+export const DEFAULT_SERVER = (import.meta.env.VITE_SERVER_URL as string | undefined) ?? 'http://localhost:23100';
 const DEFAULTS: Device = { code: '', server: DEFAULT_SERVER, theme: 'auto', roomKey: '', recent: [], gifRecent: [] };
 const KEY = 'slp-device';
 const ext = () => typeof chrome !== 'undefined' && !!chrome.storage?.local;
