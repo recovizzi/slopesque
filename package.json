@@ -20,7 +20,7 @@
     "services:up": "docker compose -f infra/docker-compose.yml up -d --wait",
     "services:down": "docker compose -f infra/docker-compose.yml down",
     "format": "prettier --write .",
-    "prepare": "lefthook install || true",
+    "prepare": "lefthook install 2>/dev/null || true",
     "e2e": "pnpm build && pnpm --filter @slopesque/e2e e2e",
     "stack:up": "node tools/stack.mjs up",
     "stack:down": "node tools/stack.mjs down",
