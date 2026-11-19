@@ -35,6 +35,21 @@ pnpm --filter @slopesque/e2e e2e   # bout en bout : deux joueurs avec la vraie e
 Sans `.env`, tout tourne avec les valeurs de développement de [`.env.example`](.env.example). Les clés externes
 (GIF) sont facultatives : sans elles, la fenêtre GIF dit pourquoi elle est vide.
 
+## Deux façons de lancer Slopesque en local
+
+| | `pnpm dev` (développement) | `pnpm stack:up` (la version de production, sur Docker) |
+|---|---|---|
+| Serveur | sur ta machine, **http://localhost:3100**, relancé à chaque modification | dans Docker, **http://localhost:8080** |
+| Données | conteneurs `slopesque-dev-*` (Postgres, Redis, RustFS) | conteneurs `slopesque-*`, base et images à part |
+| Console d'admin | `pnpm admin <commande>` | `pnpm stack:admin <commande>` |
+
+Ce sont **deux serveurs différents, avec deux bases** : un salon créé avec `pnpm stack:admin` n'existe que sur
+`:8080`, un salon créé avec `pnpm admin` que sur `:3100`. Dans l'extension, l'adresse du serveur (premier lancement,
+ou onglet Extension) doit être celle du serveur où le salon a été créé.
+
+Valider un salon qu'un joueur a « créé » (il attend, avec sa clé) : `pnpm admin rooms:validate ABCD-EFGH --name "Son nom"`
+(ou `pnpm stack:admin rooms:validate …`). Le joueur clique ensuite « Réessayer ».
+
 ## La version de production sur ta machine
 
 ```sh

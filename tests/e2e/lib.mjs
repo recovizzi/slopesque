@@ -9,7 +9,8 @@ import { chromium } from 'playwright';
 export const ROOT = path.resolve(import.meta.dirname, '../..');
 export const OUT = path.join(ROOT, 'tests/e2e/shots');
 // E2E_STACK=1: against the production stack running on this Docker (`pnpm stack:up`, port 8080) instead of dist/;
-// infra/.env then needs CODE_ATTEMPTS_PER_MINUTE=1000 (the test makes many accounts from one address)
+// infra/.env then needs CODE_ATTEMPTS_PER_MINUTE=1000 (the test makes many accounts from one address) and
+// ROBOT_DELAY_MS=60 (the card robots play fast enough for the test's waits)
 export const STACK = process.env.E2E_STACK === '1';
 export const PORT = STACK ? 8080 : 3198, SERVER = `http://localhost:${PORT}`;
 const compose = ['compose', '-f', path.resolve(import.meta.dirname, '../../infra/docker-compose.prod.yml'), '--env-file', path.resolve(import.meta.dirname, '../../infra/.env')];
@@ -62,7 +63,7 @@ const PAGE = `<!doctype html><html lang="fr"><body style="margin:0;font:16px sys
 export const WEB = { ok: 'https://lowtide.test', other: 'https://autre.test', down: 'https://down.test' };
 
 /** A browser with the extension (a copy allowed on the test page), as a new player. */
-export async function player(scheme = 'light') {
+export async function player(scheme = 'light', { presetServer = true } = {}) {
   const ext = fs.mkdtempSync(path.join(os.tmpdir(), 'slp-ext-'));
   fs.cpSync(path.join(ROOT, 'apps/extension/dist/extension'), ext, { recursive: true });
   const mf = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
@@ -85,7 +86,7 @@ export async function player(scheme = 'light') {
   const sw = ctx.serviceWorkers()[0] ?? await ctx.waitForEvent('serviceworker');
   for (let k = 0; k < 40 && !(await sw.evaluate(() => !!globalThis.chrome?.storage?.local)); k++) await new Promise(r => setTimeout(r, 100));
   // the server of this test, before the app reads its settings
-  await sw.evaluate(s => chrome.storage.local.set({ 'slp-device': { server: s } }), SERVER);
+  if (presetServer) await sw.evaluate(s => chrome.storage.local.set({ 'slp-device': { server: s } }), SERVER);
   return {
     ctx, sw,
     async open(size = { w: 780, h: 620 }) {

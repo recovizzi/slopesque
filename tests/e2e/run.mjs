@@ -1,6 +1,6 @@
 // End-to-end: two players with the real extension, the real server and its services (`pnpm services:up`, `pnpm build`).
 // Jalon 2: first launch, a room made by the admin, text chat (link, reply, reaction), presence, a server restart.
-import { WEB, admin, check, failures, player, prepareShots, shot, startServer, stopServer, until } from './lib.mjs';
+import { SERVER, WEB, admin, check, failures, player, prepareShots, shot, startServer, stopServer, until } from './lib.mjs';
 
 prepareShots();
 await startServer();
@@ -12,7 +12,12 @@ async function enter(p, name) {
   await welcome.waitFor();
   const code = (await welcome.locator('.code-text').textContent()).trim();
   check(/^[A-HJKMNP-Z2-9]{4}(-[A-HJKMNP-Z2-9]{4}){3}$/.test(code), `${name}: the first launch shows a code drawn at random (${code})`);
-  if (name === 'A') await shot(page, '01-welcome');
+  if (name === 'A') {   // A arrives with the default address: he types the server's on the first launch
+    await welcome.locator('[name="server"]').fill(SERVER);
+    await welcome.getByRole('button', { name: 'Vérifier' }).click();
+    check(await until(async () => (await welcome.getByText('Serveur joignable ✓').count()) === 1), 'A: the server\'s address typed and checked on the first launch');
+    await shot(page, '01-welcome');
+  }
   await welcome.getByRole('button', { name: 'Continuer avec ce code' }).click();
   await frame.getByText('Aucun salon').waitFor();
   check(true, `${name}: no room yet: « Aucun salon »`);
@@ -31,7 +36,7 @@ async function enter(p, name) {
   return { page, frame, code };
 }
 
-const A = await player('light'), B = await player('dark');
+const A = await player('light', { presetServer: false }), B = await player('dark');
 const a = await enter(A, 'A');
 check(await a.frame.getByText('Début de la conversation').count() === 1, 'A: a new room: « Début de la conversation »');
 check(await a.frame.locator('.person', { hasText: 'hôte' }).count() === 1, 'A: the first player hosts the room');

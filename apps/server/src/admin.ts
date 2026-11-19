@@ -21,6 +21,7 @@ import { UserError } from './errors.js';
 
 const HELP: Record<string, [string, string]> = {
   'rooms:create': ['[--key XXXX-XXXX] [--name …]', 'crée un salon (clé tirée au hasard si absente) et affiche sa clé'],
+  'rooms:validate': ['<clé> [--name …]', 'valide un salon qu\'un joueur a « créé » (en attente) : le crée sur le serveur avec sa clé'],
   'rooms:list': ['[--search …]', 'les salons : joueurs, dernière activité'],
   'rooms:delete': ['<clé> [--yes]', 'supprime le salon et tout ce qu\'il contient (définitif : aucune sauvegarde)'],
   'accounts:find': ['[--name …] [--room XXXX-XXXX] [--seen-after AAAA-MM-JJ]', 'comptes correspondants (uuid, pseudos, salons, dates), jamais de code'],
@@ -71,6 +72,14 @@ try {
       const r = await rooms.create(str('key'), str('name') ?? '');
       await log(r.key, { name: r.name });
       console.log(`Salon créé : ${r.key}${r.name ? ` (${r.name})` : ''}`);
+      break;
+    }
+    case 'rooms:validate': {
+      const key = normalizeKey(args[0] ?? '');
+      if (!key) throw new UserError('Une clé a la forme XXXX-XXXX : lettres et chiffres, sans I, L, O, 0 ni 1.');
+      const r = await rooms.create(key, str('name') ?? '');
+      await log(r.key, { name: r.name, validated: true });
+      console.log(`Salon validé : ${r.key}${r.name ? ` (${r.name})` : ''}. Le joueur qui l'attendait peut cliquer « Réessayer ».`);
       break;
     }
     case 'rooms:list': {

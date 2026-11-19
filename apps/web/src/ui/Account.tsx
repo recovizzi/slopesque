@@ -5,6 +5,7 @@ import { canonicalCode, codeStrength, CODE_MIN_LEN, newCode, tidyCode, type Stre
 import { checkCode, connect, request } from '../net';
 import { useStore } from '../store';
 import { Icon } from './common';
+import { ServerField } from './ServerField';
 
 export const SAMPLE_HINT = 'Tape le code affiché sur ton autre appareil (Profil → Compte). Majuscules, minuscules et tirets ne comptent pas.';
 
@@ -25,6 +26,7 @@ export function Welcome({ code, onChange }: { code: string; onChange: (mode: 're
   return <div className="room-card welcome"><h1>Bienvenue sur Slopesque</h1>
     <p>Voici ton <b>code utilisateur</b>. Il remplace compte et mot de passe : il relie ton pseudo, ta couleur, tes photos et tes résultats.</p>
     <CodeBox code={code} />
+    <ServerField />
     <ul className="welcome-points">
       <li><Icon name="key" /><span><b>Note-le</b> : sur un autre appareil, ce code te rend ton compte.</span></li>
       <li><Icon name="lock" /><span><b>Garde-le pour toi</b> : qui le connaît prend ton compte.</span></li>

@@ -11,6 +11,7 @@ import { AccountSection, CodeModal, Welcome, type CodeMode } from './ui/Account'
 import { Chat, People } from './ui/Chat';
 import { Avatar, Html, Icon } from './ui/common';
 import { KeyBadge, RoomList, RoomPage } from './ui/Rooms';
+import { ServerField } from './ui/ServerField';
 import { DiskSettings, DiskStage, Ranking } from './ui/DiskStage';
 import { PollSettings, PollStage, WheelStage } from './ui/PollWheel';
 import { CardsStage } from './ui/CardsStage';
@@ -168,11 +169,9 @@ function Profile({ pop, onCode }: { pop: EmojiPop | null; onCode: () => void }) 
 
 function ExtensionTab({ setDevice }: { setDevice: (p: Partial<ReturnType<typeof useStore.getState>['device']>) => void }) {
   const device = useStore(s => s.device);
-  const [server, setServer] = useState(device.server);
+  void setDevice;
   return <>
-    <label className="field"><span>Serveur</span><input value={server} spellCheck={false} onChange={e => setServer(e.target.value)}
-      onBlur={() => { const v = server.trim().replace(/\/+$/, ''); if (v && v !== device.server) { setDevice({ server: v }); connect(); } }}
-      onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} /></label>
+    <ServerField onSaved={() => connect()} />
     {isInsecureUrl(device.server) && <p className="alert">Connexion non chiffrée : ton code et tes messages circulent en clair jusqu'à ce serveur.</p>}
     <RoomList />
     <ExtensionOptions />
@@ -271,6 +270,7 @@ function FatalPage({ onCode }: { onCode: (m: CodeMode) => void }) {
 function OfflinePage() {
   const server = useStore(s => s.device.server);
   return <div className="room-card offline"><h1>Serveur injoignable</h1><p>Aucune réponse de {server}. Vérifie l'adresse du serveur, ou ta connexion.</p>
+    <ServerField onSaved={() => connect()} />
     <button className="btn big" type="button" onClick={() => connect()}><Icon name="reset" />Réessayer</button></div>;
 }
 

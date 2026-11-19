@@ -8,3 +8,7 @@
 .reply-ref.is-gone { cursor: default; }
 .cards-holder { display: contents; }
 .cards-note { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); z-index: 3; }
+.server-field { width: 100%; text-align: left; }
+.server-field .row input { flex: 1; min-width: 0; }
+.server-field .btn.sm { margin-top: 0; }
+.room-card .server-field { max-width: 380px; }
