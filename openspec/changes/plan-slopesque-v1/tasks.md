@@ -104,4 +104,4 @@ chaque jalon, les tâches sont groupées par partie du monorepo (`[racine]`, `[i
 - [x] 11.1b [ci] Nouvelle clé CRX (jamais celle de `jethub`), secrets `CHROME_CRX_KEY` et Mozilla (valeurs de `jethub`, `MANQUES.md`) dans l'environnement `release`
 - [x] 11.2 [ci] Image du serveur publiée sur GHCR à chaque release
 - [ ] 11.3 [infra] Certificat sans domaine (sslip.io ou IP, décision 15) — bloqué jusqu'aux ports de la machine (`MANQUES.md`)
-- [ ] 11.4 [racine] `pnpm deploy` : SSH (alias local), compte de déploiement, `docker compose pull && up -d`, contrôle de santé — bloqué jusqu'à l'accès (`MANQUES.md`)
+- [ ] 11.4 [racine] `pnpm deploy:prod` (`pnpm deploy` est une commande de pnpm) : SSH (alias local), compte de déploiement, `docker compose pull && up -d`, contrôle de santé — écrit, pas encore essayé : il attend l'accès, la première image GHCR et `infra/.env` sur la machine (`MANQUES.md`)

@@ -26,7 +26,8 @@
     "stack:down": "node tools/stack.mjs down",
     "stack:logs": "node tools/stack.mjs logs",
     "stack:admin": "docker compose -f infra/docker-compose.prod.yml --env-file infra/.env exec server admin",
-    "e2e:stack": "E2E_STACK=1 pnpm --filter @slopesque/e2e e2e"
+    "e2e:stack": "E2E_STACK=1 pnpm --filter @slopesque/e2e e2e",
+    "deploy:prod": "node tools/deploy.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",

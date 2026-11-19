@@ -9,22 +9,26 @@ concept, les règles des jeux). La maquette de référence (comportements, captu
 
 | Dossier | Contenu |
 |---|---|
-| `apps/server` | NestJS 12 (ESM, TypeScript 6). `src/config` (env validé), `src/db` (schéma Drizzle, migrations dans `drizzle/`), `src/cache` (Redis facultatif), `src/storage` (RustFS / S3 facultatif), `src/health` |
-| `apps/web` | React + Vite, construit dans l'extension (noms de fichiers sans `_`, pas de script inline) |
-| `apps/extension` | MV3 (jalon 2) |
-| `packages/shared` | constantes, schéma de l'environnement, protocole (zod) |
-| `packages/engines` | règles pures (code utilisateur, clés, jeux), testées avec Vitest |
-| `infra` | `docker-compose.yml` (dev, ports 127.0.0.1 : Postgres 55432, Redis 56379, RustFS 59000) |
-| `tools` | `dev.mjs`, `doctor.mjs`, `scan-secrets.mjs` |
+| `apps/server` | NestJS 12 (ESM, TypeScript 6). `src/rooms/room-hub.service.ts` = les salons en mémoire (présence, votes, crédit, Demi-disque, Sondage, Roulette, cartes, Low Tide, palmarès), `src/realtime/gateway.ts` = les intentions Socket.IO, `src/chat`, `src/media` (images par usage, `/media/:id`), `src/external` (GIF, aperçus de lien, `safeFetch`), `src/accounts`, `src/admin.ts` (console), `src/db/schema.ts` (Drizzle, migrations dans `drizzle/`). Tests : `test/*.test.ts` lancent le vrai serveur (`dist/`) |
+| `apps/web` | React + Vite, construit dans l'extension. `src/App.tsx` (coque, onglets), `src/ui/*` (chat, compte, salons, Demi-disque, Sondage / Roulette, cartes, palmarès, Low Tide), `src/lib/*` (vues HTML reprises de la maquette : disque, amphi, sondage, roue, cartes, tarot, palmarès, emoji, liens), `src/net.ts` (Socket.IO, état complet + événements numérotés), `src/store.ts` (Zustand) |
+| `apps/extension` | MV3 : `src/panel-core.js` (panneau), `panel.js` (icône, raccourci), `panel-auto.js` (« toutes les pages »), `background.js`, `tools/build.mjs`. `public-key.txt` fixe l'identifiant Chrome (la clé privée : `slopesque-crx.pem`, non versionnée) |
+| `packages/shared` | constantes, schéma de l'environnement, protocole (zod + types) |
+| `packages/engines` | règles pures testées : code, clés, couleurs, liens, votes, crédit, Demi-disque, Sondage, Roulette, Trou du cul, places à table, Tarot (vues par place) |
+| `tests/e2e` | Playwright : deux joueurs avec la vraie extension contre le serveur (`E2E_STACK=1` : contre la pile de production locale) |
+| `infra` | `docker-compose.yml` (dev, 127.0.0.1 : Postgres 55432, Redis 56379, RustFS 59000), `docker-compose.prod.yml` (un seul port public) |
+| `tools` | `dev.mjs`, `doctor.mjs`, `stack.mjs`, `deploy.mjs`, `scan-secrets.mjs` |
 
 ## Commandes
 
 ```sh
 pnpm dev                 # services Docker, paquets, serveur :3100, web :5173 (surveillés)
 pnpm doctor              # état des services et des clés
-pnpm check               # typecheck + lint + tests (turbo)
+pnpm check               # typecheck + lint + tests (turbo ; les tests serveur ont besoin de `pnpm services:up`)
+pnpm build && pnpm --filter @slopesque/e2e e2e   # bout en bout (deux navigateurs)
+pnpm stack:up / stack:admin <cmd> / stack:logs / stack:down   # la pile de production sur le Docker local (:8080)
+pnpm admin <cmd>         # console d'admin (dev)
 pnpm db:generate         # nouvelle migration après un changement de src/db/schema.ts
-pnpm services:up / services:down
+pnpm deploy:prod         # déploiement (lancé par l'utilisateur : SSH + sudo)
 ```
 
 ## Règles

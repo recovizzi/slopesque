@@ -5,7 +5,7 @@ Des jeux entre amis dans un panneau flottant du navigateur. Un salon s'ouvre sur
 Tarot) ou une page web intégrée. Pas de compte ni de mot de passe : un **code utilisateur** relie la sauvegarde d'un
 joueur sur ses appareils.
 
-> Statut : **V1 en développement.** Le concept et ses décisions sont dans [`openspec/`](openspec/) ; la maquette de
+> Statut : **V1 jouable en local** (chat, Demi-disque, Sondage, Roulette, Trou du cul, Tarot à 4 et 5, Low Tide, palmarès). Le concept et ses décisions sont dans [`openspec/`](openspec/) ; la maquette de
 > référence vit dans le dépôt `semicirculardisk`.
 
 ## Monorepo
@@ -27,8 +27,9 @@ Prérequis : Node 22+, pnpm 10, Docker.
 pnpm install
 pnpm dev        # services Docker + serveur (http://localhost:3100) + app (http://localhost:5173)
 pnpm doctor     # ce qui marche, ce qui est en mode dégradé, ce qu'il faut faire
-pnpm check      # types, lint, tests
+pnpm check      # types, lint, tests (les tests du serveur utilisent les services Docker)
 pnpm build
+pnpm --filter @slopesque/e2e e2e   # bout en bout : deux joueurs avec la vraie extension
 ```
 
 Sans `.env`, tout tourne avec les valeurs de développement de [`.env.example`](.env.example). Les clés externes
