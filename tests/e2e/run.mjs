@@ -79,7 +79,7 @@ await chooseFile(a.frame, 'paysage.png', await png(a.frame, 1400, 900, '#2a6f97'
 await a.frame.getByRole('button', { name: /^Image/ }).click();
 const pic = b.frame.locator('.msg img.msg-image');
 check(await until(async () => (await pic.count()) === 1, 8000), 'image: sent by A, shown to B');
-check(await pic.evaluate(i => i.complete && i.naturalWidth === 1400 && i.src.includes('/media/')), 'image: served by our server (/media), 1400 px kept under 1600');
+check(await until(async () => await pic.evaluate(i => i.complete && i.naturalWidth === 1400 && i.src.includes('/media/')), 8000), 'image: served by our server (/media), 1400 px kept under 1600');
 
 await chooseFile(a.frame, 'Bravo Léa.png', await png(a.frame, 400, 400, '#ef476f'));
 await a.frame.getByRole('button', { name: /^Sticker/ }).click();
@@ -107,7 +107,7 @@ await a.frame.locator('.bar .avatar').click();
 const [ph] = await Promise.all([a.page.waitForEvent('filechooser'), a.frame.getByRole('button', { name: 'Ajouter une photo' }).click()]);
 await ph.setFiles({ name: 'moi.png', mimeType: 'image/png', buffer: await png(a.frame, 640, 480, '#ffd166') });
 check(await until(async () => (await b.frame.locator('.person', { hasText: 'Léa' }).locator('.avatar.has-photo img').count()) === 1, 8000), 'photo: A\'s photo shown to B in the players');
-check(await a.frame.locator('.photo-wrap .avatar img').evaluate(i => i.naturalWidth === 256 && i.naturalHeight === 256), 'photo: a 256 px square');
+check(await until(async () => await a.frame.locator('.photo-wrap .avatar img').evaluate(i => i.complete && i.naturalWidth === 256 && i.naturalHeight === 256), 8000), 'photo: a 256 px square');
 await shot(a.page, '05-photo');
 await a.frame.locator('.drawer-right [aria-label="Fermer"]').click();
 await shot(b.page, '06-pictures-dark');
