@@ -31,7 +31,7 @@ export class AccountsService {
       return { account: found };
     }
     if (await this.isRetired(h)) return { reason: 'retired' };
-    if (!(await this.cache.allow(`code:${ip}`, LIMITS.codeAttempts.count, LIMITS.codeAttempts.perMs))) return { reason: 'limited' };
+    if (!(await this.cache.allow(`code:${ip}`, this.env.CODE_ATTEMPTS_PER_MINUTE, LIMITS.codeAttempts.perMs))) return { reason: 'limited' };
     const name = `Joueur ${[...crypto.getRandomValues(new Uint32Array(3))].map(v => KEY_ALPHABET[v % KEY_ALPHABET.length]).join('')}`;
     const [account] = await this.db.insert(accounts).values({ codeHmac: h, name }).onConflictDoNothing().returning();
     return account ? { account } : this.authenticate(code, ip);   // made at the same moment by another connection
@@ -43,7 +43,7 @@ export class AccountsService {
 
   /** « Reprendre un compte » / « Repartir de zéro »: does an account have this code (limited like unknown codes)? */
   async find(code: string, ip: string) {
-    if (!(await this.cache.allow(`code:${ip}`, LIMITS.codeAttempts.count, LIMITS.codeAttempts.perMs))) throw new UserError('Trop d\'essais : attends une minute.');
+    if (!(await this.cache.allow(`code:${ip}`, this.env.CODE_ATTEMPTS_PER_MINUTE, LIMITS.codeAttempts.perMs))) throw new UserError('Trop d\'essais : attends une minute.');
     const h = this.hmac(code);
     const a = await this.db.query.accounts.findFirst({ where: eq(accounts.codeHmac, h) });
     return { exists: !!a, retired: !a && (await this.isRetired(h)), name: a?.name ?? null };

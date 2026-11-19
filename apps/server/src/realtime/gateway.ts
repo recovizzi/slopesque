@@ -169,4 +169,30 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
   gifFavorites(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {
     return this.run('gif:favorites', b, async v => { await this.db.update(accounts).set({ gifFavorites: v.favorites }).where(eq(accounts.id, this.me(s).id)); return null; });
   }
+
+  // ---------------------------------------------------------------- commands, votes, social credit
+  @SubscribeMessage('vote:cast')
+  castVote(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('vote:cast', b, async v => { await this.hub.vote(s, v.id, v.yes); return null; }); }
+
+  @SubscribeMessage('host:ask')
+  askHost(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('host:ask', b, () => this.hub.askHost(s)); }
+
+  @SubscribeMessage('activity:choose')
+  chooseActivity(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('activity:choose', b, v => this.hub.chooseActivity(s, v.choice, activityName(v.choice))); }
+
+  @SubscribeMessage('credit:give')
+  credit(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('credit:give', b, async v => { await this.hub.giveCredit(s, v.to, v.delta); return null; }); }
+
+  @SubscribeMessage('kick:ask')
+  kick(@MessageBody() b: unknown) {
+    return this.run('kick:ask', b, async () => { throw new UserError('Personne n\'est en retard à une table : /kick sert pendant une partie de cartes.'); });
+  }
+}
+
+/** An activity and its format, in words (« Tarot à 5 », « Demi-disque · Amphithéâtre »). */
+function activityName(c: { activity: string; mode?: string; cardGame?: string; tarotPlayers?: number }) {
+  const names: Record<string, string> = { chat: 'Chat', disk: 'Demi-disque', poll: 'Sondage', wheel: 'Roulette', cards: 'Cartes', lowtide: 'Low Tide' };
+  if (c.activity === 'disk' && c.mode) return `Demi-disque · ${c.mode === 'amphi' ? 'Amphithéâtre' : 'Rayon libre'}`;
+  if (c.activity === 'cards' && c.cardGame) return c.cardGame === 'tarot' ? `Tarot à ${c.tarotPlayers ?? 4}` : ({ tdc: 'Trou du cul', holdem: 'Texas Hold\'em', coinche: 'Coinche' } as Record<string, string>)[c.cardGame] ?? 'Cartes';
+  return names[c.activity] ?? c.activity;
 }

@@ -9,7 +9,7 @@ import { PROTOCOL_VERSION, type Ack, type GifPage, type RoomState, type Sequence
 
 const PORT = 3197, URL = `http://localhost:${PORT}`;
 const up = await new Promise<boolean>(res => { const s = net.connect(55432, 'localhost').on('connect', () => { s.destroy(); res(true); }).on('error', () => res(false)); });
-const env = { ...process.env, PORT: String(PORT), PUBLIC_URL: URL, LOG_LEVEL: 'warn', KLIPY_API_KEY: '', GIPHY_API_KEY: '' };
+const env = { ...process.env, PORT: String(PORT), PUBLIC_URL: URL, LOG_LEVEL: 'warn', CODE_ATTEMPTS_PER_MINUTE: '1000', KLIPY_API_KEY: '', GIPHY_API_KEY: '' };
 let server: ChildProcess;
 const admin = (...args: string[]) => execFileSync(process.execPath, ['dist/admin.js', ...args], { env, encoding: 'utf8' });
 const ask = <T>(s: Socket, ev: string, body: unknown = {}) => s.emitWithAck(ev, body) as Promise<Ack<T>>;

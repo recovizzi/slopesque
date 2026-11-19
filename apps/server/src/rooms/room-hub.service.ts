@@ -4,10 +4,11 @@ import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { Server, Socket } from 'socket.io';
 import type postgres from 'postgres';
-import { defaultHue } from '@slopesque/engines';
-import { PRESENCE, type EmojiView, type GifRef, type MemberView, type RoomEvent, type RoomState, type StickerView } from '@slopesque/shared';
+import { castVote, closeVote, creditWord, defaultHue, startVote, tierOf, type Vote } from '@slopesque/engines';
+import { PRESENCE, READY_ACTIVITIES, type ActivityChoice, type EmojiView, type GifRef, type MemberView, type RoomEvent, type RoomState, type StickerView } from '@slopesque/shared';
 import { DB, SQL, type Db } from '../db/db.module.js';
-import { accounts, customEmoji, media, roomMembers, rooms, stickers } from '../db/schema.js';
+import { accounts, customEmoji, media, messages, roomMembers, rooms, stickers } from '../db/schema.js';
+import { sql } from 'drizzle-orm';
 import { MediaService, type MediaRow } from '../media/media.service.js';
 import { PreviewService } from '../external/preview.service.js';
 import { ChatService } from '../chat/chat.service.js';
@@ -16,7 +17,7 @@ import { ADMIN_CHANNEL, RoomsService, type AdminNotice, type Room } from './room
 import type { Account } from '../accounts/accounts.service.js';
 
 interface MemberRt { sockets: Set<string>; awaySince: number | null; grace: NodeJS.Timeout | null }
-interface RoomRt { room: Room; seq: number; members: Map<string, MemberRt> }
+interface RoomRt { room: Room; seq: number; members: Map<string, MemberRt>; vote: { id: number; v: Vote; timer: NodeJS.Timeout } | null }
 export interface SocketData { account: Account; ip: string; roomId: string | null }
 
 @Injectable()
@@ -29,6 +30,7 @@ export class RoomHub implements OnModuleInit {
     private readonly rooms: RoomsService, readonly chat: ChatService, private readonly media: MediaService, private readonly previews: PreviewService) {}
 
   async onModuleInit() {
+    await this.cancelVotes();
     await this.sql.listen(ADMIN_CHANNEL, payload => { try { this.onAdmin(JSON.parse(payload) as AdminNotice); } catch { /* malformed */ } });
   }
 
@@ -38,7 +40,7 @@ export class RoomHub implements OnModuleInit {
     if (!room) throw new UserError('unknown');
     const data = socket.data as SocketData, me = data.account.id;
     if (data.roomId && data.roomId !== room.id) this.leave(socket);
-    const rt = this.live.get(room.id) ?? { room, seq: 0, members: new Map() };
+    const rt = this.live.get(room.id) ?? { room, seq: 0, members: new Map(), vote: null };
     this.live.set(room.id, rt);
 
     const existing = await this.db.query.roomMembers.findFirst({ where: and(eq(roomMembers.roomId, room.id), eq(roomMembers.accountId, me)) });
@@ -91,7 +93,7 @@ export class RoomHub implements OnModuleInit {
   async state(rt: RoomRt, me: string): Promise<RoomState> {
     return { seq: rt.seq, room: { key: rt.room.key, name: rt.room.name, createdAt: rt.room.createdAt.getTime() }, me, hostId: rt.room.hostId,
       members: await this.members(rt), chat: await this.chat.page(rt.room.id, rt.room.createdAt), serverTime: Date.now(),
-      stickers: await this.stickerViews(rt), emoji: await this.emojiViews(rt) };
+      stickers: await this.stickerViews(rt), emoji: await this.emojiViews(rt), activity: this.activity(rt) };
   }
 
   private async members(rt: RoomRt, only?: string): Promise<MemberView[]> {
@@ -223,6 +225,113 @@ export class RoomHub implements OnModuleInit {
     rt.room = { ...rt.room, hostId: to };
     this.emit(rt, { type: 'host', hostId: to });
     await this.say(rt, null, `${target.name} devient l'hôte.`);
+  }
+
+  // ---------------------------------------------------------------- activity, votes, host, social credit
+  activity(rt: RoomRt): ActivityChoice { return (rt.room.rules.activity as ActivityChoice | undefined) ?? { activity: 'chat' }; }
+
+  private async setActivity(rt: RoomRt, choice: ActivityChoice) {
+    const rules = { ...rt.room.rules, activity: choice };
+    await this.db.update(rooms).set({ rules }).where(eq(rooms.id, rt.room.id));
+    rt.room = { ...rt.room, rules };
+    this.emit(rt, { type: 'activity', activity: choice });
+  }
+
+  private async setHost(rt: RoomRt, to: string) {
+    await this.db.update(rooms).set({ hostId: to }).where(eq(rooms.id, rt.room.id));
+    rt.room = { ...rt.room, hostId: to };
+    this.emit(rt, { type: 'host', hostId: to });
+  }
+
+  /** The players connected now (or within their grace): the voters of a vote launched now. */
+  private connected(rt: RoomRt) { return [...rt.members].filter(([, m]) => m.sockets.size > 0 || m.grace !== null).map(([id]) => id); }
+
+  private async launch(rt: RoomRt, v: Omit<Vote, 'yes' | 'no' | 'voters' | 'ends'>) {
+    if (rt.vote) throw new UserError('Un vote est déjà en cours dans le chat : attends sa fin.');
+    const vote = startVote(v, this.connected(rt));
+    const [row] = await this.db.insert(messages).values({ roomId: rt.room.id, authorId: v.by, kind: 'vote', data: { vote } }).returning();
+    rt.vote = { id: row!.id, v: vote, timer: setTimeout(() => void this.finish(rt), Math.max(0, vote.ends - Date.now())) };
+    this.emit(rt, { type: 'message', message: this.chat.view(row!) });
+    if (vote.yes.length === vote.voters.length) await this.finish(rt);   // alone: decided at once
+  }
+
+  private async saveVote(rt: RoomRt, v: Vote) {
+    const [row] = await this.db.update(messages).set({ data: { vote: v } }).where(eq(messages.id, rt.vote!.id)).returning();
+    this.emit(rt, { type: 'message-updated', message: this.chat.view(row!) });
+  }
+
+  async vote(socket: Socket, id: number, yes: boolean) {
+    const rt = this.roomOf(socket);
+    if (!rt.vote || rt.vote.id !== id) throw new UserError('Ce vote est terminé.');
+    const r = castVote(rt.vote.v, (socket.data as SocketData).account.id, yes);
+    if (!r) throw new UserError('Tu ne votes pas : tu n\'étais pas connecté à son lancement.');
+    rt.vote.v = r.vote;
+    await this.saveVote(rt, r.vote);
+    if (r.done) await this.finish(rt);
+  }
+
+  /** The end of the vote (its 2 minutes, or everyone voted): the result, and what it changes. */
+  private async finish(rt: RoomRt) {
+    if (!rt.vote) return;
+    clearTimeout(rt.vote.timer);
+    const v = closeVote(rt.vote.v);
+    await this.saveVote(rt, v);
+    rt.vote = null;
+    if (v.result !== 'yes') return;
+    if (v.kind === 'host' && v.target) {
+      await this.setHost(rt, v.target);
+      const [m] = await this.members(rt, v.target);
+      await this.say(rt, null, `${m?.name ?? '?'} devient l'hôte (vote accepté).`);
+    } else if (v.kind === 'activity' && v.choice) await this.setActivity(rt, v.choice as ActivityChoice);
+  }
+
+  /** At start: the votes left open by a restart are cancelled, and it is said. */
+  private async cancelVotes() {
+    const open = await this.db.select().from(messages).where(sql`${messages.kind} = 'vote' and ${messages.data}->'vote'->>'result' is null`);
+    for (const m of open) {
+      await this.db.update(messages).set({ data: { vote: { ...(m.data as { vote: Vote }).vote, result: 'cancelled' } } }).where(eq(messages.id, m.id));
+      await this.chat.send(m.roomId, null, 'Le serveur a redémarré : vote annulé.', null, 'system');
+    }
+  }
+
+  /** /hote: the host already; the host away for 5 min or more (or gone): the role at once; else a vote. */
+  async askHost(socket: Socket): Promise<'already' | 'taken' | 'vote'> {
+    const rt = this.roomOf(socket), me = (socket.data as SocketData).account;
+    if (rt.room.hostId === me.id) return 'already';
+    const [host] = rt.room.hostId ? await this.members(rt, rt.room.hostId) : [];
+    if (!host || host.presence === 'gone') {
+      await this.setHost(rt, me.id);
+      const mins = host?.awaySince ? Math.floor((Date.now() - host.awaySince) / 60_000) : 0;
+      await this.say(rt, null, `${me.name} devient l'hôte : ${host ? `${host.name} n'était plus là depuis ${mins} min` : 'l\'hôte avait quitté le salon'}.`);
+      return 'taken';
+    }
+    await this.launch(rt, { kind: 'host', by: me.id, target: me.id, label: `demande à devenir l'hôte, à la place de ${host.name}` });
+    return 'vote';
+  }
+
+  /** /activity: the host changes it at once; another player proposes it to a vote. */
+  async chooseActivity(socket: Socket, choice: ActivityChoice, label: string): Promise<'applied' | 'vote'> {
+    const rt = this.roomOf(socket), me = (socket.data as SocketData).account;
+    if (!READY_ACTIVITIES.includes(choice.activity)) throw new UserError('Cette activité arrive bientôt.');
+    if (rt.room.hostId === me.id) {
+      await this.setActivity(rt, choice);
+      await this.say(rt, null, `${me.name} passe à ${label}.`);
+      return 'applied';
+    }
+    await this.launch(rt, { kind: 'activity', by: me.id, choice, label: `propose de passer à ${label}` });
+    return 'vote';
+  }
+
+  /** /credit-social: never to oneself; said in the chat with the change. */
+  async giveCredit(socket: Socket, to: string, delta: number) {
+    const rt = this.roomOf(socket), me = (socket.data as SocketData).account.id;
+    if (to === me) throw new UserError('Impossible de se donner du crédit soi-même.');
+    const [row] = await this.db.update(roomMembers).set({ credit: sql`${roomMembers.credit} + ${delta}` })
+      .where(and(eq(roomMembers.roomId, rt.room.id), eq(roomMembers.accountId, to))).returning();
+    if (!row) throw new UserError('Ce joueur n\'est plus dans le salon.');
+    const [m] = await this.db.insert(messages).values({ roomId: rt.room.id, authorId: null, kind: 'credit', data: { by: me, to, delta, tier: tierOf(delta).name, words: creditWord(Math.abs(delta)) } }).returning();
+    this.emit(rt, { type: 'message', message: this.chat.view(m!) });
+    await this.emitMember(rt, to);
   }
 
   // ---------------------------------------------------------------- the console's notices

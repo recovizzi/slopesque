@@ -22,7 +22,7 @@ export type Db = PostgresJsDatabase<typeof schema>;
           console.error(`Postgres injoignable (${(e as Error).message}) : le serveur ne peut pas démarrer sans sa base.`);
           process.exit(1);
         }
-        await runMigrations(sql);
+        await runMigrations(env.DATABASE_URL);
         return sql;
       },
     },

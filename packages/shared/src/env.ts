@@ -23,6 +23,7 @@ export const envSchema = z.object({
   S3_BUCKET_DURABLE: z.string().default('slopesque-durable'),
   S3_BUCKET_CHAT: z.string().default('slopesque-chat'),
   STORAGE_QUOTA_GB: z.coerce.number().positive().default(50),
+  CODE_ATTEMPTS_PER_MINUTE: z.coerce.number().int().positive().default(10),   // unknown codes per IP (tests raise it)
   KLIPY_API_KEY: optional,
   GIPHY_API_KEY: optional,
 });

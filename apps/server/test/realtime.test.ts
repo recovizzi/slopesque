@@ -9,7 +9,7 @@ import { PROTOCOL_VERSION, type Ack, type RoomState, type SequencedEvent } from 
 
 const PORT = 3199, URL = `http://localhost:${PORT}`;
 const up = await new Promise<boolean>(res => { const s = net.connect(55432, 'localhost').on('connect', () => { s.destroy(); res(true); }).on('error', () => res(false)); });
-const env = { ...process.env, PORT: String(PORT), PUBLIC_URL: URL, LOG_LEVEL: 'warn' };
+const env = { ...process.env, PORT: String(PORT), PUBLIC_URL: URL, LOG_LEVEL: 'warn', CODE_ATTEMPTS_PER_MINUTE: '1000' };
 let server: ChildProcess;
 
 const admin = (...args: string[]) => execFileSync(process.execPath, ['dist/admin.js', ...args], { env, encoding: 'utf8' });

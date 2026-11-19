@@ -73,6 +73,7 @@ export interface RoomState {
   chat: ChatPage;
   stickers: StickerView[];
   emoji: EmojiView[];
+  activity: ActivityChoice;
   serverTime: number;
 }
 
@@ -87,7 +88,19 @@ export type RoomEvent =
   | { type: 'host'; hostId: string | null }
   | { type: 'message-updated'; message: MessageView }
   | { type: 'stickers'; stickers: StickerView[] }
-  | { type: 'emoji'; emoji: EmojiView[] };
+  | { type: 'emoji'; emoji: EmojiView[] }
+  | { type: 'activity'; activity: ActivityChoice };
+
+/** An activity and its format (/activity, the host's choice). Only the activities in READY_ACTIVITIES can be chosen. */
+export const activityChoice = z.object({
+  activity: z.enum(['chat', 'disk', 'poll', 'wheel', 'cards', 'lowtide']),
+  mode: z.enum(['ray', 'amphi']).optional(),
+  cardGame: z.enum(['tdc', 'tarot', 'holdem', 'coinche']).optional(),
+  tarotPlayers: z.union([z.literal(4), z.literal(5)]).optional(),
+});
+export type ActivityChoice = z.infer<typeof activityChoice>;
+/** The activities the V1 can play now (grows with the milestones). */
+export const READY_ACTIVITIES: ActivityChoice['activity'][] = ['chat'];
 export type SequencedEvent = RoomEvent & { seq: number };
 
 // ------------------------------------------------------------------ intents (client → server), with their answers
@@ -114,6 +127,11 @@ export const intents = {
   'photo:set': z.object({ mediaId: z.string().uuid().nullable() }),
   'gif:search': z.object({ q: z.string().trim().min(1).max(60), page: z.number().int().min(0).max(20), provider: z.string().max(16).nullable().optional() }),
   'gif:trending': z.object({ page: z.number().int().min(0).max(20), provider: z.string().max(16).nullable().optional() }),
+  'vote:cast': z.object({ id: z.number().int().positive(), yes: z.boolean() }),
+  'host:ask': z.object({}),
+  'activity:choose': z.object({ choice: activityChoice }),
+  'credit:give': z.object({ to: z.string().uuid(), delta: z.number().int().min(-1000).max(1000).refine(n => n !== 0) }),
+  'kick:ask': z.object({ name: z.string().max(20).optional() }),
   'gif:favorites': z.object({ favorites: z.array(z.object({ id: z.string().max(64), provider: z.string().max(16), url: z.url(), w: z.number().int(), h: z.number().int(), title: z.string().max(200) })).max(200) }),
 } as const;
 export type IntentName = keyof typeof intents;
@@ -145,6 +163,11 @@ export interface IntentResults {
   'gif:search': GifPage;
   'gif:trending': GifPage;
   'gif:favorites': null;
+  'vote:cast': null;
+  'host:ask': 'already' | 'taken' | 'vote';
+  'activity:choose': 'applied' | 'vote';
+  'credit:give': null;
+  'kick:ask': 'vote';
 }
 
 /** GIF results: the provider that answered, or why there is none (no key, key refused, no answer). */

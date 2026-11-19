@@ -9,7 +9,7 @@ import { chromium } from 'playwright';
 export const ROOT = path.resolve(import.meta.dirname, '../..');
 export const OUT = path.join(ROOT, 'tests/e2e/shots');
 export const PORT = 3198, SERVER = `http://localhost:${PORT}`;
-const env = { ...process.env, PORT: String(PORT), PUBLIC_URL: SERVER, LOG_LEVEL: 'warn' };
+const env = { ...process.env, PORT: String(PORT), PUBLIC_URL: SERVER, LOG_LEVEL: 'warn', CODE_ATTEMPTS_PER_MINUTE: '1000' };
 const serverDir = path.join(ROOT, 'apps/server');
 
 let failed = 0;
