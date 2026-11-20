@@ -84,7 +84,7 @@ console.log(`\nPlan :
   commit      chore(release): ${tag}
   tag         ${tag} (annoté, portée : ${scope})
   publie      ${parts}${minExt ? `\n  serveur     refuse les extensions plus anciennes que ${tag}` : ''}
-  ensuite     GitHub Actions → Release ; le déploiement attend ton approbation (environnement « production »)`);
+  ensuite     GitHub Actions → Release${scope === 'extension' ? '' : ' ; le déploiement attend ton approbation (environnement « production »)'}`);
 if (flag('dry-run')) { console.log('\n(--dry-run : rien n\'a changé)'); process.exit(0); }
 if (!/^o(ui)?$/i.test(await ask('\nOn y va ? o / N : ', 'o'))) { console.log('Annulé : rien n\'a changé.'); process.exit(0); }
 rl.close();
