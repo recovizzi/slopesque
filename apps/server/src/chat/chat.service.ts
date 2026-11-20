@@ -75,8 +75,10 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
 
   view(m: Row, reactions: Record<string, string[]> = {}, reply: Quote | null = null, pic?: MediaRow): MessageView {
     const { preview, ...data } = (m.data ?? {}) as { preview?: LinkPreview };
+    // a link's preview older than a week: its text stays, its picture (deleted after a week) no longer shown
+    const old = Date.now() - m.createdAt.getTime() > RETENTION.linkPreviews;
     return { id: m.id, from: m.authorId, kind: m.kind as MessageView['kind'], text: m.text, at: m.createdAt.getTime(), reply, reactions,
-      data: Object.keys(data).length ? data : null, preview: preview ?? null, media: this.mediaView(m, pic), scope: m.scope };
+      data: Object.keys(data).length ? data : null, preview: preview ? (old ? { ...preview, image: null } : preview) : null, media: this.mediaView(m, pic), scope: m.scope };
   }
 
   /** A message's picture: a GIF's link, or our stored picture; gone (src null) once deleted, or for a chat image more
@@ -135,5 +137,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
 /** What a reply shows of the message it answers; `gone` once it is deleted (more than 30 days old). */
 function quote(id: number, m: Row | undefined): Quote {
   if (!m) return { id, from: null, text: '', kind: 'text', gone: true };
-  return { id, from: m.authorId, text: m.text.slice(0, 200), kind: m.mediaKind ?? m.kind, gone: false };
+  // a chat image older than a week is gone: the quote says it (« Image expirée »)
+  const expired = m.mediaKind === 'image' && Date.now() - m.createdAt.getTime() > RETENTION.chatImages;
+  return { id, from: m.authorId, text: m.text.slice(0, 200), kind: m.mediaKind ?? m.kind, gone: false, ...(expired ? { expired: true } : {}) };
 }

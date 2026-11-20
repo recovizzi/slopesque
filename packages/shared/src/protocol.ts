@@ -5,11 +5,17 @@ import { z } from 'zod';
 
 // ------------------------------------------------------------------ handshake
 /** Sent in Socket.IO's `auth` (never in the address). */
-export const handshakeSchema = z.object({ code: z.string().min(1).max(64), protocol: z.number().int() });
+export const handshakeSchema = z.object({ code: z.string().min(1).max(64), protocol: z.number().int(), version: z.string().max(32).optional() });   // version: the extension's
+/** « 0.10.2 » < « 0.11.0 »: versions compared number by number. */
+export function versionBelow(a: string, b: string) {
+  const x = a.split('.').map(n => parseInt(n, 10) || 0), y = b.split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) { if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) < (y[i] ?? 0); }
+  return false;
+}
 export type Handshake = z.infer<typeof handshakeSchema>;
 
 /** Why the server refuses or ends a connection (the panel shows the French text it maps to). */
-export type FatalReason = 'protocol' | 'code' | 'retired' | 'limited' | 'replaced';
+export type FatalReason = 'protocol' | 'outdated' | 'code' | 'retired' | 'limited' | 'replaced';   // outdated: the extension is older than the server accepts
 
 // ------------------------------------------------------------------ data sent to the client
 export interface AccountView {
@@ -37,7 +43,7 @@ export interface MemberView {
 }
 
 /** A quoted message: what a reply shows above itself; `gone` once the quoted one is deleted (30 days). */
-export interface Quote { id: number; from: string | null; text: string; kind: string; gone: boolean }
+export interface Quote { id: number; from: string | null; text: string; kind: string; gone: boolean; expired?: boolean }   // expired: a chat image past its week
 export interface MessageView {
   id: number;
   from: string | null;             // null: the room (system)
@@ -79,6 +85,7 @@ export interface RoomState {
   emoji: EmojiView[];
   activity: ActivityChoice;
   scope: string;                   // the activity's session (« cards#12 »): its system lines are shown during it only
+  notice?: { id: string; title: string; text: string } | null;   // the server restarted during a game: it is lost (a window, once)
   disk: DiskView;
   poll: PollView;
   wheel: WheelView;
@@ -88,7 +95,9 @@ export interface RoomState {
 }
 
 /** What the server says right after a connection is accepted. */
-export interface Hello { account: AccountView; protocol: number; serverTime: number; insecure: boolean }
+export interface Hello { account: AccountView; protocol: number; serverTime: number; insecure: boolean; server: ServerVersions }
+/** What the server says of the versions: its own, the oldest extension it accepts, the latest release to download. */
+export interface ServerVersions { version: string; minExtension: string; download: string }
 
 export type RoomEvent =
   | { type: 'message'; message: MessageView }
@@ -282,7 +291,7 @@ export interface IntentResults {
   'chat:react': null;
   'profile:update': AccountView;
   'rooms:save': null;
-  'account:find': { exists: boolean; retired: boolean; name: string | null; triesLeft?: number };
+  'account:find': { exists: boolean; retired: boolean; name: string | null; triesLeft?: number; retryIn?: number };   // retryIn: the next try waits (ms)
   'account:renew': null;
   'host:give': null;
   'media:ticket': { ticket: string; url: string };

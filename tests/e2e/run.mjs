@@ -347,15 +347,31 @@ await a.frame.locator('.bar .avatar').click();
 await a.frame.locator('[data-action], .tab', { hasText: 'Extension' }).first().click();
 check(await until(async () => (await a.frame.getByText('Raccourci clavier').count()) === 1), 'extension: the shortcut in the Extension tab');
 check(!(await a.frame.getByRole('checkbox', { name: 'Rester ouvert sur toutes les pages' }).isChecked()), 'extension: « Rester ouvert sur toutes les pages » off by default');
+check(await until(async () => /^Slopesque \d+\.\d+\.\d+$/.test(await a.frame.locator('.version-bubble').textContent().catch(() => '')) && (await a.frame.locator('.version-server').textContent().catch(() => '')).startsWith('serveur ')),
+  'extension: its version in a bubble at the bottom of the tab (and the server\'s)');
 await shot(a.page, '15-extension-tab');
 await a.frame.locator('.drawer-right [aria-label="Fermer"]').click();
 
-// the server restarts: the panels say « Reconnexion… », then come back with the chat kept
+// the server restarts during a poll: the panels say « Reconnexion… », then come back with the chat kept; the poll is
+// lost, said in a window (once)
+await say(b.frame, '/activity sondage');
+await b.frame.getByRole('button', { name: 'Nouveau sondage' }).click({ timeout: 5000 }).catch(() => {});   // the last one's results
+await b.frame.locator('[data-poll="question"]').fill('On mange où ?');
+await b.frame.locator('[data-poll="choice"][data-i="0"]').fill('Pizza');
+await b.frame.locator('[data-poll="choice"][data-i="1"]').fill('Sushi');
+await b.frame.getByRole('button', { name: 'Publier le sondage' }).click();
+await a.frame.locator('.poll-option').first().waitFor();
 await stopServer();
 check(await until(async () => (await a.frame.getByText('Reconnexion…').count()) === 1, 8000), 'server down: « Reconnexion… » in the header');
 await startServer();
-check(await until(async () => (await a.frame.getByText('Reconnexion…').count()) === 0 && (await a.frame.locator('.msg', { hasText: 'merci' }).count()) === 1, 15000),
-  'server back: reconnected, the chat kept');
+check(await until(async () => (await a.frame.getByText('Reconnexion…').count()) === 0, 15000), 'server back: reconnected');
+check(await until(async () => (await a.frame.locator('.notice-modal').textContent().catch(() => '')).includes('le sondage'), 8000), 'server back: « Partie perdue » — the poll that was open, cancelled, said in a window');
+await shot(a.page, '17-game-lost');
+await a.frame.getByRole('button', { name: 'Compris' }).click();
+await b.frame.getByRole('button', { name: 'Compris' }).click();
+check(await a.frame.locator('.notice-modal').count() === 0 && (await a.frame.locator('.poll-option').count()) === 0, 'server back: the poll back to its first step, the window read once');
+await say(b.frame, '/activity chat');
+check(await until(async () => (await a.frame.locator('.chat-stage .msg', { hasText: 'merci' }).count()) === 1, 8000), 'server back: the chat kept');
 await a.frame.locator('[name="text"]').fill('toujours là ?');
 await a.frame.locator('[name="text"]').press('Enter');
 check(await until(async () => (await b.frame.locator('.msg', { hasText: 'toujours là' }).count()) === 1, 8000), 'after the restart, messages go through again');

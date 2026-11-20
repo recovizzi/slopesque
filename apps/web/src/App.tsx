@@ -9,7 +9,7 @@ import { connect, request, upload } from './net';
 import { useStore } from './store';
 import { AccountSection, CodeModal, Welcome, type CodeMode } from './ui/Account';
 import { Chat, People } from './ui/Chat';
-import { Avatar, Html, Icon } from './ui/common';
+import { Avatar, Html, Icon, useEscape } from './ui/common';
 import { KeyBadge, RoomList, RoomPage } from './ui/Rooms';
 import { ServerField } from './ui/ServerField';
 import { DiskSettings, DiskStage, Ranking } from './ui/DiskStage';
@@ -18,7 +18,8 @@ import { CardsStage } from './ui/CardsStage';
 import { TrumpArt } from './ui/TrumpArt';
 import { Palmares } from './ui/Palmares';
 import { WebSettings, WebStage } from './ui/WebStage';
-import { CARD_PLAYERS, READY_ACTIVITIES, SCORE_NAMES, scoreKey } from '@slopesque/shared';
+import { EXT_VERSION } from './version';
+import { CARD_PLAYERS, READY_ACTIVITIES, SCORE_NAMES, scoreKey, versionBelow } from '@slopesque/shared';
 
 const EMBED = new URLSearchParams(location.search).has('embed');
 const RELEASES = 'https://github.com/recovizzi/slopesque/releases/latest';
@@ -132,6 +133,7 @@ export function App() {
           : tab === 'extension' ? <ExtensionTab setDevice={setDevice} />
           : <GameTab />}</div></>}</aside>
     </div>
+    {room?.notice && <NoticeModal notice={room.notice} />}
     {codeModal && <CodeModal first={codeModal.first} start={codeModal.start} onClose={() => setCodeModal(null)} onDone={() => setCodeModal(null)} />}
     <div ref={popHost} />
   </>;
@@ -193,7 +195,19 @@ function ExtensionTab({ setDevice }: { setDevice: (p: Partial<ReturnType<typeof 
     <ExtensionOptions />
     <label className="field"><span>Thème</span><select value={device.theme} onChange={e => setDevice({ theme: e.target.value as 'auto' })}>
       <option value="auto">Système</option><option value="light">Clair</option><option value="dark">Sombre</option></select></label>
+    <Versions />
   </>;
+}
+
+/** At the bottom of the Extension tab: this extension's version in a bubble (and the server's, when connected). */
+function Versions() {
+  const v = useStore(s => s.versions);
+  const behind = v && v.minExtension !== '?' && v.version !== '?' && versionBelow(EXT_VERSION, v.version);
+  return <div className="versions">
+    <span className="version-bubble" title="Version de l'extension">Slopesque {EXT_VERSION}</span>
+    {v && <span className="version-server">serveur {v.version}</span>}
+    {behind && <a className="version-new" href={v.download} target="_blank" rel="noopener noreferrer">Une version plus récente existe</a>}
+  </div>;
 }
 
 /** Profil: my photo in this room (or my letter), a small ✕ to remove it, a button to choose one. */
@@ -333,8 +347,13 @@ function CardsSettings() {
 /** The server refused my code, or this version of the extension. */
 function FatalPage({ onCode }: { onCode: (m: CodeMode) => void }) {
   const fatal = useStore(s => s.fatal);
-  if (fatal === 'protocol') return <div className="room-card offline"><h1>Mets l'extension à jour</h1><p>Le serveur attend une version plus récente de l'extension.</p>
-    <a className="btn big" href={RELEASES} target="_blank" rel="noopener noreferrer">Télécharger la dernière version</a></div>;
+  if (fatal === 'protocol' || fatal === 'outdated') {   // blocking: this extension is older than the server accepts
+    const v = useStore.getState().versions;
+    return <div className="room-card offline outdated"><h1>Mets l'extension à jour</h1>
+      <p>Cette version de l'extension ({EXT_VERSION}) n'est plus prise en charge par le serveur{v ? ` : il demande la ${v.minExtension} ou plus récente` : ''}.</p>
+      <a className="btn big" href={v?.download ?? RELEASES} target="_blank" rel="noopener noreferrer">Télécharger la dernière version</a>
+      <p className="note">Puis recharge l'extension (↻ dans la page des extensions du navigateur). Ton compte et tes salons sont gardés sur le serveur.</p></div>;
+  }
   if (fatal === 'limited') return <div className="room-card offline"><h1>Trop d'essais</h1><p>Le serveur a reçu trop de codes inconnus depuis ta connexion. Réessaie dans une minute.</p>
     <button className="btn big" type="button" onClick={() => connect()}><Icon name="reset" />Réessayer</button></div>;
   return <div className="room-card unknown"><h1>{fatal === 'code' ? 'Code invalide' : 'Ce code a été remplacé'}</h1>
@@ -350,3 +369,18 @@ function OfflinePage() {
     <button className="btn big" type="button" onClick={() => connect()}><Icon name="reset" />Réessayer</button></div>;
 }
 
+
+/** The server restarted during a game: it is lost — said once to each player (this device remembers it was read). */
+function NoticeModal({ notice }: { notice: { id: string; title: string; text: string } }) {
+  const KEY = 'slp-notices-read';
+  const read = () => { try { return JSON.parse(localStorage.getItem(KEY) ?? '[]') as string[]; } catch { return []; } };
+  const [open, setOpen] = useState(() => !read().includes(notice.id));
+  useEffect(() => { setOpen(!read().includes(notice.id)); }, [notice.id]);
+  const close = () => { try { localStorage.setItem(KEY, JSON.stringify([...read(), notice.id].slice(-20))); } catch { /* not kept: shown again next time */ } setOpen(false); };
+  useEscape(close, open);
+  if (!open) return null;
+  return <><div className="modal-backdrop" onClick={close} />
+    <div className="modal notice-modal" role="alertdialog" aria-modal="true" aria-label={notice.title}>
+      <h2>{notice.title}</h2><p>{notice.text}</p>
+      <div className="modal-buttons"><button className="btn" type="button" onClick={close} autoFocus>Compris</button></div></div></>;
+}

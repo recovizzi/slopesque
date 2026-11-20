@@ -17,7 +17,7 @@ const start = async () => {
 };
 const stop = async () => { const s = server; server = null; s?.kill(); if (s) await new Promise(r => s.once('exit', r)); };
 const ask = <T>(s: Socket, ev: string, body: unknown = {}) => s.emitWithAck(ev, body) as Promise<Ack<T>>;
-const connect = async (code: string) => { const s = io(URL, { auth: { code, protocol: PROTOCOL_VERSION }, transports: ['websocket'], forceNew: true, reconnection: false }); await new Promise(r => s.once('hello', r)); return s; };
+const connect = async (code: string) => { const s = io(URL, { auth: { code, protocol: PROTOCOL_VERSION, version: '0.1.0' }, transports: ['websocket'], forceNew: true, reconnection: false }); await new Promise(r => s.once('hello', r)); return s; };
 const nextEvent = (s: Socket, type: string, f: (e: any) => boolean = () => true) => new Promise<any>(res => { const h = (e: SequencedEvent) => { if (e.type === type && f(e)) { s.off('event', h); res(e); } }; s.on('event', h); });
 
 describe.skipIf(!up)('commands and votes', () => {

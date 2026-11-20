@@ -24,6 +24,8 @@ export const envSchema = z.object({
   S3_BUCKET_DURABLE: z.string().default('slopesque-durable'),
   S3_BUCKET_CHAT: z.string().default('slopesque-chat'),
   STORAGE_QUOTA_GB: z.coerce.number().positive().default(50),
+  MIN_EXTENSION_VERSION: z.string().regex(/^\d+(\.\d+)*$/).default('0.1.0'),   // an older extension is refused, with the download link
+  EXTENSION_DOWNLOAD_URL: z.url().default('https://github.com/recovizzi/slopesque/releases/latest'),
   ROBOT_DELAY_MS: z.coerce.number().int().min(0).default(900),   // a card robot's thinking time (tests lower it)
   CODE_ATTEMPTS_PER_MINUTE: z.coerce.number().int().positive().default(10),   // unknown codes per IP (tests raise it)
   KLIPY_API_KEY: optional,

@@ -5,7 +5,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { Inject, Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { DeleteObjectsCommand, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import sharp from 'sharp';
 import { HOUR, LIMITS, RETENTION } from '@slopesque/shared';
 import { ENV, type Env } from '../config/config.module.js';
@@ -110,6 +110,11 @@ export class MediaService implements OnModuleInit, OnModuleDestroy {
     return r.Body as NodeJS.ReadableStream;
   }
 
+  /** A poll's pictures kept while it is open (and an hour after, for its results): the default + the poll's duration. */
+  async keepFor(ids: string[], ms: number) {
+    if (ids.length) await this.db.update(media).set({ expiresAt: new Date(Date.now() + HOUR + ms) }).where(inArray(media.id, ids));
+  }
+
   /** Deletes pictures nothing uses any more (or expired), rows and files; `only`: just these ones, now. */
   async sweep(only?: string[]) {
     const ids = only?.length ? sql`and m.id in (${sql.join(only.map(i => sql`${i}::uuid`), sql`, `)})` : sql``;
@@ -121,7 +126,8 @@ export class MediaService implements OnModuleInit, OnModuleDestroy {
             and not exists (select 1 from stickers s where s.media_id = m.id)
             and not exists (select 1 from custom_emoji e where e.media_id = m.id)
             and not exists (select 1 from room_members r where r.photo_id = m.id)
-            and not exists (select 1 from trump_art t where t.media_id = m.id))
+            and not exists (select 1 from trump_art t where t.media_id = m.id)
+            and not (m.usage = 'poll' and m.expires_at is not null and m.expires_at > now()))   -- a poll's picture: while its poll lasts
         ) ${ids} returning m.bucket, m.object_key, m.bytes`);
       if (!gone.length) return 0;
       const byBucket = new Map<string, string[]>();

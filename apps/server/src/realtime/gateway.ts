@@ -1,9 +1,10 @@
 // The WebSocket entry (openspec: realtime-sync): the code checked at the handshake, then the intents of
 // packages/shared/protocol.ts, each validated (zod) and answered by an acknowledgement { ok, value | error }.
+import { readFileSync } from 'node:fs';
 import { Inject, Logger } from '@nestjs/common';
 import { ConnectedSocket, MessageBody, type OnGatewayConnection, type OnGatewayDisconnect, type OnGatewayInit, SubscribeMessage, WebSocketGateway } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
-import { handshakeSchema, intents, isInsecureUrl, LIMITS, PROTOCOL_VERSION, type Ack, type Hello, type IntentName, type IntentResults } from '@slopesque/shared';
+import { handshakeSchema, intents, isInsecureUrl, LIMITS, PROTOCOL_VERSION, versionBelow, type Ack, type Hello, type IntentName, type IntentResults, type ServerVersions } from '@slopesque/shared';
 import { ENV, type Env } from '../config/config.module.js';
 import { AccountsService } from '../accounts/accounts.service.js';
 import { CacheService } from '../cache/cache.service.js';
@@ -18,6 +19,9 @@ import { UserError } from '../errors.js';
 
 const ipOf = (s: Socket, trust: boolean) => (trust && String(s.handshake.headers['x-forwarded-for'] ?? '').split(',')[0]?.trim()) || s.handshake.address;
 
+/** This server's version: its package.json (read once; « ? » if it can't be). */
+const SERVER_VERSION = (() => { try { return (JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { version: string }).version; } catch { return '?'; } })();
+
 @WebSocketGateway()
 export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   private readonly log = new Logger('Temps réel');
@@ -26,13 +30,19 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
     private readonly rooms: RoomsService, private readonly cache: CacheService, private readonly media: MediaService,
     private readonly gifs: GifService, @Inject(DB) private readonly db: Db) {}
 
+  /** The server's version (its package), the oldest extension it accepts, where to get the latest. */
+  versions(): ServerVersions { return { version: SERVER_VERSION, minExtension: this.env.MIN_EXTENSION_VERSION, download: this.env.EXTENSION_DOWNLOAD_URL }; }
+
   afterInit(io: Server) {
     this.hub.io = io;
     io.use(async (socket, next) => {
-      const fail = (reason: string) => next(Object.assign(new Error(reason), { data: { reason } }));
+      const fail = (reason: string, more: object = {}) => next(Object.assign(new Error(reason), { data: { reason, ...more } }));
       const h = handshakeSchema.safeParse(socket.handshake.auth);
       if (!h.success) return fail('code');
-      if (h.data.protocol !== PROTOCOL_VERSION) return fail('protocol');
+      const versions = this.versions();
+      // an extension older than the server accepts (or one that says no version: before versioning) is sent to update
+      if (!h.data.version || versionBelow(h.data.version, versions.minExtension)) return fail('outdated', { ...versions, yours: h.data.version ?? null });
+      if (h.data.protocol !== PROTOCOL_VERSION) return fail('protocol', versions);
       const ip = ipOf(socket, this.env.TRUST_PROXY);
       try {
         const r = await this.accounts.authenticate(h.data.code, ip);
@@ -46,7 +56,7 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
   handleConnection(socket: Socket) {
     const data = socket.data as SocketData;
     if (!data?.account) return;
-    const hello: Hello = { account: this.accounts.view(data.account), protocol: PROTOCOL_VERSION, serverTime: Date.now(), insecure: isInsecureUrl(this.env.PUBLIC_URL) };
+    const hello: Hello = { account: this.accounts.view(data.account), protocol: PROTOCOL_VERSION, serverTime: Date.now(), insecure: isInsecureUrl(this.env.PUBLIC_URL), server: this.versions() };
     socket.emit('hello', hello);
   }
 

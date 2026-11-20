@@ -72,8 +72,8 @@ première manche, celui qui a le 3 de trèfle ouvre.
 - **THEN** il est Trou du cul ; le premier sorti est Président ; chacun reçoit les points de son rôle
 
 ### Requirement: Tarot
-Le Tarot MUST se jouer à 4 ou à 5, au choix de l'hôte dans Paramètres → Partie (à partir de la donne suivante ; 3
-pour la V1), avec 78 cartes : 4 couleurs de 14 (1 à 10, Valet, Cavalier,
+Le Tarot MUST se jouer à 4 ou à 5, au choix de l'hôte dans Paramètres → Partie (à partir de la donne suivante ; pas de Tarot à 3 : des robots
+complètent), avec 78 cartes : 4 couleurs de 14 (1 à 10, Valet, Cavalier,
 Dame, Roi), 21 atouts et l'Excuse. Une donne : 18 cartes chacun et un chien de 6 ; les **enchères** une fois chacun,
 plus haut ou passe (Prise ×1, Garde ×2, Garde sans ×4, Garde contre ×6 ; tous passent : on redonne) ; pour Prise et
 Garde, le chien est montré, le preneur le prend et fait son **écart** de 6 (ni Roi ni bout ; un atout seulement s'il

@@ -143,12 +143,29 @@ secrets, du développement testable en local sans aucune clé.
     fiche AMO publique. Limites : sous Windows et macOS, Chrome n'accepte que le zip en mode développeur (sans mise à
     jour automatique) ; Firefox n'installe durablement qu'un `.xpi` signé, ce qui demande des clés d'API AMO (compte
     Mozilla gratuit, sans publication) ; sans elles, le `.xpi` n'est installable que temporairement. CI comme `jethub` :
-    runners hébergés par GitHub (`ubuntu-26.04`), workflows `ci.yml` et `release.yml` repris. **Clés Mozilla** : les
-    mêmes que `jethub` (décidé avec l'utilisateur le 2026-11-19) ; les secrets GitHub ne se relisent pas, leurs valeurs
-    viennent du Developer Hub d'AMO (`MANQUES.md`). **Clé CRX : une nouvelle**, jamais celle de `jethub` : la clé fixe
+    runners hébergés par GitHub (`ubuntu-26.04`), workflows `ci.yml` et `release.yml` repris. **Clés Mozilla** :
+    celles de Slopesque, créées pour lui sur le Developer Hub d'AMO (décidé le 2026-11-20 : plus de dépendance à
+    `jethub` ; méthode dans `MANQUES.md`). **Clé CRX : une nouvelle**, jamais celle de `jethub` : la clé fixe
     l'identifiant de l'extension, deux extensions avec la même clé auraient le même identifiant et ne pourraient pas
     être installées ensemble. Générée en local (`openssl`), gardée dans `.env` et dans le secret `CHROME_CRX_KEY`.
 
+
+18. **Revue des specs du 2026-11-20** (décidé avec l'utilisateur) :
+    - Images d'un sondage gardées le temps du sondage + 1 h (jamais effacées avant sa fin) ; favoris GIF : 200.
+    - « Reprendre un compte » sans Redis : 3 min d'attente après chaque code inconnu (au lieu de 3 essais puis 5 min).
+    - Changer d'activité pendant un tour l'**annule** (dit dans le chat) ; un redémarrage du serveur pendant une partie
+      l'annule aussi, la remet à son début et le dit dans une fenêtre « Partie perdue ».
+    - Roulette : le résultat est celui du serveur ; l'animation part à l'heure du serveur (décalage d'horloge corrigé).
+    - Deux joueurs peuvent avoir la même couleur (leur choix) ; un joueur ne quitte jamais un salon (il est absent) :
+      le palmarès le garde ; seul un admin efface un joueur (`accounts:delete`, `ADMIN.md`).
+    - Aperçu de lien : au-delà de 7 jours, son texte reste, son image non.
+    - Journal d'admin : les actions d'un admin et les changements de code (jamais les parties, les messages, un code).
+    - Alerte dans le journal du serveur dès 90 % de place ; refus des images à 98 %.
+    - Cartes : pas de Tarot à 3 (des robots complètent) ; pas de paris pour l'instant ; le temps par tour, c'est /kick
+      (un robot prend la place) ; Tarot complet (Petit au bout, poignées, chelem) et robots de niveau réglable.
+    - Versions : le serveur refuse une extension plus ancienne que `MIN_EXTENSION_VERSION`, avec le lien de la
+      dernière release (`EXTENSION_DOWNLOAD_URL`) ; la version de l'extension est montrée dans l'onglet Extension.
+    - Le dépôt ne nomme jamais la machine : alias SSH et compte de déploiement dans le `.env` de l'utilisateur.
 
 ## Risks / Trade-offs
 
@@ -183,8 +200,8 @@ secrets, du développement testable en local sans aucune clé.
 
 1. **Certificat** (bloque seulement le chiffrement en production) : la V1 démarre en clair (`ALLOW_INSECURE=true`, le
    panneau le dit) ; le choix sslip.io / certificat d'IP se fera quand l'utilisateur aura tranché (ports 80 / 443).
-2. ~~Clés AMO~~ → décidé : celles de `jethub` (décision 17).
-3. ~~Accès de déploiement~~ → décidé : `pnpm deploy` lancé par l'utilisateur ; CI sur les runners GitHub, comme
+2. ~~Clés AMO~~ → décidé : des clés propres à Slopesque (décision 17, revue le 2026-11-20).
+3. ~~Accès de déploiement~~ → décidé : `pnpm deploy:prod` lancé par l'utilisateur (alias SSH et compte dans son `.env`, jamais dans le dépôt) ; CI sur les runners GitHub, comme
    `jethub` (décision 17).
 4. Les questions de règles de jeu de `define-game-concept` (1, 2, 5, 6, 8, 9, 12, 14 à 20) et la question 21 (compte)
    restent ouvertes ; elles ne bloquent pas le socle, et les choix provisoires de la maquette s'appliquent en attendant.

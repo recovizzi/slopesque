@@ -6,11 +6,23 @@ import { spawnSync } from 'node:child_process';
 import { readEnv, ROOT } from './env.mjs';
 import { join } from 'node:path';
 
+// The machine is named only in your .env (git-ignored): its SSH alias, the deploy account. Never in the repository.
 const { env } = readEnv();
-const host = process.env.DEPLOY_SSH_HOST || env.DEPLOY_SSH_HOST ;
-const user = process.env.DEPLOY_USER || env.DEPLOY_USER ;
+const host = process.env.DEPLOY_SSH_HOST || env.DEPLOY_SSH_HOST;
+const user = process.env.DEPLOY_USER || env.DEPLOY_USER;
 const dir = process.env.DEPLOY_DIR || env.DEPLOY_DIR || 'slopesque';
+if (!host || !user) { console.error('Il manque DEPLOY_SSH_HOST (ton alias SSH) ou DEPLOY_USER (le compte de déploiement) dans ton .env.'); process.exit(1); }
 const run = (cmd, args) => { const r = spawnSync(cmd, args, { stdio: 'inherit' }); if (r.status !== 0) { console.error(`Échec : ${cmd} ${args.join(' ')}`); process.exit(r.status ?? 1); } };
+const quote = s => `'${String(s).replace(/'/g, `'"'"'`)}'`;
+
+// `pnpm prod:admin <commande> [options]`: an admin command in the server's container on the machine (see ADMIN.md)
+if (process.argv[2] === 'admin') {
+  const args = process.argv.slice(3).map(quote).join(' ');
+  if (!args) { console.error('Usage : pnpm prod:admin <commande> [options] (pnpm prod:admin help pour la liste)'); process.exit(1); }
+  const inner = `cd ~/${dir}/infra && docker compose -f docker-compose.prod.yml --env-file .env exec -T server admin ${args}`;
+  run('ssh', ['-t', host, `sudo -iu ${user} sh -c ${quote(inner)}`]);
+  process.exit(0);
+}
 
 console.log(`Déploiement sur ${host} (compte ${user}, dossier ~${user}/${dir}). Aucune sauvegarde n'est faite.`);
 run('scp', [join(ROOT, 'infra/docker-compose.prod.yml'), `${host}:/tmp/slopesque-compose.yml`]);

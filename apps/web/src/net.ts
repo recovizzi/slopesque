@@ -1,30 +1,32 @@
 // The connection to the server (openspec: realtime-sync): Socket.IO with my code in `auth`, reconnection from 0.5 s to
 // 10 s, the room joined again after each reconnection (full state), events applied in order.
 import { io, type Socket } from 'socket.io-client';
-import { PROTOCOL_VERSION, type Ack, type UploadResult, type EffectView, type FatalReason, type GifRef, type Hello, type IntentName, type IntentResults, type RoomState, type SequencedEvent } from '@slopesque/shared';
+import { PROTOCOL_VERSION, type Ack, type UploadResult, type EffectView, type FatalReason, type ServerVersions, type GifRef, type Hello, type IntentName, type IntentResults, type RoomState, type SequencedEvent } from '@slopesque/shared';
 import { useStore } from './store';
+import { EXT_VERSION } from './version';
 import { playEffect } from './fx';
 import { loadChat, mergeChat, saveChat } from './lib/chat-cache';
 
 let socket: Socket | null = null;
-const FATAL: FatalReason[] = ['protocol', 'code', 'retired', 'replaced'];
+const FATAL: FatalReason[] = ['protocol', 'outdated', 'code', 'retired', 'replaced'];
 
 export function connect() {
   const { device, set } = useStore.getState();
   socket?.close();
   if (!device.code) return;
   set({ conn: 'connecting', fatal: null });
-  const s = io(device.server, { auth: { code: device.code, protocol: PROTOCOL_VERSION }, transports: ['websocket'],
+  const s = io(device.server, { auth: { code: device.code, protocol: PROTOCOL_VERSION, version: EXT_VERSION }, transports: ['websocket'],
     reconnectionDelay: 500, reconnectionDelayMax: 10_000, timeout: 8000 });
   socket = s;
   s.on('hello', async (h: Hello) => {
-    set({ account: h.account, insecure: h.insecure, clockSkew: h.serverTime - Date.now() });
+    set({ account: h.account, insecure: h.insecure, clockSkew: h.serverTime - Date.now(), versions: h.server });
     const key = useStore.getState().device.roomKey;
     if (key) await join(key, true);   // « Reconnexion… » stays until the room is joined again (nothing sent before)
     set({ conn: 'ok' });
   });
-  s.on('connect_error', (e: Error & { data?: { reason?: FatalReason } }) => {
+  s.on('connect_error', (e: Error & { data?: { reason?: FatalReason } & Partial<ServerVersions> }) => {
     const reason = e.data?.reason;
+    if (e.data?.download) set({ versions: { version: e.data.version ?? '?', minExtension: e.data.minExtension ?? '?', download: e.data.download } });   // where to update
     if (reason && FATAL.includes(reason)) { s.close(); set({ conn: 'idle', fatal: reason }); return; }
     if (reason === 'limited') set({ fatal: 'limited' });
     const st = useStore.getState();
@@ -122,7 +124,7 @@ export function toggleGifFavorite(g: GifRef) {
   const st = useStore.getState(), acc = st.account;
   if (!acc) return;
   const list = acc.gifFavorites ?? [], on = list.some(x => x.id === g.id);
-  const next = on ? list.filter(x => x.id !== g.id) : [g, ...list].slice(0, 500);
+  const next = on ? list.filter(x => x.id !== g.id) : [g, ...list].slice(0, 200);   // the server keeps 200
   st.set({ account: { ...acc, gifFavorites: next } });
   void request('gif:favorites', { favorites: next });
 }

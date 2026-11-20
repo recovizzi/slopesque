@@ -73,3 +73,8 @@ et RustFS restent sur le réseau interne de Docker.
 ## Licence
 
 [MIT](LICENSE).
+
+## Administrer le serveur
+
+Voir [ADMIN.md](ADMIN.md) : les commandes d'admin (salons, comptes, modération, place), et `pnpm prod:admin <commande>`
+pour les lancer sur la machine du projet depuis ton ordinateur.

@@ -185,7 +185,7 @@ export function WheelStage() {
   const shown = role === 'host' && wv.phase === 'writing' ? items : wv.spin && wv.phase !== 'writing' ? wv.spin.items : wv.items;
   useEffect(() => {
     wheel.current?.setItems(shown, wv.phase === 'result' && wv.spin ? wv.spin.winner : null);
-    wheel.current?.setSpin(wv.phase === 'writing' ? null : (wv.spin as W.Spin | null));
+    wheel.current?.setSpin(wv.phase === 'writing' ? null : (wv.spin as W.Spin | null), useStore.getState().clockSkew);
   });
   const [note, setNote] = useState('');
   const change = (next: W.WheelItem[]) => { setItems(next); void request('wheel:set', { items: next }); };

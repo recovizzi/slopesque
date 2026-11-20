@@ -29,6 +29,17 @@ export class StorageService implements OnModuleInit {
     if (!this.s3) { this.log.warn('non configuré : images indisponibles'); return; }
     await this.check();
     if (!this.reachable) this.log.warn('injoignable : images indisponibles, nouvel essai à chaque contrôle de santé');
+    // the place taken: a warning in the log from 90 % (the admin cleans up before the refusals at 98 %), every hour
+    setTimeout(() => void this.watch(), 30_000).unref();
+    setInterval(() => void this.watch(), 60 * 60_000).unref();
+  }
+
+  private async watch() {
+    try {
+      const u = await this.usage(), pct = `${(u.ratio * 100).toFixed(1)} %`;
+      if (u.level === 'full') this.log.error(`place pleine (${pct}) : les nouvelles images sont refusées. Fais du ménage : admin media:stats, puis media:delete ou purge:run (voir ADMIN.md).`);
+      else if (u.level === 'warn') this.log.warn(`place presque pleine (${pct}) : fais du ménage avant le refus des images à 98 % (admin media:stats, voir ADMIN.md).`);
+    } catch { /* RustFS down: said by its own checks */ }
   }
 
   /** Can we reach RustFS (and are the buckets there)? Makes them when missing. */

@@ -18,7 +18,7 @@ export interface GifSource {
 export const PER_PAGE = 24;
 export const SEARCH_DELAY = 400;   // ms without typing before a search is sent
 export const MIN_QUERY = 2;
-export const MAX_RECENT = 50, MAX_FAVORITES = 500;
+export const MAX_RECENT = 50, MAX_FAVORITES = 200;   // the server keeps 200 favourites
 const LOAD_AHEAD = 300;            // px from the bottom of the list: the next page is asked for
 
 /** Recent GIFs: the one sent goes first, once, MAX_RECENT at most. */

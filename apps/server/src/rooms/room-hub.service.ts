@@ -24,7 +24,7 @@ interface MemberRt { sockets: Set<string>; awaySince: number | null; grace: Node
 interface PollRt { phase: PollView['phase']; round: number; seconds: number; secret: boolean; poll: PollView['poll']; answers: Record<string, PollAnswer>; host: string | null; deadline: number | null; timer: NodeJS.Timeout | null }
 interface WheelRt { phase: WheelView['phase']; items: WheelView['items']; spin: WheelView['spin']; needle: number; round: number; timer: NodeJS.Timeout | null }
 interface CardsRt { game: 'tdc' | 'tarot'; players: number; settings: { tdc: number; tarot: number }; showTricks: boolean; tarot: Tarot.Tarot | null; settled: boolean; seats: Table.CardSeat[]; tdc: Tdc.Tdc | null; paid: Record<string, string | null>; turnSince: number; robot: NodeJS.Timeout | null; late: NodeJS.Timeout | null; art: Record<string, string> }
-interface RoomRt { cards: CardsRt; room: Room; seq: number; members: Map<string, MemberRt>; vote: { id: number; v: Vote; timer: NodeJS.Timeout } | null; disk: D.DiskState; diskTimer: NodeJS.Timeout | null; poll: PollRt; wheel: WheelRt; fx: Record<string, number[]> }
+interface RoomRt { cards: CardsRt; room: Room; seq: number; members: Map<string, MemberRt>; vote: { id: number; v: Vote; timer: NodeJS.Timeout } | null; disk: D.DiskState; diskTimer: NodeJS.Timeout | null; poll: PollRt; wheel: WheelRt; fx: Record<string, number[]>; notice: { id: string; title: string; text: string; at: number } | null }
 export interface SocketData { account: Account; ip: string; roomId: string | null }
 
 @Injectable()
@@ -50,10 +50,59 @@ export class RoomHub implements OnModuleInit {
     const ws = (room.rules.wheel ?? {}) as { items?: WheelView['items']; needle?: number; round?: number };
     const rt: RoomRt = { cards: { game: 'tdc', players: 4, settings: { tdc: 4, tarot: 4, ...((room.rules.cards as object | undefined) ?? {}) }, showTricks: true, tarot: null, settled: false, seats: [], tdc: null, paid: {}, turnSince: 0, robot: null, late: null, art: {} }, room, seq: 0, members: new Map(), vote: null, disk, diskTimer: null,
       poll: { phase: 'writing', round: ps.round ?? 1, seconds: ps.seconds ?? 300, secret: ps.secret ?? false, poll: null, answers: {}, host: null, deadline: null, timer: null },
-      wheel: { phase: 'writing', items: ws.items ?? [{ label: '', weight: '' }, { label: '', weight: '' }], spin: null, needle: ws.needle ?? 0, round: ws.round ?? 1, timer: null }, fx: {} };
+      wheel: { phase: 'writing', items: ws.items ?? [{ label: '', weight: '' }, { label: '', weight: '' }], spin: null, needle: ws.needle ?? 0, round: ws.round ?? 1, timer: null }, fx: {}, notice: null };
     for (const a of await this.db.select().from(trumpArt).where(eq(trumpArt.roomId, room.id))) rt.cards.art[a.card] = a.mediaId;   // the trumps' pictures
-    if (saved.guessing) { await this.saveDisk(rt); await this.chat.send(room.id, null, 'Le serveur a redémarré : tour annulé.', null, 'system'); }
+    // a game running when the server stopped: cancelled, back to its first step, said in the chat and in a window
+    const live = (room.rules.live ?? {}) as { cards?: string; poll?: string };
+    const lost = [saved.guessing ? 'le tour du Demi-disque' : '', live.poll ? 'le sondage' : '', live.cards ? (live.cards === 'tarot' ? 'la donne de Tarot' : 'la manche du Trou du cul') : ''].filter(Boolean);
+    if (saved.guessing) await this.saveDisk(rt);
+    if (live.cards || live.poll) await this.saveRules(rt, 'live', {});
+    if (lost.length) {
+      const what = lost.join(' et '), text = `Le serveur a redémarré pendant ${what} : ${lost.length > 1 ? 'ils sont annulés' : 'la partie est annulée'}. Tout reprend à son début ; l'hôte peut relancer.`;
+      rt.notice = { id: randomUUID(), title: 'Partie perdue', text, at: Date.now() };
+      await this.chat.send(room.id, null, `Le serveur a redémarré : ${what} en cours ${lost.length > 1 ? 'sont annulés' : 'est annulé(e)'}.`, null, 'system');
+    }
     return rt;
+  }
+
+  /** A game is running (its kind) or not (null): kept in the room's rules, to say it is lost after a restart. */
+  private async setLive(rt: RoomRt, what: 'cards' | 'poll', on: string | null) {
+    const live = { ...((rt.room.rules.live ?? {}) as Record<string, string>) };
+    if (on) live[what] = on; else delete live[what];
+    await this.saveRules(rt, 'live', live);
+  }
+
+  /** The activity changes during a round: the rounds of the other activities are cancelled (the host's choice, said in
+   *  the chat); the activity chosen keeps its own (a round that just started switches to its activity). */
+  private async cancelRunning(rt: RoomRt, to: ActivityChoice) {
+    const lost: string[] = [];
+    if (rt.disk.phase === 'guessing' && to.activity !== 'disk') {
+      if (rt.diskTimer) { clearTimeout(rt.diskTimer); rt.diskTimer = null; }
+      rt.disk = { ...D.newDisk({ ...rt.disk.rules, ...rt.disk.pending }), round: rt.disk.round, phase: 'writing' };
+      await this.saveDisk(rt); await this.emitDisk(rt);
+      lost.push('le tour du Demi-disque');
+    }
+    if (rt.poll.phase === 'open' && to.activity !== 'poll') {
+      if (rt.poll.timer) clearTimeout(rt.poll.timer);
+      rt.poll = { ...rt.poll, phase: 'writing', poll: null, answers: {}, host: null, deadline: null, timer: null };
+      await this.setLive(rt, 'poll', null); await this.emitPoll(rt);
+      lost.push('le sondage');
+    }
+    if (rt.wheel.phase === 'spinning' && to.activity !== 'wheel') {
+      if (rt.wheel.timer) clearTimeout(rt.wheel.timer);
+      rt.wheel = { ...rt.wheel, phase: 'writing', spin: null, timer: null };
+      this.emitWheel(rt);
+      lost.push('le tirage');
+    }
+    if (this.inRound(rt) && (to.activity !== 'cards' || (to.cardGame ?? 'tdc') !== rt.cards.game)) {
+      const c = rt.cards;
+      if (c.robot) { clearTimeout(c.robot); c.robot = null; }
+      if (c.late) { clearTimeout(c.late); c.late = null; }
+      lost.push(c.game === 'tarot' ? 'la donne de Tarot' : 'la manche du Trou du cul');
+      c.tdc = null; c.tarot = null; c.paid = {}; c.settled = false;
+      await this.setLive(rt, 'cards', null); await this.emitCards(rt);
+    }
+    return lost;
   }
 
   // ---------------------------------------------------------------- join / leave
@@ -115,7 +164,8 @@ export class RoomHub implements OnModuleInit {
   async state(rt: RoomRt, me: string, after?: number): Promise<RoomState> {
     return { seq: rt.seq, room: { key: rt.room.key, name: rt.room.name, createdAt: rt.room.createdAt.getTime() }, me, hostId: rt.room.hostId,
       members: await this.members(rt), chat: after ? await this.chat.since(rt.room.id, rt.room.createdAt, after) : await this.chat.page(rt.room.id, rt.room.createdAt), serverTime: Date.now(),
-      stickers: await this.stickerViews(rt), emoji: await this.emojiViews(rt), activity: this.activity(rt), scope: this.scope(rt), disk: D.diskView(rt.disk, me),
+      stickers: await this.stickerViews(rt), emoji: await this.emojiViews(rt), activity: this.activity(rt), scope: this.scope(rt),
+      notice: rt.notice && Date.now() - rt.notice.at < 30 * 60_000 ? { id: rt.notice.id, title: rt.notice.title, text: rt.notice.text } : null, disk: D.diskView(rt.disk, me),
       poll: this.pollView(rt, me), wheel: this.wheelView(rt), cards: this.cardsView(rt, me), web: (rt.room.rules.web as Record<string, string> | undefined) ?? {} };
   }
 
@@ -269,6 +319,11 @@ export class RoomHub implements OnModuleInit {
   scope(rt: RoomRt) { return `${this.activity(rt).activity}#${(rt.room.rules.scope as number | undefined) ?? 0}`; }
 
   private async setActivity(rt: RoomRt, choice: ActivityChoice) {
+    const before = this.activity(rt);
+    if (before.activity !== choice.activity || (choice.activity === 'cards' && (before.cardGame ?? 'tdc') !== (choice.cardGame ?? 'tdc'))) {
+      const lost = await this.cancelRunning(rt, choice);
+      if (lost.length) await this.say(rt, null, `Changement d'activité : ${lost.join(' et ')} en cours ${lost.length > 1 ? 'sont annulés' : 'est annulé(e)'}.`, null, true);
+    }
     if (choice.cardGame === 'tarot' && choice.tarotPlayers) rt.cards.settings = { ...rt.cards.settings, tarot: choice.tarotPlayers };
     if (choice.activity === 'cards') this.prepareTable(rt, choice.cardGame === 'tarot' ? 'tarot' : 'tdc');
     if (choice.activity === 'disk' && choice.mode && choice.mode !== { ...rt.disk.rules, ...rt.disk.pending }.mode) {   // the format chosen: its voting mode
@@ -276,9 +331,8 @@ export class RoomHub implements OnModuleInit {
       await this.saveDisk(rt);
       await this.emitDisk(rt);
     }
-    const rules = { ...rt.room.rules, activity: choice, scope: ((rt.room.rules.scope as number | undefined) ?? 0) + 1 };   // a new session
-    await this.db.update(rooms).set({ rules }).where(eq(rooms.id, rt.room.id));
-    rt.room = { ...rt.room, rules };
+    rt.room = { ...rt.room, rules: { ...rt.room.rules, activity: choice, scope: ((rt.room.rules.scope as number | undefined) ?? 0) + 1 } };   // a new session
+    await this.db.update(rooms).set({ rules: rt.room.rules }).where(eq(rooms.id, rt.room.id));
     this.emit(rt, { type: 'activity', activity: choice, scope: this.scope(rt) });
     if (choice.activity === 'cards') await this.emitCards(rt);
   }
@@ -403,9 +457,7 @@ export class RoomHub implements OnModuleInit {
     for (const s of await this.io.in(`room:${rt.room.id}`).fetchSockets()) s.emit('event', { type: 'disk', disk: D.diskView(rt.disk, (s.data as SocketData).account.id), seq: rt.seq });
   }
   private async saveDisk(rt: RoomRt) {
-    const rules = { ...rt.room.rules, disk: { rules: { ...rt.disk.rules, ...rt.disk.pending }, round: rt.disk.round, guessing: rt.disk.phase === 'guessing' } };
-    await this.db.update(rooms).set({ rules }).where(eq(rooms.id, rt.room.id));
-    rt.room = { ...rt.room, rules };
+    await this.saveRules(rt, 'disk', { rules: { ...rt.disk.rules, ...rt.disk.pending }, round: rt.disk.round, guessing: rt.disk.phase === 'guessing' });
   }
   private hostOnly(rt: RoomRt, socket: Socket) { if (rt.room.hostId !== (socket.data as SocketData).account.id) throw new UserError('Seul l\'hôte peut faire ça.'); }
   private wrap<T>(f: () => T): T { try { return f(); } catch (e) { if (e instanceof D.DiskError) throw new UserError(e.message); throw e; } }
@@ -519,10 +571,11 @@ export class RoomHub implements OnModuleInit {
     rt.seq++;
     for (const s of await this.io.in(`room:${rt.room.id}`).fetchSockets()) s.emit('event', { type: 'poll', poll: this.pollView(rt, (s.data as SocketData).account.id), seq: rt.seq });
   }
+  /** A part of the room's rules changed: in memory first, then the whole of them written — two writes at the same
+   *  time can't put back an older copy (each writes the latest). */
   private async saveRules(rt: RoomRt, key: string, value: unknown) {
-    const rules = { ...rt.room.rules, [key]: value };
-    await this.db.update(rooms).set({ rules }).where(eq(rooms.id, rt.room.id));
-    rt.room = { ...rt.room, rules };
+    rt.room = { ...rt.room, rules: { ...rt.room.rules, [key]: value } };
+    await this.db.update(rooms).set({ rules: rt.room.rules }).where(eq(rooms.id, rt.room.id));
   }
   private async playingIds(rt: RoomRt) { return new Set((await this.db.select({ id: roomMembers.accountId }).from(roomMembers).where(and(eq(roomMembers.roomId, rt.room.id), eq(roomMembers.playing, true)))).map(r => r.id)); }
 
@@ -557,6 +610,8 @@ export class RoomHub implements OnModuleInit {
     if (this.activity(rt).activity !== 'poll') await this.setActivity(rt, { activity: 'poll' });
     rt.poll = { ...rt.poll, phase: 'open', poll: draft, answers: {}, host: rt.room.hostId, deadline: Date.now() + rt.poll.seconds * 1000, timer: null };
     rt.poll.timer = setTimeout(() => void this.pollClose(rt), rt.poll.seconds * 1000);
+    await this.setLive(rt, 'poll', v.question);
+    await this.media.keepFor(v.pics.flatMap(p => (p?.mediaId ? [p.mediaId] : [])), rt.poll.seconds * 1000);   // not swept before the poll's end
     await this.say(rt, null, `Sondage ${rt.poll.round} : « ${v.question} »`);
     await this.emitPoll(rt);
   }
@@ -581,6 +636,7 @@ export class RoomHub implements OnModuleInit {
     if (rt.poll.phase !== 'open') return;
     if (rt.poll.timer) clearTimeout(rt.poll.timer);
     rt.poll = { ...rt.poll, phase: 'results', deadline: null, timer: null };
+    await this.setLive(rt, 'poll', null);
     const n = Object.keys(rt.poll.answers).length;
     await this.say(rt, null, `Sondage terminé : ${n} réponse${n > 1 ? 's' : ''}.`);
     await this.emitPoll(rt);
@@ -709,6 +765,7 @@ export class RoomHub implements OnModuleInit {
     const names = new Map<string, string>();
     for (const s of c.seats) names.set(s.id, await this.seatName(rt, s.id));
     c.tdc = Tdc.deal(c.seats.map(s => s.id), fresh ? null : c.tdc, id => names.get(id) ?? '?');
+    await this.setLive(rt, 'cards', 'tdc');
     c.settled = false;
     c.turnSince = Date.now();
     if (this.activity(rt).activity !== 'cards') await this.setActivity(rt, { activity: 'cards', cardGame: 'tdc' });
@@ -739,6 +796,7 @@ export class RoomHub implements OnModuleInit {
     if (c.late) { clearTimeout(c.late); c.late = null; }
     if (t.turn === null && !c.settled) {   // the round's end, counted once
       c.settled = true;
+      await this.setLive(rt, 'cards', null);
       for (const sid of t.out) {
         const uid = c.seats.find(s => s.id === sid)?.credit ?? null, role = t.roles[sid]!;
         c.paid[sid] = uid;
@@ -826,6 +884,7 @@ export class RoomHub implements OnModuleInit {
     c.seats = c.seats.map(s => ({ ...s, credit: s.user }));
     c.paid = {}; c.settled = false;
     c.tarot = Tarot.deal(c.seats.map(s => s.id), c.tarot);
+    await this.setLive(rt, 'cards', 'tarot');
     c.turnSince = Date.now();
     const names = [];
     for (const s of c.tarot.seats) names.push(await this.seatName(rt, s));
@@ -866,6 +925,7 @@ export class RoomHub implements OnModuleInit {
     if (c.late) { clearTimeout(c.late); c.late = null; }
     if (t.phase === 'done' && t.result && !c.settled) {
       c.settled = true;
+      await this.setLive(rt, 'cards', null);
       const r = t.result;
       for (const sid of t.seats) {
         const uid = c.seats.find(s => s.id === sid)?.credit ?? null, mark = r.marks[sid] ?? 0;

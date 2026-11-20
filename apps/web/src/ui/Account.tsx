@@ -57,7 +57,8 @@ export type CodeMode = 'renew' | 'resume' | 'new';
 export function CodeModal({ first, start, onClose, onDone }: { first: boolean; start: CodeMode | null; onClose: () => void; onDone: () => void }) {
   const { device, setDevice, account, set } = useStore();
   const [mode, setMode] = useState<CodeMode | null>(start);
-  const [code, setCode] = useState(start === 'new' && first ? device.code || newCode() : start && start !== 'resume' ? newCode() : '');
+  // the first launch keeps the code drawn on the welcome page; after a replaced code (fatal), a new one is drawn
+  const [code, setCode] = useState(start === 'new' && first && !useStore.getState().fatal ? device.code || newCode() : start && start !== 'resume' ? newCode() : '');
   const [step, setStep] = useState<'edit' | 'confirm'>('edit');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -100,7 +101,7 @@ export function CodeModal({ first, start, onClose, onDone }: { first: boolean; s
     const r = await checkCode(device.server, code, mode === 'resume');
     setBusy(false);
     if (!r.ok) { setError(r.error); return; }
-    const left = r.value.triesLeft ? ` Encore ${r.value.triesLeft} essai${r.value.triesLeft > 1 ? 's' : ''} avant 5 min d'attente.` : '';
+    const left = r.value.triesLeft ? ` Encore ${r.value.triesLeft} essai${r.value.triesLeft > 1 ? 's' : ''} avant 5 min d'attente.` : r.value.retryIn ? ` Prochain essai dans ${Math.round(r.value.retryIn / 60000)} min.` : '';
     if (r.value.retired) setError(mode === 'resume' ? `Ce code a été remplacé : tape le nouveau (Profil → Compte sur ton autre appareil).${left}` : 'Ce code est déjà pris : choisis-en un autre.');
     else if (mode === 'resume' && !r.value.exists) setError(`Aucun compte avec ce code sur ce serveur. Recopie-le depuis ton autre appareil (Profil → Compte).${left}`);
     else if (mode !== 'resume' && r.value.exists) setError('Ce code est déjà pris : choisis-en un autre, ou « Reprendre un compte existant » si c\'est le tien.');

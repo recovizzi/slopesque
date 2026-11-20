@@ -21,7 +21,7 @@ describe.skipIf(!up)('a code to take an account back', () => {
     server = spawn(process.execPath, ['dist/main.js'], { env, stdio: 'inherit' });
     for (let i = 0; i < 50; i++) { try { if ((await fetch(`${URL}/api/health`)).ok) break; } catch { /* starting */ } await new Promise(r => setTimeout(r, 200)); }
     mine = newCode();
-    const s = io(URL, { auth: { code: mine, protocol: PROTOCOL_VERSION }, transports: ['websocket'], forceNew: true });   // the account exists
+    const s = io(URL, { auth: { code: mine, protocol: PROTOCOL_VERSION, version: '0.1.0' }, transports: ['websocket'], forceNew: true });   // the account exists
     await new Promise(r => s.once('hello', r));
     s.close();
   }, 20_000);

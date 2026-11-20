@@ -9,7 +9,7 @@ import { eq } from 'drizzle-orm';
 import { newCode, normalizeKey } from '@slopesque/engines';
 import { CoreModule } from './app.module.js';
 import { DB, type Db } from './db/db.module.js';
-import { accounts, adminLog, customEmoji, media, messages, roomMembers, stickers, trumpArt } from './db/schema.js';
+import { accounts, adminLog, customEmoji, media, messages, palmares, roomMembers, stickers, trumpArt } from './db/schema.js';
 import { and, sql } from 'drizzle-orm';
 import { MediaService } from './media/media.service.js';
 import { AccountsService } from './accounts/accounts.service.js';
@@ -27,6 +27,7 @@ const HELP: Record<string, [string, string]> = {
   'accounts:find': ['[--name …] [--room XXXX-XXXX] [--seen-after AAAA-MM-JJ]', 'comptes correspondants (uuid, pseudos, salons, dates), jamais de code'],
   'accounts:show': ['<uuid>', 'le détail d\'un compte'],
   'accounts:reset-code': ['<uuid> [--yes]', 'donne au compte un code tiré au hasard, affiché une seule fois ; l\'ancien est retiré'],
+  'accounts:delete': ['<uuid> | --code XXXX-XXXX-XXXX-XXXX [--yes]', 'efface un joueur et tout ce qui le concerne : compte, places dans les salons, messages, palmarès (définitif)'],
   'credit:reset': ['<clé> [--account <uuid>] [--yes]', 'remet à zéro le crédit social d\'un joueur, ou de tout le salon'],
   'messages:delete': ['<id> [--yes]', 'retire un message (modération) : « Message retiré par un admin »'],
   'media:delete': ['<id> [--yes]', 'retire une image, un sticker ou un emoji (modération), partout où il sert'],
@@ -123,6 +124,22 @@ try {
       console.log(`Nouveau code de ${a.name} (affiché une seule fois, à transmettre) :\n\n    ${fresh}\n`);
       break;
     }
+    case 'accounts:delete': {
+      const code = str('code');
+      const a = code ? await db.query.accounts.findFirst({ where: eq(accounts.codeHmac, accts.hmac(code)) })
+        : args[0] ? await db.query.accounts.findFirst({ where: eq(accounts.id, args[0]) }).catch(() => undefined) : undefined;
+      if (!a) throw new UserError(code ? 'Aucun compte avec ce code.' : 'Aucun compte avec cet uuid (ou --code XXXX-XXXX-XXXX-XXXX).');
+      const inRooms = (await db.select({ roomId: roomMembers.roomId }).from(roomMembers).where(eq(roomMembers.accountId, a.id))).map(r => r.roomId);
+      if (!(await confirm(`Effacer ${a.name} (${a.id}) : son compte, ses places dans ${inRooms.length} salon(s), ses messages et son palmarès ? Aucune sauvegarde : c'est définitif.`))) { console.log('Annulé.'); break; }
+      await rooms.notify({ type: 'code-reset', accountId: a.id });   // his panels disconnected
+      const msgs = await db.delete(messages).where(eq(messages.authorId, a.id)).returning({ id: messages.id });
+      const pal = await db.delete(palmares).where(sql`${palmares.data}->>'account' = ${a.id}`).returning({ id: palmares.id });
+      await db.delete(accounts).where(eq(accounts.id, a.id));   // his places, reactions, names follow (cascade); a room he hosted has no host
+      for (const roomId of inRooms) await rooms.notify({ type: 'members-changed', roomId });
+      await log(a.id, { rooms: inRooms.length, messages: msgs.length, palmares: pal.length });
+      console.log(`${a.name} effacé : ${inRooms.length} salon(s), ${msgs.length} message(s), ${pal.length} résultat(s) du palmarès. Sa photo part au prochain ménage (dans l'heure).`);
+      break;
+    }
     case 'credit:reset': {
       const room = await rooms.byKey(args[0] ?? '');
       if (!room) throw new UserError('Aucun salon avec cette clé.');
@@ -181,7 +198,7 @@ try {
       const cache = app.get(CacheService), storage = app.get(StorageService);
       await cache.onModuleInit();
       const s3 = await storage.check(), u = await storage.usage();
-      console.log(`Postgres : ok\nRedis : ${cache.state}\nRustFS : ${s3}\nGIF : ${['KLIPY_API_KEY', 'GIPHY_API_KEY', 'KLIPY_API_KEY_WITH_AD'].filter(k => process.env[k]).join(', ') || 'aucune clé'}\nPlace : ${(u.ratio * 100).toFixed(1)} % de ${(u.quotaBytes / 1024 ** 3).toFixed(0)} Go\nSauvegardes : aucune`);
+      console.log(`Postgres : ok\nRedis : ${cache.state}\nRustFS : ${s3}\nGIF : ${['KLIPY_API_KEY', 'GIPHY_API_KEY', 'KLIPY_API_KEY_WITH_AD'].filter(k => process.env[k]).join(', ') || 'aucune clé'}\nPlace : ${(u.ratio * 100).toFixed(1)} % de ${(u.quotaBytes / 1024 ** 3).toFixed(0)} Go${u.level === 'full' ? ' — PLEINE : les images sont refusées, fais du ménage' : u.level === 'warn' ? ' — attention : plus de 90 %, fais du ménage avant 98 %' : ''}\nSauvegardes : aucune`);
       break;
     }
   }

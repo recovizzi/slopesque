@@ -1,7 +1,7 @@
 // The app's state: the device's settings, the connection, my account, the room I'm in (its full state, then the
 // numbered events applied in order; a gap asks for the full state again).
 import { create } from 'zustand';
-import type { AccountView, ChatPage, FatalReason, MemberView, MessageView, RoomState, SequencedEvent } from '@slopesque/shared';
+import type { AccountView, ChatPage, FatalReason, MemberView, MessageView, RoomState, SequencedEvent, ServerVersions } from '@slopesque/shared';
 import { saveDevice, type Device } from './lib/device';
 
 export type Conn = 'idle' | 'connecting' | 'ok' | 'reconnecting' | 'offline';
@@ -17,6 +17,7 @@ interface State {
   room: RoomState | null;
   roomStatus: RoomStatus;
   clockSkew: number;                     // server time − my time (ms)
+  versions: ServerVersions | null;       // the server's version, the oldest extension it accepts, where to update
   note: string;                          // a short message under the chat (an error of mine)
   setDevice(p: Partial<Device>): void;
   set(p: Partial<Omit<State, 'set' | 'setDevice' | 'apply' | 'prependPage'>>): void;
@@ -29,7 +30,7 @@ const mapMessage = (list: MessageView[], id: number, f: (m: MessageView) => Mess
 
 export const useStore = create<State>((set, get) => ({
   device: { code: '', server: '', theme: 'auto', roomKey: '', recent: [], gifRecent: [] },
-  conn: 'idle', fatal: null, insecure: false, account: null, room: null, roomStatus: 'none', clockSkew: 0, note: '',
+  conn: 'idle', fatal: null, insecure: false, account: null, room: null, roomStatus: 'none', clockSkew: 0, versions: null, note: '',
   setDevice: p => { const device = { ...get().device, ...p }; set({ device }); void saveDevice(device); },
   set: p => set(p),
   apply: e => {

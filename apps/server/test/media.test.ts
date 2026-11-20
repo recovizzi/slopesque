@@ -29,7 +29,7 @@ describe.skipIf(!up)('pictures', () => {
     server = spawn(process.execPath, ['dist/main.js'], { env, stdio: 'inherit' });
     for (let i = 0; i < 50; i++) { try { if ((await fetch(`${URL}/api/health`)).ok) break; } catch { /* starting */ } await new Promise(r => setTimeout(r, 200)); }
     const key = admin('rooms:create').match(/[A-Z0-9]{4}-[A-Z0-9]{4}/)![0];
-    s = io(URL, { auth: { code: newCode(), protocol: PROTOCOL_VERSION }, transports: ['websocket'], forceNew: true });
+    s = io(URL, { auth: { code: newCode(), protocol: PROTOCOL_VERSION, version: '0.1.0' }, transports: ['websocket'], forceNew: true });
     await new Promise(r => s.once('hello', r));
     const j = await ask<RoomState>(s, 'room:join', { key });
     expect(j.ok).toBe(true);
@@ -58,7 +58,7 @@ describe.skipIf(!up)('pictures', () => {
     const big = await sharp(noise, { raw: { width: w, height: h, channels: 3 } }).png({ compressionLevel: 1 }).toBuffer();
     expect(big.length).toBeGreaterThan(15 * 1024 * 1024);
     const sizes: Record<string, number> = {};
-    const other = io(URL, { auth: { code: newCode(), protocol: PROTOCOL_VERSION }, transports: ['websocket'], forceNew: true });   // its own upload limit
+    const other = io(URL, { auth: { code: newCode(), protocol: PROTOCOL_VERSION, version: '0.1.0' }, transports: ['websocket'], forceNew: true });   // its own upload limit
     await new Promise(r => other.once('hello', r));
     for (const usage of ['chat', 'sticker', 'emoji', 'photo']) {
       const r = await send(other, usage, big);

@@ -1,8 +1,8 @@
 ## ADDED Requirements
 
 ### Requirement: Activité Roulette
-L'hôte MUST pouvoir choisir l'activité « Roulette » dans l'onglet Partie, comme « Demi-disque » et « Sondage ». Comme
-les autres règles, un changement d'activité pendant un tour en cours MUST attendre la fin de ce tour. Un tirage ne
+L'hôte MUST pouvoir choisir l'activité « Roulette » dans l'onglet Partie, comme « Demi-disque » et « Sondage ». Un changement
+d'activité pendant un tour en cours MUST l'annuler (sondage ouvert, tirage, tour, donne), et le dire dans le chat. Un tirage ne
 MUST pas rapporter de points.
 
 #### Scenario: Passer à la roulette

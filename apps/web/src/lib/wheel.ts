@@ -126,15 +126,16 @@ export class Wheel {
   }
 
   /** Spins the needle to the drawn angle, from `spin.at` (a player joining mid-draw sees it where it is); null leaves
-   *  it where it stopped. */
-  setSpin(spin: Spin | null) {
+   *  it where it stopped. `skew`: the server's time minus this device's (the start is the server's, whatever the clock
+   *  here; the result is the server's anyway). */
+  setSpin(spin: Spin | null, skew = 0) {
     if (spin === this.spin) return;
     this.spin = spin;
     cancelAnimationFrame(this.frame);
     if (!spin) return;
     const turn = TURNS * 360 + ((((spin.angle - spin.from) % 360) + 360) % 360);
     const step = () => {
-      const t = Math.min(1, (Date.now() - spin.at) / SPIN_MS);
+      const t = Math.min(1, (Date.now() + skew - spin.at) / SPIN_MS);
       this.turn(spin.from + turn * ease(Math.max(0, t)));
       this.svg.classList.toggle('is-spinning', t < 1);
       if (t < 1) this.frame = requestAnimationFrame(step);

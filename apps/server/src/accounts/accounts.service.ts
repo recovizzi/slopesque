@@ -7,7 +7,7 @@ import { canonicalCode, codeStrength, CODE_MIN_LEN } from '@slopesque/engines';
 import { KEY_ALPHABET, LIMITS, type AccountView, type FatalReason, type SavedRoom } from '@slopesque/shared';
 import { ENV, type Env } from '../config/config.module.js';
 import { DB, type Db } from '../db/db.module.js';
-import { accountNames, accounts, retiredCodes, roomMembers } from '../db/schema.js';
+import { accountNames, accounts, adminLog, retiredCodes, roomMembers } from '../db/schema.js';
 import { CacheService } from '../cache/cache.service.js';
 import { UserError } from '../errors.js';
 
@@ -18,6 +18,9 @@ const wait = (ms: number) => { const s = Math.ceil(ms / 1000), m = Math.floor(s 
 
 @Injectable()
 export class AccountsService {
+  /** Without Redis (« Reprendre un compte »): an address waits 3 min after each unknown code — still protected, never shared. */
+  private readonly slow = new Map<string, number>();
+
   constructor(@Inject(ENV) private readonly env: Env, @Inject(DB) private readonly db: Db, private readonly cache: CacheService) {}
 
   hmac(code: string) { return createHmac('sha256', this.env.CODE_HMAC_SECRET).update(canonicalCode(code)).digest('hex'); }
@@ -48,6 +51,7 @@ export class AccountsService {
    *  account back (resume): 3 wrong codes from an address, then 5 min to wait — even a right code waits. */
   async find(code: string, ip: string, resume = false) {
     const key = `code-resume:${ip}`, now = Date.now();
+    if (resume && this.cache.state !== 'ok') return this.findSlowly(code, ip, now);
     const fails = resume ? (await this.cache.get<{ n: number; until: number }>(key)) ?? { n: 0, until: 0 } : null;
     if (fails && fails.until > now) throw new UserError(`Trois codes inconnus : réessaie dans ${wait(fails.until - now)}.`);
     if (!(await this.cache.allow(`code:${ip}`, this.env.CODE_ATTEMPTS_PER_MINUTE, LIMITS.codeAttempts.perMs))) throw new UserError('Trop d\'essais : attends une minute.');
@@ -65,6 +69,17 @@ export class AccountsService {
     return { ...found, triesLeft: tries - n };
   }
 
+  /** Without Redis: each unknown code makes the address wait 3 min (LIMITS.codeResumeAlone), the right one never does. */
+  private async findSlowly(code: string, ip: string, now: number) {
+    const until = this.slow.get(ip) ?? 0;
+    if (until > now) throw new UserError(`Code inconnu : réessaie dans ${wait(until - now)}.`);
+    for (const [k, v] of this.slow) if (v < now) this.slow.delete(k);   // the old ones go
+    const h = this.hmac(code), a = await this.db.query.accounts.findFirst({ where: eq(accounts.codeHmac, h) });
+    const found = { exists: !!a, retired: !a && (await this.isRetired(h)), name: a?.name ?? null };
+    if (!a) { this.slow.set(ip, now + LIMITS.codeResumeAlone); return { ...found, retryIn: LIMITS.codeResumeAlone }; }
+    return found;
+  }
+
   /** « Renouveler mon code »: the same account under a new code; the old one retired. */
   async renew(id: string, code: string) {
     if (codeStrength(code).level < 2) throw new UserError(codeStrength(code).reason);
@@ -74,6 +89,7 @@ export class AccountsService {
     await this.db.transaction(async tx => {
       await tx.insert(retiredCodes).values({ codeHmac: me.codeHmac }).onConflictDoNothing();
       await tx.update(accounts).set({ codeHmac: h }).where(eq(accounts.id, id));
+      await tx.insert(adminLog).values({ command: 'account:renew', target: id });   // to follow a problem later (never a code)
     });
   }
 

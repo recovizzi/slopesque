@@ -40,7 +40,7 @@ révélation, réponses d'un sondage secret).
 La V1 MUST fonctionner avec **un seul processus serveur** : l'état des salons actifs vit en mémoire de ce processus,
 écrit dans Postgres à chaque fait durable (message, fin de tour, score, crédit, palmarès). Un redémarrage MUST garder
 le chat, les scores, le crédit social, le palmarès et les comptes ; un tour, une donne ou un vote en cours MUST être
-annulé et dit dans le chat (« Le serveur a redémarré : tour annulé »).
+annulé, remis à son début et dit dans le chat et dans une fenêtre « Partie perdue » (une fois par joueur).
 
 #### Scenario: Redémarrage pendant une donne
 - **WHEN** le serveur redémarre pendant une donne de Trou du cul

@@ -23,7 +23,8 @@ import type { ActivityChoice } from '@slopesque/shared';
 const QUICK = '\u{1F44D}\u{FE0F}';
 
 /** A message in short, for a quote (one line, cut by CSS). */
-function quoteHtml(q: { text: string; kind: string }, custom: CustomEmoji[]) {
+function quoteHtml(q: { text: string; kind: string; expired?: boolean }, custom: CustomEmoji[]) {
+  if (q.expired) return `📷 <i>Image expirée</i>${q.text ? ` · ${withCustom(esc(q.text), custom)}` : ''}`;   // a week old: deleted
   if ((q.kind === 'image' || q.kind === 'media') && q.text) return `📷 ${withCustom(esc(q.text), custom)}`;   // a picture with its text
   if (q.kind === 'image' || q.kind === 'media') return '📷 Image';
   if (q.kind === 'sticker' || q.kind === 'gif') return `${q.kind === 'gif' ? 'GIF' : 'Sticker'}${q.text ? ` · ${withCustom(esc(q.text), custom)}` : ''}`;
@@ -115,7 +116,7 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
       const p = q.from ? st.room?.members.find(x => x.id === q.from) : null;
       const who = p ? `<b style="color:${colorOf(p.hue)}">${esc(q.from === st.account?.id ? 'Toi' : p.name)}</b> ` : '';
       const media = m?.media;
-      const body = media ? (media.src ? `<img src="${esc(media.src)}" width="${media.w}" height="${media.h}" alt="">` : '<i>Image plus disponible</i>')
+      const body = media ? (media.src ? `<img src="${esc(media.src)}" width="${media.w}" height="${media.h}" alt="">` : media.kind === 'sticker' ? '<i>Sticker plus disponible</i>' : '📷 <i>Image expirée</i>')
         : q.kind === 'media' || q.kind === 'image' || q.kind === 'sticker' || q.kind === 'gif' ? quoteHtml(q, custom) : withCustom(esc(q.text), custom);
       return `<div class="msg-body">${who}${body}</div>`;
     });

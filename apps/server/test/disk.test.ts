@@ -12,7 +12,7 @@ const up = await new Promise<boolean>(res => { const s = net.connect(23432, 'loc
 const env = { ...process.env, PORT: String(PORT), PUBLIC_URL: URL, LOG_LEVEL: 'warn', CODE_ATTEMPTS_PER_MINUTE: '1000' };
 let server: ChildProcess;
 const ask = <T>(s: Socket, ev: string, body: unknown = {}) => s.emitWithAck(ev, body) as Promise<Ack<T>>;
-const connect = async () => { const s = io(URL, { auth: { code: newCode(), protocol: PROTOCOL_VERSION }, transports: ['websocket'], forceNew: true }); await new Promise(r => s.once('hello', r)); return s; };
+const connect = async () => { const s = io(URL, { auth: { code: newCode(), protocol: PROTOCOL_VERSION, version: '0.1.0' }, transports: ['websocket'], forceNew: true }); await new Promise(r => s.once('hello', r)); return s; };
 const disk = (s: Socket, f: (d: DiskView) => boolean) => new Promise<DiskView>(res => { const h = (e: { type: string; disk: DiskView }) => { if (e.type === 'disk' && f(e.disk)) { s.off('event', h); res(e.disk); } }; s.on('event', h); });
 
 describe.skipIf(!up)('Demi-disque', () => {

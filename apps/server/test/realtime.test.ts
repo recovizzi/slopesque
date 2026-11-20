@@ -13,7 +13,7 @@ const env = { ...process.env, PORT: String(PORT), PUBLIC_URL: URL, LOG_LEVEL: 'w
 let server: ChildProcess;
 
 const admin = (...args: string[]) => execFileSync(process.execPath, ['dist/admin.js', ...args], { env, encoding: 'utf8' });
-const connect = (code: string, protocol = PROTOCOL_VERSION) => io(URL, { auth: { code, protocol }, transports: ['websocket'], reconnection: false, forceNew: true });
+const connect = (code: string, protocol = PROTOCOL_VERSION, version: string | null = '0.1.0') => io(URL, { auth: { code, protocol, ...(version ? { version } : {}) }, transports: ['websocket'], reconnection: false, forceNew: true });
 const once = <T>(s: Socket, ev: string) => new Promise<T>(res => s.once(ev, res));
 const ask = <T>(s: Socket, ev: string, body: unknown = {}) => s.emitWithAck(ev, body) as Promise<Ack<T>>;
 const nextEvent = (s: Socket, type: string) => new Promise<SequencedEvent>(res => { const f = (e: SequencedEvent) => { if (e.type === type) { s.off('event', f); res(e); } }; s.on('event', f); });
@@ -32,6 +32,13 @@ describe.skipIf(!up)('realtime', () => {
     expect(((await once<Error & { data: { reason: string } }>(a, 'connect_error')).data).reason).toBe('protocol');
     const b = connect('ABC');
     expect(((await once<Error & { data: { reason: string } }>(b, 'connect_error')).data).reason).toBe('code');
+    // an extension older than the server accepts (or saying no version): refused, with where to update
+    for (const old of ['0.0.9', null]) {
+      const c = connect(newCode(), PROTOCOL_VERSION, old);
+      const e = (await once<Error & { data: { reason: string; download: string; minExtension: string } }>(c, 'connect_error')).data;
+      expect(e).toMatchObject({ reason: 'outdated', minExtension: '0.1.0' });
+      expect(e.download).toMatch(/^https:\/\//);
+    }
   });
 
   it('two players: join, the first hosts, messages, reply, reaction, renew, limits, deletion', async () => {
