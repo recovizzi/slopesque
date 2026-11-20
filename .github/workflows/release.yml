@@ -188,7 +188,7 @@ jobs:
     env:
       VERSION: ${{ needs.plan.outputs.version }}
     steps:
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         if: needs.extension.result == 'success'
         with:
           name: extension
