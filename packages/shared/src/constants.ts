@@ -32,7 +32,9 @@ export const LIMITS = {
   messages: { count: 10, perMs: 10_000 },
   reactions: { count: 20, perMs: 10_000 },
   uploads: { count: 30, perMs: MINUTE },
-  effects: { count: 6, perMs: 10_000 },   // /effet   // the 22 trumps of the Tarot imported at once
+  effects: { count: 6, perMs: 10_000 },   // /effet
+  joins: { count: 20, perMs: MINUTE },     // rooms entered (a key guessed)
+  gifs: { count: 40, perMs: MINUTE },      // GIF pages (the providers' quotas)   // the 22 trumps of the Tarot imported at once
   codeAttempts: { count: 10, perMs: MINUTE },   // unknown codes, per IP
   codeResume: { tries: 3, lockMs: 5 * MINUTE },   // « Reprendre un compte »: 3 unknown codes, then 5 min to wait (per IP)
   codeResumeAlone: 3 * MINUTE,   // … without Redis: 3 min after each unknown code

@@ -35,7 +35,8 @@ describe.skipIf(!up)('a code to take an account back', () => {
     expect(await check(newCode(), true)).toMatchObject({ ok: true, value: { triesLeft: 1 } });
     expect(await check(newCode(), true)).toMatchObject({ ok: false, error: 'Trois codes inconnus : réessaie dans 5 min.' });
     expect((await check(mine, true)).ok).toBe(false);   // locked: even the right code waits
-    expect((await check(newCode(), false)).ok).toBe(true);   // a new code checked as free: not concerned
+    expect((await check(newCode(), false)).ok).toBe(true);   // a new code checked as free: still possible (« Repartir de zéro »)
+    expect((await check(mine, false)).ok).toBe(false);       // … but an existing code isn't told while locked (a probe learns nothing)
     expect(await check(mine, true, `${from}9`)).toMatchObject({ ok: true, value: { exists: true } });   // another address
   });
 });

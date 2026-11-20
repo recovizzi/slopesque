@@ -38,6 +38,7 @@ export class AccountsService {
     }
     if (await this.isRetired(h)) return { reason: 'retired' };
     if (!(await this.cache.allow(`code:${ip}`, this.env.CODE_ATTEMPTS_PER_MINUTE, LIMITS.codeAttempts.perMs))) return { reason: 'limited' };
+    if (codeStrength(code).level < 2) return { reason: 'code' };   // a new account: never under a weak code
     const name = `Joueur ${[...crypto.getRandomValues(new Uint32Array(3))].map(v => KEY_ALPHABET[v % KEY_ALPHABET.length]).join('')}`;
     const [account] = await this.db.insert(accounts).values({ codeHmac: h, name }).onConflictDoNothing().returning();
     return account ? { account } : this.authenticate(code, ip);   // made at the same moment by another connection
@@ -52,14 +53,18 @@ export class AccountsService {
   async find(code: string, ip: string, resume = false) {
     const key = `code-resume:${ip}`, now = Date.now();
     if (resume && this.cache.state !== 'ok') return this.findSlowly(code, ip, now);
-    const fails = resume ? (await this.cache.get<{ n: number; until: number }>(key)) ?? { n: 0, until: 0 } : null;
-    if (fails && fails.until > now) throw new UserError(`Trois codes inconnus : réessaie dans ${wait(fails.until - now)}.`);
+    // the same counter for both checks: a wrong code to take an account back, and a code « to check it is free » that
+    // turns out to be someone's (what someone guessing codes would get)
+    const fails = (await this.cache.get<{ n: number; until: number }>(key)) ?? { n: 0, until: 0 };
+    const locked = fails.until > now, lockedMsg = `Trois codes inconnus : réessaie dans ${wait(fails.until - now)}.`;
+    if (locked && resume) throw new UserError(lockedMsg);   // locked: no account taken back, even with the right code
     if (!(await this.cache.allow(`code:${ip}`, this.env.CODE_ATTEMPTS_PER_MINUTE, LIMITS.codeAttempts.perMs))) throw new UserError('Trop d\'essais : attends une minute.');
     const h = this.hmac(code);
     const a = await this.db.query.accounts.findFirst({ where: eq(accounts.codeHmac, h) });
     const found = { exists: !!a, retired: !a && (await this.isRetired(h)), name: a?.name ?? null };
-    if (!fails) return found;
-    if (a) { await this.cache.set(key, { n: 0, until: 0 }, 1000); return found; }   // the right code: counted from zero again
+    if (locked) { if (a || found.retired) throw new UserError(lockedMsg); return found; }   // locked: a free code can still be checked, an existing one isn't told
+    const wrong = resume ? !a : !!a;
+    if (!wrong) { if (resume) await this.cache.set(key, { n: 0, until: 0 }, 1000); return found; }   // the right code: counted from zero again
     const n = fails.n + 1, { tries, lockMs } = LIMITS.codeResume;
     if (n >= tries) {
       await this.cache.set(key, { n: 0, until: now + lockMs }, lockMs);

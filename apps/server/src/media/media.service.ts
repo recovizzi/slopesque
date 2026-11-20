@@ -58,6 +58,9 @@ export class MediaService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** The file of an upload: converted for its usage, stored once (the same file again gives the same picture). */
+  /** Does this ticket exist (not used, not expired)? Checked before the body is even read. */
+  hasTicket(ticket: string) { const t = this.tickets.get(ticket); return !!t && t.until > Date.now(); }
+
   async upload(ticket: string, body: Buffer): Promise<MediaRow & { account: string }> {
     const t = this.tickets.get(ticket);
     this.tickets.delete(ticket);
@@ -82,7 +85,8 @@ export class MediaService implements OnModuleInit, OnModuleDestroy {
       // quality first (down to 40), then the size (×0.8 at a time): until the weight aimed at is met
       for (let side = f.side, step = 0; step < 6 && !(out && out.data.length <= f.maxBytes); step++, side = Math.round(side * 0.8)) {
         for (let q = f.quality; q >= 40; q -= 10) {
-          const img = sharp(body, { animated: !f.square, limitInputPixels: false, failOn: 'none' }).rotate();
+          // at most 100 megapixels (all the frames of an animation together): a « bomb » picture is refused, not decoded
+          const img = sharp(body, { animated: !f.square, limitInputPixels: 100_000_000, failOn: 'none' }).rotate();
           out = await (f.square ? img.resize(side, side, { fit: 'cover', position: 'centre' })
             : img.resize(side, side, { fit: 'inside', withoutEnlargement: true })).webp({ quality: q, effort: 4 }).toBuffer({ resolveWithObject: true });
           if (out.data.length <= f.maxBytes) break;

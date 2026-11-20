@@ -5,6 +5,9 @@ import { z } from 'zod';
 
 // ------------------------------------------------------------------ handshake
 /** Sent in Socket.IO's `auth` (never in the address). */
+/** A GIF sent or kept: a link to its provider, https on KLIPY or GIPHY only (never javascript:, data:, nor a tracker). */
+export const gifUrl = z.url().refine(u => /^https:\/\/([a-z0-9-]+\.)*(klipy\.com|giphy\.com)\//i.test(u), 'Lien de GIF refusé.');
+const gifRef = z.object({ id: z.string().max(64), provider: z.string().max(16), url: gifUrl, w: z.number().int(), h: z.number().int(), title: z.string().max(200) });
 export const handshakeSchema = z.object({ code: z.string().min(1).max(64), protocol: z.number().int(), version: z.string().max(32).optional() });   // version: the extension's
 /** « 0.10.2 » < « 0.11.0 »: versions compared number by number. */
 export function versionBelow(a: string, b: string) {
@@ -229,7 +232,7 @@ export const intents = {
   'host:give': z.object({ to: z.string().uuid() }),
   'media:ticket': z.object({ usage: z.enum(['chat', 'sticker', 'emoji', 'photo', 'poll', 'trump']) }),
   'chat:media': z.object({ mediaId: z.string().uuid(), text: z.string().trim().max(MAX_TEXT).optional(), replyTo: z.number().int().positive().nullable().optional() }),   // text: what is written with the picture
-  'chat:gif': z.object({ gif: z.object({ id: z.string().max(64), provider: z.string().max(16), url: z.url(), w: z.number().int(), h: z.number().int(), title: z.string().max(200) }), text: z.string().trim().max(MAX_TEXT).optional(), replyTo: z.number().int().positive().nullable().optional() }),
+  'chat:gif': z.object({ gif: gifRef, text: z.string().trim().max(MAX_TEXT).optional(), replyTo: z.number().int().positive().nullable().optional() }),
   'sticker:add': z.object({ mediaId: z.string().uuid(), send: z.boolean() }),
   'sticker:send': z.object({ id: z.string().uuid(), text: z.string().trim().max(MAX_TEXT).optional(), replyTo: z.number().int().positive().nullable().optional() }),
   'sticker:remove': z.object({ id: z.string().uuid() }),
@@ -252,7 +255,7 @@ export const intents = {
   'poll:settings': z.object({ seconds: z.union([z.literal(180), z.literal(300), z.literal(900), z.literal(1800), z.literal(3600), z.literal(10800)]).optional(), secret: z.boolean().optional() }),
   'poll:publish': z.object({ kind: z.enum(['choices', 'free', 'gradient']), question: z.string().trim().min(1).max(120), choices: z.array(z.string().trim().max(40)).max(8),
     pics: z.array(z.object({ mediaId: z.string().uuid().optional(), stickerId: z.string().uuid().optional(),
-      gif: z.object({ id: z.string().max(64), provider: z.string().max(16), url: z.url(), w: z.number().int(), h: z.number().int(), title: z.string().max(200) }).optional() }).nullable()).max(8) }),
+      gif: gifRef.optional() }).nullable()).max(8) }),
   'poll:answer': z.object({ answer: z.union([z.number().int().min(0).max(7), z.string().trim().min(1).max(60), z.tuple([z.number(), z.number()])]) }),
   'poll:end': z.object({}),
   'poll:next': z.object({}),
@@ -278,7 +281,7 @@ export const intents = {
   'cards:players': z.object({ game: z.enum(['tdc', 'tarot']), players: z.number().int().min(3).max(8) }),
   'table:join': z.object({}),
   'table:leave': z.object({}),
-  'gif:favorites': z.object({ favorites: z.array(z.object({ id: z.string().max(64), provider: z.string().max(16), url: z.url(), w: z.number().int(), h: z.number().int(), title: z.string().max(200) })).max(200) }),
+  'gif:favorites': z.object({ favorites: z.array(gifRef).max(200) }),
 } as const;
 export type IntentName = keyof typeof intents;
 export type Intent<N extends IntentName> = z.infer<(typeof intents)[N]>;

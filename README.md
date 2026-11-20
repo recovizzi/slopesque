@@ -78,3 +78,8 @@ et RustFS restent sur le réseau interne de Docker.
 
 Voir [ADMIN.md](ADMIN.md) : les commandes d'admin (salons, comptes, modération, place), et `pnpm prod:admin <commande>`
 pour les lancer sur la machine du projet depuis ton ordinateur.
+
+## Publier une version
+
+Voir [RELEASE.md](RELEASE.md) : `pnpm release` (patch, minor, major ; tout, l'extension ou le serveur) crée le tag,
+GitHub publie l'extension, l'image du serveur, et déploie après ton approbation.

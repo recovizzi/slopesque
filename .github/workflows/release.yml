@@ -1,52 +1,80 @@
-# Builds the release packages for a version tag and publishes them on a GitHub release page (the jethub method), plus
-# the server's image on GHCR. Run it by hand: Actions → Release → Run workflow, and enter the tag.
-#   1. bump "version" in apps/extension/package.json (the manifest takes it from there), commit
-#   2. git tag v0.2.0 && git push origin v0.2.0
-#   3. run this workflow with tag v0.2.0
-#
-# The release page gets:
-#   slopesque-chrome-<version>.zip    unzip, then chrome://extensions → Load unpacked (any OS)
-#   slopesque-chrome-<version>.crx    drag onto chrome://extensions (Linux); needs CHROME_CRX_KEY
-#   slopesque-firefox-<version>.xpi   signed by Mozilla (unlisted channel); needs MOZILLA_API_KEY / MOZILLA_API_SECRET
-# The secrets live in the « release » environment. A missing secret skips its package, with the reason in the summary:
-# a fork without secrets still gets the zip and the server's image. AMO accepts each version number once.
+# A new version of Slopesque, started by its tag (`pnpm release`, see RELEASE.md): one pipeline per tag vX.Y.Z.
+#   plan        the version (the tag = every package.json) and what to release, read in the tag's message
+#               (« portée : tout | extension | serveur », written by pnpm release)
+#   extension   its packages: slopesque-chrome-<v>.zip, .crx (CHROME_CRX_KEY), slopesque-firefox-<v>.xpi signed by
+#               Mozilla, unlisted (MOZILLA_API_KEY / MOZILLA_API_SECRET) — environment « release »
+#   server      its image on GHCR: ghcr.io/<owner>/slopesque-server:<v> and :latest
+#   deploy      environment « production »: waits for your approval (Actions → this run → Review deployments), then
+#               over SSH to the machine: the compose file, that very image, a health check, the old images pruned
+#               (the last 3 kept); its secrets: DEPLOY_SSH_KEY, DEPLOY_SSH_HOST, DEPLOY_SSH_PORT, DEPLOY_SSH_USER,
+#               DEPLOY_SSH_KNOWN_HOSTS, DEPLOY_DIR (MANQUES.md). Missing secrets skip the job, with the reason.
+#   publish     the release page, with what was made
+# Run again by hand for a tag already pushed: Actions → Release → Run workflow (AMO accepts a version only once).
 name: Release
 
 on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Version tag to release, e.g. v0.2.0 (must already be pushed)'
+        description: 'Version tag already pushed, e.g. v0.2.0'
         required: true
         type: string
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
-  release:
+  plan:
     runs-on: ubuntu-26.04
-    environment: release
-    env:
-      TAG: ${{ inputs.tag }}
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      extension: ${{ steps.plan.outputs.extension }}
+      server: ${{ steps.plan.outputs.server }}
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: refs/tags/${{ inputs.tag }}
+          ref: refs/tags/${{ env.TAG }}
+          fetch-depth: 0
+      - name: The version and what to release
+        id: plan
+        run: |
+          git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+          pkg=$(node -p "require('./apps/extension/package.json').version")
+          if [ "v$pkg" != "$TAG" ]; then echo "::error::Le tag $TAG et apps/extension/package.json ($pkg) diffèrent : passe par pnpm release"; exit 1; fi
+          scope=$(git tag -l --format='%(contents)' "$TAG" | sed -n 's/^portée : //p' | head -1)
+          scope=${scope:-tout}
+          case "$scope" in tout|extension|serveur) ;; *) echo "::error::Portée inconnue dans le tag : $scope"; exit 1 ;; esac
+          echo "version=$pkg" >> "$GITHUB_OUTPUT"
+          echo "extension=$([ "$scope" != serveur ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "server=$([ "$scope" != extension ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "### Slopesque $TAG — portée : $scope" >> "$GITHUB_STEP_SUMMARY"
+
+  extension:
+    needs: plan
+    if: needs.plan.outputs.extension == 'true'
+    runs-on: ubuntu-26.04
+    environment: release
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ env.TAG }}
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-
-      - name: Check the tag matches the extension's version
-        run: |
-          pkg=$(node -p "require('./apps/extension/package.json').version")
-          if [ "v$pkg" != "$TAG" ]; then echo "::error::Tag $TAG and apps/extension/package.json $pkg must match"; exit 1; fi
-          echo "VERSION=$pkg" >> "$GITHUB_ENV"
-
       - run: pnpm build
       - run: pnpm --filter @slopesque/extension run lint
       - run: mkdir -p release && cp apps/extension/dist/slopesque-extension.zip release/slopesque-chrome-$VERSION.zip
@@ -82,6 +110,24 @@ jobs:
           pnpm --filter @slopesque/extension exec crx3 -p "$RUNNER_TEMP/crx-key.pem" -o "$GITHUB_WORKSPACE/release/slopesque-chrome-$VERSION.crx" -- dist/extension
           rm "$RUNNER_TEMP/crx-key.pem"
 
+      - uses: actions/upload-artifact@v7
+        with:
+          name: extension
+          path: release/*
+
+  server:
+    needs: plan
+    if: needs.plan.outputs.server == 'true'
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      packages: write
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ env.TAG }}
       - name: The server's image on GHCR
         run: |
           echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
@@ -90,24 +136,86 @@ jobs:
           docker push "$image:$VERSION" && docker push "$image:latest"
           echo "- 🐳 $image:$VERSION" >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@v7
+  deploy:
+    needs: [plan, server]
+    runs-on: ubuntu-26.04
+    environment: production
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+      SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+      SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT }}
+      SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
+      SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
+      DEPLOY_DIR: ${{ secrets.DEPLOY_DIR }}
+    steps:
+      - uses: actions/checkout@v7
         with:
-          name: slopesque-${{ inputs.tag }}
-          path: release/*
+          ref: refs/tags/${{ env.TAG }}
+      - name: Deploy the image of this version on the machine
+        run: |
+          if [ -z "$SSH_KEY" ] || [ -z "$SSH_HOST" ] || [ -z "$SSH_USER" ] || [ -z "$SSH_KNOWN_HOSTS" ]; then
+            echo "::warning::Déploiement sauté : secrets DEPLOY_SSH_* absents (environnement production, voir MANQUES.md)"
+            echo "- ⚠️ déploiement sauté : secrets DEPLOY_SSH_* absents (pnpm deploy:prod reste possible à la main)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          dir=${DEPLOY_DIR:-slopesque}
+          image=ghcr.io/${GITHUB_REPOSITORY,,}-server:$VERSION
+          opts=(-i ~/.ssh/deploy -o BatchMode=yes -o StrictHostKeyChecking=yes)
+          scp "${opts[@]}" -P "${SSH_PORT:-22}" infra/docker-compose.prod.yml "$SSH_USER@$SSH_HOST:$dir/infra/docker-compose.prod.yml"
+          ssh "${opts[@]}" -p "${SSH_PORT:-22}" "$SSH_USER@$SSH_HOST" "set -e
+            cd $dir/infra
+            test -f .env || { echo 'Il manque infra/.env sur la machine (MANQUES.md)'; exit 1; }
+            export SERVER_IMAGE=$image
+            docker compose -f docker-compose.prod.yml --env-file .env pull server
+            docker compose -f docker-compose.prod.yml --env-file .env up -d --wait
+            port=\$(grep -E '^PUBLIC_PORT=' .env | cut -d= -f2)
+            curl -fsS http://127.0.0.1:\$port/api/health > /dev/null
+            docker images --format '{{.Repository}}:{{.Tag}}' | grep -E '/slopesque-server:[0-9]' | sort -t: -k2 -V -r | tail -n +4 | xargs -r docker rmi || true"
+          rm -f ~/.ssh/deploy
+          echo "- 🚀 déployé : $image (santé vérifiée)" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Create the GitHub release
+  publish:
+    needs: [plan, extension, server, deploy]
+    if: always() && needs.plan.result == 'success' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@v7
+        if: needs.extension.result == 'success'
+        with:
+          name: extension
+          path: release
+      - name: The release page
         env:
           GH_TOKEN: ${{ github.token }}
+          WITH_EXT: ${{ needs.extension.result == 'success' }}
+          WITH_SERVER: ${{ needs.server.result == 'success' }}
         run: |
-          cat > notes.md <<EOF
-          ## Installer l'extension
-
-          **Chrome / Edge / Brave sous Windows ou macOS :** télécharge \`slopesque-chrome-$VERSION.zip\` et dézippe-le. Ouvre \`chrome://extensions\`, active le **Mode développeur**, clique **Charger l'extension non empaquetée** et choisis le dossier dézippé.
-
-          **Chrome / Chromium sous Linux :** télécharge \`slopesque-chrome-$VERSION.crx\` et glisse-le sur \`chrome://extensions\` (s'il est dans la release).
-
-          **Firefox (142+) :** télécharge \`slopesque-firefox-$VERSION.xpi\` et ouvre-le dans Firefox, puis **Ajouter** (s'il est dans la release).
-
-          Puis : onglet **Extension** du panneau → **Serveur** → l'adresse du serveur de ton groupe.
-          EOF
-          gh release create "$TAG" release/* --verify-tag --title "$TAG" --notes-file notes.md --generate-notes
+          mkdir -p release
+          {
+            if [ "$WITH_EXT" = true ]; then
+              echo "## Installer l'extension"
+              echo
+              echo "**Chrome / Edge / Brave sous Windows ou macOS :** télécharge \`slopesque-chrome-$VERSION.zip\` et dézippe-le. Ouvre \`chrome://extensions\`, active le **Mode développeur**, clique **Charger l'extension non empaquetée** et choisis le dossier dézippé."
+              echo
+              echo "**Chrome / Chromium sous Linux :** glisse \`slopesque-chrome-$VERSION.crx\` sur \`chrome://extensions\` (s'il est dans la release)."
+              echo
+              echo "**Firefox (142+) :** ouvre \`slopesque-firefox-$VERSION.xpi\` dans Firefox, puis **Ajouter** (s'il est dans la release)."
+              echo
+              echo "Puis : onglet **Extension** du panneau → **Serveur** → l'adresse du serveur de ton groupe."
+            else
+              echo "Le serveur seulement : l'extension ne change pas."
+            fi
+            if [ "$WITH_SERVER" = true ]; then echo; echo "Serveur : \`ghcr.io/${GITHUB_REPOSITORY,,}-server:$VERSION\`"; fi
+          } > notes.md
+          files=(release/*)
+          [ -e "${files[0]}" ] || files=()
+          gh release create "$TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$TAG" --notes-file notes.md --generate-notes

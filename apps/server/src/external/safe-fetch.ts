@@ -3,14 +3,18 @@
 import { lookup } from 'node:dns/promises';
 import net from 'node:net';
 
-function privateIp(ip: string): boolean {
+export function privateIp(ip: string): boolean {
   if (net.isIPv4(ip)) {
     const [a, b] = ip.split('.').map(Number) as [number, number];
     return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)
-      || (a === 100 && b >= 64 && b <= 127) || a >= 224;
+      || (a === 100 && b >= 64 && b <= 127) || (a === 198 && (b === 18 || b === 19)) || a >= 224;
   }
   const v = ip.toLowerCase();
-  return v === '::1' || v === '::' || v.startsWith('fc') || v.startsWith('fd') || v.startsWith('fe80') || v.startsWith('::ffff:') && privateIp(v.slice(7));
+  // an IPv4 inside an IPv6 (« ::ffff:127.0.0.1 », that URL parsing writes « ::ffff:7f00:1 »; NAT64 « 64:ff9b::… »):
+  // unwrapped, then checked as IPv4
+  const wrapped = /^(?:::ffff:|::ffff:0:|64:ff9b::)(?:(\d+\.\d+\.\d+\.\d+)|([0-9a-f]{1,4}):([0-9a-f]{1,4}))$/.exec(v);
+  if (wrapped) return privateIp(wrapped[1] ?? [parseInt(wrapped[2]!, 16) >> 8, parseInt(wrapped[2]!, 16) & 255, parseInt(wrapped[3]!, 16) >> 8, parseInt(wrapped[3]!, 16) & 255].join('.'));
+  return v === '::1' || v === '::' || v.startsWith('fc') || v.startsWith('fd') || v.startsWith('fe80') || v.startsWith('::ffff:') || v.startsWith('64:ff9b:');
 }
 
 async function allowed(u: URL) {

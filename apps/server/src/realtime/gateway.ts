@@ -19,8 +19,9 @@ import { UserError } from '../errors.js';
 
 const ipOf = (s: Socket, trust: boolean) => (trust && String(s.handshake.headers['x-forwarded-for'] ?? '').split(',')[0]?.trim()) || s.handshake.address;
 
-/** This server's version: its package.json (read once; « ? » if it can't be). */
-const SERVER_VERSION = (() => { try { return (JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { version: string }).version; } catch { return '?'; } })();
+/** This server's package.json (read once): its version, and the oldest extension it accepts (pnpm release --min-extension). */
+const PKG = (() => { try { return JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { version: string; slopesque?: { minExtension?: string } }; } catch { return { version: '?' }; } })();
+const SERVER_VERSION = PKG.version;
 
 @WebSocketGateway()
 export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
@@ -31,7 +32,7 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
     private readonly gifs: GifService, @Inject(DB) private readonly db: Db) {}
 
   /** The server's version (its package), the oldest extension it accepts, where to get the latest. */
-  versions(): ServerVersions { return { version: SERVER_VERSION, minExtension: this.env.MIN_EXTENSION_VERSION, download: this.env.EXTENSION_DOWNLOAD_URL }; }
+  versions(): ServerVersions { return { version: SERVER_VERSION, minExtension: this.env.MIN_EXTENSION_VERSION ?? PKG.slopesque?.minExtension ?? '0.1.0', download: this.env.EXTENSION_DOWNLOAD_URL }; }
 
   afterInit(io: Server) {
     this.hub.io = io;
@@ -73,16 +74,16 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
     }
   }
   private me(s: Socket) { return (s.data as SocketData).account; }
-  private async limit(s: Socket, what: 'messages' | 'reactions' | 'effects') {
+  private async limit(s: Socket, what: 'messages' | 'reactions' | 'effects' | 'joins' | 'gifs') {
     const l = LIMITS[what];
-    if (!(await this.cache.allow(`${what}:${this.me(s).id}`, l.count, l.perMs))) throw new UserError({ messages: 'Doucement : trop de messages.', reactions: 'Doucement : trop de réactions.', effects: 'Doucement : trop d\'effets.' }[what]);
+    if (!(await this.cache.allow(`${what}:${this.me(s).id}`, l.count, l.perMs))) throw new UserError({ messages: 'Doucement : trop de messages.', reactions: 'Doucement : trop de réactions.', effects: 'Doucement : trop d\'effets.', joins: 'Trop de salons essayés : attends une minute.', gifs: 'Doucement : trop de recherches de GIF.' }[what]);
   }
 
   @SubscribeMessage('room:check')
-  check(@MessageBody() b: unknown) { return this.run('room:check', b, async v => ((await this.rooms.byKey(v.key)) ? 'ok' : 'unknown')); }
+  check(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('room:check', b, async v => { await this.limit(s, 'joins'); return (await this.rooms.byKey(v.key)) ? 'ok' : 'unknown'; }); }
 
   @SubscribeMessage('room:join')
-  join(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('room:join', b, v => this.hub.join(s, v.key, v.after)); }
+  join(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('room:join', b, async v => { await this.limit(s, 'joins'); return this.hub.join(s, v.key, v.after); }); }
 
   @SubscribeMessage('room:leave')
   leave(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('room:leave', b, async () => { this.hub.leave(s); return null; }); }
@@ -170,10 +171,10 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
   photo(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('photo:set', b, async v => { await this.hub.setPhoto(s, v.mediaId ? await this.hub.picture(v.mediaId, 'photo') : null); return null; }); }
 
   @SubscribeMessage('gif:search')
-  gifSearch(@MessageBody() b: unknown) { return this.run('gif:search', b, v => this.gifs.page(v.q, v.page, v.provider)); }
+  gifSearch(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('gif:search', b, async v => { await this.limit(s, 'gifs'); return this.gifs.page(v.q, v.page, v.provider); }); }
 
   @SubscribeMessage('gif:trending')
-  gifTrending(@MessageBody() b: unknown) { return this.run('gif:trending', b, v => this.gifs.page(null, v.page, v.provider)); }
+  gifTrending(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('gif:trending', b, async v => { await this.limit(s, 'gifs'); return this.gifs.page(null, v.page, v.provider); }); }
 
   @SubscribeMessage('gif:favorites')
   gifFavorites(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {

@@ -27,6 +27,7 @@ pnpm check               # typecheck + lint + tests (turbo ; les tests serveur o
 pnpm build && pnpm --filter @slopesque/e2e e2e   # bout en bout (deux navigateurs)
 pnpm stack:up / stack:admin <cmd> / stack:logs / stack:down   # la pile de production sur le Docker local (:23180)
 pnpm prod:admin <cmd>    # une commande d'admin sur la machine du projet (alias SSH et compte dans .env ; voir ADMIN.md)
+pnpm release [patch|minor|major] [--only extension|server] [--min-extension] [--dry-run]   # une version : tag → CI Release (voir RELEASE.md)
 pnpm admin <cmd>         # console d'admin (dev)
 pnpm db:generate         # nouvelle migration après un changement de src/db/schema.ts
 pnpm deploy:prod         # déploiement (lancé par l'utilisateur : SSH + sudo)

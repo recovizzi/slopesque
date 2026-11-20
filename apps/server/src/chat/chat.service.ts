@@ -62,7 +62,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     const ids = list.map(m => m.id);
     const reacts = await this.db.select().from(reactions).where(inArray(reactions.messageId, ids)).orderBy(reactions.at);
     const replyIds = [...new Set(list.map(m => m.replyTo).filter((x): x is number => x !== null))];
-    const quoted = replyIds.length ? await this.db.select().from(messages).where(inArray(messages.id, replyIds)) : [];
+    const quoted = replyIds.length ? await this.db.select().from(messages).where(and(inArray(messages.id, replyIds), eq(messages.roomId, list[0]!.roomId))) : [];   // never a message of another room
     const byId = new Map(quoted.map(q => [q.id, q]));
     const mediaIds = [...new Set(list.map(m => m.mediaId).filter((x): x is string => !!x))];
     const pics = new Map((mediaIds.length ? await this.db.select().from(media).where(inArray(media.id, mediaIds)) : []).map(x => [x.id, x]));

@@ -21,3 +21,4 @@ playwright-report/
 tests/e2e/shots/
 tests/e2e/.cache/
 infra/.env
+SECURITE.md

@@ -167,6 +167,16 @@ secrets, du développement testable en local sans aucune clé.
       dernière release (`EXTENSION_DOWNLOAD_URL`) ; la version de l'extension est montrée dans l'onglet Extension.
     - Le dépôt ne nomme jamais la machine : alias SSH et compte de déploiement dans le `.env` de l'utilisateur.
 
+19. **Publier une version : `pnpm release`** (décidé avec l'utilisateur le 2026-11-20, sur le principe de la release
+    d'inspare) : une commande locale (patch / minor / major / X.Y.Z, portée tout / extension / serveur, option
+    `--min-extension`) vérifie la CI, montre les commits, demande une confirmation, puis crée le commit de version et
+    le tag annoté portant la portée. Le tag lance le workflow Release : paquets de l'extension, image du serveur,
+    déploiement de cette image sur la machine **après approbation** (environnement `production`), page de release.
+    Les environnements ne servent qu'aux tags `v*` et à `main`. `pnpm deploy:prod` reste la voie manuelle.
+20. **Revue de sécurité du 2026-11-20** : historique réécrit (e-mail professionnel → noreply GitHub, noms de la machine
+    retirés), six failles corrigées avec leurs tests (`security.test.ts`) ; le rapport détaillé et les risques ouverts
+    sont dans `SECURITE.md`, non versionné.
+
 ## Risks / Trade-offs
 
 - [Reconnexion à chaque changement de page avec l'option persistante] → état complet en un message, grâce de 15 s
