@@ -53,3 +53,10 @@
 .version-bubble { padding: 3px 10px; border-radius: 99px; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); font-weight: 700; }
 .version-new { color: var(--accent); }
 .outdated .note { margin-top: 10px; }
+/* the Tarot's bonuses: a poignée shown, a chelem announced */
+.role-handful { background: #c7f0d8; color: #0d4a2a; }
+.role-chelem { background: #ffd0d6; color: #7a0019; }
+.announce-box.handful { max-width: 92%; }
+.handful-cards { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; margin: 6px 0 2px; }
+.handful-cards .pcard { width: 30px; }
+.handful-cards .card-svg { width: 100%; height: auto; display: block; }

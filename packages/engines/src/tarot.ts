@@ -21,7 +21,16 @@ const ORDER: Bid[] = ['pass', 'prise', 'garde', 'sans', 'contre'];
 export const NEED = [56, 51, 41, 36];   // points to make, by the number of bouts
 
 export interface TPlay { by: string; card: TCard }
-export interface TResult { taker: string; partner: string | null; bid: Exclude<Bid, 'pass'>; bouts: number; need: number; made: number; won: boolean; score: number; marks: Record<string, number> }
+export interface TResult {
+  taker: string; partner: string | null; bid: Exclude<Bid, 'pass'>; bouts: number; need: number; made: number; won: boolean; score: number; marks: Record<string, number>;
+  petit: 'taker' | 'defense' | null;     // the Petit au bout: the side that took it in the last trick
+  handfuls: number;                      // the poignées' points (for the side that won the deal: + for the taker)
+  chelem: number;                        // the chelem's points (+400, +200, −200…)
+}
+/** Poignées (FFT): the trumps to show for a simple, double, triple one (at 4, at 5) and their points. */
+export const handfulSizes = (players: number) => (players === 5 ? [8, 10, 13] : [10, 13, 15]);
+export const HANDFUL_POINTS = [20, 30, 40];
+export const HANDFUL_NAMES = ['simple poignée', 'double poignée', 'triple poignée'];
 export interface Tarot {
   seats: string[];                       // 4 or 5 players; the dealer is the last, the first bids and leads
   hands: Record<string, TCard[]>;
@@ -44,6 +53,11 @@ export interface Tarot {
   startedAt: number;
   result: TResult | null;
   note: string;                          // « Tout le monde a passé : nouvelle donne. »
+  shownChien: TCard[];                   // the chien as shown to everyone (Prise, Garde): what all the players saw
+  chelem: string | null;                 // the taker announced a chelem (he leads)
+  handfuls: Record<string, { level: 1 | 2 | 3; cards: TCard[] }>;   // the poignées shown, by seat
+  started: string[];                     // the seats that played their first card (a poignée is shown before it)
+  winners: string[];                     // who took each trick, in order
 }
 
 const SUITS: Suit[] = ['S', 'H', 'C', 'D'];   // in the hand: black, red, black, red
@@ -81,7 +95,8 @@ export function deal(seats: string[], prev: Tarot | null): Tarot {
   const n = order.length === 5 ? 15 : 18, cards = shuffle(deck()), hands: Record<string, TCard[]> = {};
   order.forEach((id, k) => { hands[id] = sortHand(cards.slice(k * n, k * n + n)); });
   return { seats: order, hands, chien: cards.slice(order.length * n), phase: 'bid', bids: {}, turn: order[0], taker: null, bid: null, called: null, partner: null, revealed: false, ecart: [], trick: [], lastTrick: [],
-    won: Object.fromEntries(order.map(id => [id, []])), tricks: Object.fromEntries(order.map(id => [id, []])), lastWinner: null, deal: (prev?.deal ?? 0) + 1, startedAt: prev?.startedAt ?? Date.now(), result: null, note: '' };
+    won: Object.fromEntries(order.map(id => [id, []])), tricks: Object.fromEntries(order.map(id => [id, []])), lastWinner: null, deal: (prev?.deal ?? 0) + 1, startedAt: prev?.startedAt ?? Date.now(), result: null, note: '',
+    shownChien: [], chelem: null, handfuls: {}, started: [], winners: [] };
 }
 
 const best = (t: Tarot) => Object.values(t.bids).reduce((m, b) => (ORDER.indexOf(b) > ORDER.indexOf(m) ? b : m), 'pass' as Bid);
@@ -105,7 +120,32 @@ export function bid(t: Tarot, id: string, b: Bid) {
 
 function afterCall(t: Tarot) {
   if (t.bid === 'sans' || t.bid === 'contre') { t.ecart = t.chien; t.phase = 'play'; t.turn = t.seats[0]; }
-  else { t.hands[t.taker!] = sortHand([...t.hands[t.taker!], ...t.chien]); t.phase = 'dog'; t.turn = t.taker; }
+  else { t.shownChien = [...t.chien]; t.hands[t.taker!] = sortHand([...t.hands[t.taker!], ...t.chien]); t.phase = 'dog'; t.turn = t.taker; }
+}
+
+/** The poignées a player may show now (before his first card): the levels his trumps reach (the Excuse counts for one
+ *  if it would be his last). */
+export function handfulLevels(t: Tarot, id: string): (1 | 2 | 3)[] {
+  if (t.phase !== 'play' || t.started.includes(id) || t.handfuls[id]) return [];
+  const h = t.hands[id], n = h.filter(c => c.kind === 'trump').length + (h.some(c => c.kind === 'excuse') ? 1 : 0);
+  return handfulSizes(t.seats.length).flatMap((size, i) => (n >= size ? [(i + 1) as 1 | 2 | 3] : []));
+}
+
+/** A poignée shown: exactly its number of trumps (the lowest ones; the Excuse only if no other trump is left hidden). */
+export function declareHandful(t: Tarot, id: string, level: 1 | 2 | 3) {
+  if (!handfulLevels(t, id).includes(level)) return false;
+  const size = handfulSizes(t.seats.length)[level - 1]!, trumps = t.hands[id].filter(c => c.kind === 'trump').sort((a, b) => a.r - b.r);
+  const cards = trumps.length >= size ? trumps.slice(0, size) : [...trumps, t.hands[id].find(c => c.kind === 'excuse')!];
+  t.handfuls[id] = { level, cards };
+  return true;
+}
+
+/** The taker announces a chelem (before the first card): he leads. */
+export function announceChelem(t: Tarot, id: string) {
+  if (t.phase !== 'play' || id !== t.taker || t.chelem || t.started.length || t.trick.length) return false;
+  t.chelem = id;
+  t.turn = id;
+  return true;
 }
 
 /** At 5, the cards the taker may call: the 4 Kings; a Queen if he has the 4 Kings; a Cavalier if the 4 Queens too. */
@@ -166,7 +206,7 @@ export function legal(t: Tarot, id: string): TCard[] {
 }
 
 /** Who takes the trick: the highest trump, else the highest card of the suit led (never the Excuse). */
-function winner(trick: TPlay[]) {
+export function winner(trick: TPlay[]) {
   const lead = trick.find(p => p.card.kind !== 'excuse')?.card;
   if (!lead) return trick[0].by;   // only the Excuse so far (led): nobody beats it yet
   const trumps = trick.filter(p => p.card.kind === 'trump');
@@ -178,15 +218,20 @@ export function play(t: Tarot, id: string, card: TCard) {
   if (t.phase !== 'play' || t.turn !== id || !legal(t, id).some(c => c.id === card.id)) return false;
   t.hands[id] = t.hands[id].filter(c => c.id !== card.id);
   if (t.called?.id === card.id) t.revealed = true;   // the partner is known
+  if (!t.started.includes(id)) t.started.push(id);
   if (!t.trick.length) t.lastTrick = [];
   t.trick.push({ by: id, card });
   if (t.trick.length < t.seats.length) { t.turn = nextSeat(t, id); return true; }
-  const w = winner(t.trick), last = Object.values(t.hands).every(h => !h.length);
+  const last = Object.values(t.hands).every(h => !h.length), side = sideOf(t);
+  // a chelem: the Excuse led to the last trick by a side that took all the others wins it
+  const excuseSlam = last && t.trick[0]!.card.kind === 'excuse' && t.winners.length > 0 && t.winners.every(x => side(x) === side(t.trick[0]!.by));
+  const w = excuseSlam ? t.trick[0]!.by : winner(t.trick);
   for (const p of t.trick) {   // the Excuse stays with its owner's side (on the last trick: to the trick's winner)
     const to = p.card.kind === 'excuse' && !last ? p.by : w;
     t.won[to].push(p.card);
   }
   t.tricks[w].push(t.trick);
+  t.winners.push(w);
   t.lastWinner = w;
   t.lastTrick = t.trick; t.trick = [];
   if (last) { count(t); return true; }
@@ -194,14 +239,33 @@ export function play(t: Tarot, id: string, card: TCard) {
   return true;
 }
 
+/** The taker's side (himself, his partner) or the defence: true for the taker's. */
+const sideOf = (t: Tarot) => (x: string) => x === t.taker || (!!t.partner && x === t.partner);
+const hasPetit = (trick: TPlay[]) => trick.some(p => p.card.kind === 'trump' && p.card.r === 1);
+
+/** The Petit au bout: in the last trick (or, a chelem won with the Excuse, in the one before): the side that took it. */
+function petitAuBout(t: Tarot): 'taker' | 'defense' | null {
+  const side = sideOf(t), lastW = t.winners.at(-1)!, lastTrick = t.tricks[lastW]!.at(-1)!;
+  if (hasPetit(lastTrick)) return side(lastW) ? 'taker' : 'defense';
+  if (lastTrick[0]!.card.kind === 'excuse' && t.winners.length > 1) {
+    const prevW = t.winners.at(-2)!, prev = t.tricks[prevW]!.filter(tr => tr !== lastTrick).at(-1);
+    if (prev && hasPetit(prev) && side(prevW) === side(lastW)) return side(prevW) ? 'taker' : 'defense';
+  }
+  return null;
+}
+
 function count(t: Tarot) {
-  const taker = t.taker!, bidT = t.bid!, partner = t.partner && t.partner !== taker ? t.partner : null;
+  const taker = t.taker!, bidT = t.bid!, partner = t.partner && t.partner !== taker ? t.partner : null, mult = BIDS[bidT].mult;
   const mine = [...t.won[taker], ...(partner ? t.won[partner] : []), ...(bidT === 'contre' ? [] : t.ecart)];
-  const bouts = mine.filter(isBout).length, need = NEED[bouts], made = points(mine);
-  const won = made >= need, base = (25 + Math.round(Math.abs(made - need))) * BIDS[bidT].mult, score = won ? base : -base;
+  const bouts = mine.filter(isBout).length, need = NEED[bouts], made = points(mine), won = made >= need, sign = won ? 1 : -1;
+  const petit = petitAuBout(t), side = sideOf(t);
+  const handfuls = Object.values(t.handfuls).reduce((n, h) => n + HANDFUL_POINTS[h.level - 1]!, 0) * sign;   // to the side that won
+  const all = t.winners.every(side), none = t.winners.every(x => !side(x));
+  const chelem = all ? (t.chelem ? 400 : 200) : (t.chelem ? -200 : 0) + (none ? -200 : 0);
+  const score = (sign * (25 + Math.round(Math.abs(made - need))) + (petit === 'taker' ? 10 : petit === 'defense' ? -10 : 0)) * mult + handfuls + chelem;
   const defenders = t.seats.length - 1 - (partner ? 1 : 0);   // the marks add up to 0
   const marks = Object.fromEntries(t.seats.map(id => [id, id === taker ? (defenders - (partner ? 1 : 0)) * score : id === partner ? score : -score]));
-  t.result = { taker, partner, bid: bidT, bouts, need, made, won, score, marks };
+  t.result = { taker, partner, bid: bidT, bouts, need, made, won, score, marks, petit, handfuls, chelem };
   t.phase = 'done'; t.turn = null;
 }
 
@@ -251,6 +315,6 @@ export function tarotView(t: Tarot, seat: string | null): Tarot {
   return { ...t,
     hands: Object.fromEntries(Object.entries(t.hands).map(([id, h]) => [id, id === seat ? h : back(h)])),
     chien: t.phase === 'dog' ? t.chien : back(t.chien),   // Prise, Garde: the chien is shown to everyone
-    ecart: taker || t.phase === 'done' ? t.ecart : back(t.ecart),
+    ecart: (taker && (t.bid === 'prise' || t.bid === 'garde')) || t.phase === 'done' ? t.ecart : back(t.ecart),   // Garde sans / contre: nobody sees the chien
     partner: t.revealed || t.phase === 'done' || (seat !== null && seat === t.partner) ? t.partner : null };
 }

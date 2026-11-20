@@ -82,6 +82,8 @@ export function CardsStage() {
         if (step.gather) { await A.wait(700); await A.gather(el, step.gather, step.gather === seat); setShowLast(false); }
         const name = (id: string) => { const s = next.seats.find(x => x.id === id), u = s?.user ?? s?.credit; return u === me ? 'Toi' : (u && useStore.getState().room?.members.find(m => m.id === u)?.name) || s?.bot || '?'; };
         if (step.take) { setAnnounce(TV.takeAnnounce(name(step.take.seat), step.take.bid as Exclude<TA.Bid, 'pass'>)); await A.wait(2000); setAnnounce(''); }
+        for (const h of step.handfuls) { setAnnounce(TV.handfulAnnounce(name(h.seat), h.level, h.cards as TA.TCard[], next.art ?? {})); await A.wait(2400); setAnnounce(''); }
+        if (step.chelem) { setAnnounce(TV.chelemAnnounce(name(step.chelem))); await A.wait(2000); setAnnounce(''); }
         if (step.call) {
           const mine = step.call.taker !== seat && !!next.tarot?.hands[seat]?.some(x => x.id === step.call!.card.id);
           setAnnounce(TV.callAnnounce(name(step.call.taker), step.call.card as TA.TCard, next.art ?? {}, mine)); await A.wait(2800); setAnnounce('');
@@ -120,6 +122,8 @@ export function CardsStage() {
       }
     } else if (a === 'tarot-bid') ack(await request('tarot:bid', { bid: el.dataset.v }));
     else if (a === 'tarot-call') ack(await request('tarot:call', { card: el.dataset.v }));
+    else if (a === 'tarot-handful') ack(await request('tarot:handful', { level: Number(el.dataset.v) as 1 | 2 | 3 }));
+    else if (a === 'tarot-chelem') ack(await request('tarot:chelem'));
     else if (a === 'tarot-ecart') ack(await request('tarot:discard', { cards: [...sel] }));
     else if (a === 'card-pick' && t) {
       const hand = t.hands[mySeat] ?? [], card = hand.find(x => x.id === el.dataset.card);

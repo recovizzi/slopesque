@@ -239,6 +239,13 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
   cardsPlay(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('cards:play', b, async v => { await this.hub.cardsMove(s, { play: v.cards }); return null; }); }
   @SubscribeMessage('cards:pass')
   cardsPass(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('cards:pass', b, async () => { await this.hub.cardsMove(s, { pass: true }); return null; }); }
+  @SubscribeMessage('tarot:bots')
+  tarotBots(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('tarot:bots', b, async v => { await this.hub.tarotBots(s, v.level); return null; }); }
+  @SubscribeMessage('tarot:handful')
+  tarotHandful(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('tarot:handful', b, async v => { await this.hub.tarotHandful(s, v.level); return null; }); }
+  @SubscribeMessage('tarot:chelem')
+  tarotChelem(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('tarot:chelem', b, async () => { await this.hub.tarotChelem(s); return null; }); }
+
   @SubscribeMessage('tarot:bid')
   tarotBid(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('tarot:bid', b, async v => { await this.hub.tarotDo(s, { bid: v.bid }); return null; }); }
   @SubscribeMessage('tarot:call')

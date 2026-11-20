@@ -83,7 +83,16 @@ moment, ne gagne jamais et reste à son camp. Le compte : 91 points (bout ou Roi
 1,5 ; autre 0,5) ; à faire selon les bouts du preneur 56 / 51 / 41 / 36 ; marque (25 + l'écart) × le contrat, 3 fois
 pour le preneur, une fois pour chaque défenseur, ajoutée au classement. Les cartes qu'on ne peut pas jouer (ou
 écarter) MUST être grisées ; celles du chien, tout juste prises, MUST se distinguer ; la main MUST indiquer le nombre
-d'atouts et de bouts. Petit au bout, poignées et chelem : V1.
+d'atouts et de bouts.
+
+Les primes (règles FFT) MUST compter : le **Petit au bout** (le Petit dans le dernier pli : 10 points × le contrat
+pour le camp qui gagne ce pli, gagné ou non) ; les **poignées**, montrées par un joueur juste avant sa première carte
+(à 4 : 10, 13 ou 15 atouts ; à 5 : 8, 10 ou 13 ; l'Excuse compte pour un atout s'il n'en a pas d'autre caché), 20,
+30 ou 40 points non multipliés pour le camp qui **gagne** la donne ; le **chelem** (tous les plis) : annoncé par le
+preneur avant la première carte (il entame alors), +400 réussi, −200 manqué, +200 non annoncé mais réussi, et −200
+pour le preneur si la défense fait tous les plis. Pour un chelem, l'Excuse menée au dernier pli le gagne (le Petit
+est alors au bout s'il est dans l'avant-dernier). La marque : ((25 + l'écart) signé + Petit au bout) × le contrat +
+poignées + chelem. Pas de Tarot à 3 : des robots complètent.
 
 #### Scenario: L'écart
 - **WHEN** je prends une Garde
@@ -205,8 +214,25 @@ Un robot qui a la **carte appelée** MUST se savoir partenaire du preneur et jou
 - **sauver le Petit** : il MUST jouer le Petit dans un pli que son camp gagne à coup sûr, plutôt que de le perdre
   à la fin.
 
-En défense, un robot MUST charger de la même façon quand le pli est sûr pour la défense. Avant que le partenaire
-soit révélé, il MUST déduire qui est probablement le partenaire à partir des cartes jouées, sans le savoir.
+En défense, un robot MUST charger de la même façon quand le pli est sûr pour la défense, et MUST ne jamais donner
+de points à un pli que le camp adverse gagne s'il peut l'éviter. Avant que le partenaire soit révélé, il MUST déduire
+qui est probablement le partenaire à partir des cartes jouées, sans le savoir. Un robot MUST aussi : enchérir selon la
+force de sa main, faire un écart qui lui donne des coupes (sans Roi ni bout), protéger ou sauver le Petit, se servir du
+21 pour prendre un pli riche, jouer l'Excuse avant la fin, montrer une poignée quand il la tient (le preneur) et
+annoncer un chelem quand sa main le permet (rare).
+
+**Niveau des robots**, réglé par l'hôte (Partie, Tarot) : *Facile* (des fautes, des enchères prudentes), *Moyen* (ces
+règles, un peu de hasard), *Fort* (il simule la fin de la donne sur plusieurs distributions possibles des cartes qu'il
+ne voit pas, cohérentes avec ce qui est tombé, et garde la meilleure carte). Un peu de hasard à chaque niveau : un
+robot reste battable et pas prévisible.
+
+#### Scenario: La défense ne charge pas l'adversaire
+- **WHEN** le preneur gagne le pli avec le 18 et Robot 3, en défense, n'a plus de cœur
+- **THEN** Robot 3 joue sa plus petite carte, pas son Roi
+
+#### Scenario: Sauver le Petit
+- **WHEN** le partenaire gagne le pli à l'atout avec le 20, et Robot 2 (même camp) doit couper sans pouvoir surcouper
+- **THEN** Robot 2 joue le Petit, qui revient à son camp
 
 #### Scenario: Le partenaire charge sans risque
 - **WHEN** à 5, Robot 2 a le Roi de cœur appelé par Léa, joue en dernier, et Léa gagne le pli avec le 19

@@ -128,6 +128,16 @@ chaque jalon, les tâches sont groupées par partie du monorepo (`[racine]`, `[i
 - [x] 10t.7 [server+web] « Reprendre un compte » : 3 codes inconnus d'une adresse, puis 5 min d'attente (même le bon code) ; essais restants affichés ; tests `code-lock.test.ts` et e2e
 - [x] 10t.5 [e2e] Effets vus par l'autre joueur, limites, screamer, effet sur la place à table ; tests serveur `effects.test.ts`
 
+## 10 quater. Revue des specs (2026-11-20)
+
+- [x] 10q.1 [server+web] Les correctifs de la revue : images d'un sondage gardées pendant le sondage, favoris GIF 200, verrou sans Redis, « Repartir de zéro » après un code remplacé, aperçu de lien sans image après 7 jours, « Image expirée » citée, roulette à l'heure du serveur, écritures des règles du salon sans course
+- [x] 10q.2 [server+web] Changer d'activité pendant un tour l'annule ; un redémarrage pendant une partie l'annule et le dit dans une fenêtre « Partie perdue »
+- [x] 10q.3 [server] `accounts:delete`, `ADMIN.md`, `pnpm prod:admin` ; journal d'admin (actions d'admin, changements de code) ; alerte de place à 90 %
+- [x] 10q.4 [server+web] Versions : extension trop ancienne refusée avec le lien de la dernière release, version dans l'onglet Extension
+- [x] 10q.5 [engines+server+web] Tarot complet : Petit au bout, poignées, chelem (règles FFT), et l'écart du preneur caché en Garde sans / contre
+- [x] 10q.6 [engines] Robots du Tarot : nouvelle IA (mémoire des cartes, camp et partenaire deviné, charger / ne pas charger, sauver le Petit, 21, Excuse, poignée, chelem), niveaux Facile / Moyen / Fort (simulation Monte-Carlo), réglés par l'hôte ; `pnpm tarot:duel` mesure les niveaux
+- [x] 10q.7 [repo] La machine nommée seulement dans le `.env` de l'utilisateur (aucun alias ni compte dans le dépôt)
+
 ## 11. Jalon 11 : releases et déploiement
 
 - [x] 11.1 [ci] Release sur tag (méthode `jethub`) : zip, `.crx` et `.xpi` non listé si leurs secrets existent (sinon sautés avec la raison), notes d'installation

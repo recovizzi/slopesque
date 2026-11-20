@@ -40,4 +40,52 @@ describe('Tarot', () => {
       if (t.result) expect(Object.values(t.result.marks).reduce((a, b) => a + b, 0)).toBe(0);
     }
   });
+
+  // ---- the FFT bonuses: a deal brought to its last trick, the rest already won
+  const card = (id: string): T.TCard => T.deck().find(c => c.id === id)!;
+  /** At 4, a (taker, Garde) has won the 17 first tricks (or not); the last trick is played from these hands. */
+  function lastTrick(hands: Record<string, string[]>, takerWonAll: boolean) {
+    const t = T.deal(['a', 'b', 'c', 'd'], null), last = new Set(Object.values(hands).flat());
+    Object.assign(t, { phase: 'play', taker: 'a', bid: 'garde', turn: 'a', bids: { a: 'garde', b: 'pass', c: 'pass', d: 'pass' }, ecart: [], started: ['a', 'b', 'c', 'd'] });
+    t.hands = Object.fromEntries(Object.entries(hands).map(([id, h]) => [id, h.map(card)]));
+    const rest = T.deck().filter(c => !last.has(c.id));
+    const w = takerWonAll ? 'a' : 'b';
+    t.won = { a: [], b: [], c: [], d: [] }; t.won[w] = rest;
+    t.tricks = { a: [], b: [], c: [], d: [] };
+    for (let k = 0; k < 17; k++) { t.tricks[w]!.push([{ by: w, card: rest[k]! }]); t.winners.push(w); }
+    return t;
+  }
+  const playLast = (t: T.Tarot) => { for (const id of ['a', 'b', 'c', 'd']) expect(T.play(t, id, t.hands[id]![0]!)).toBe(true); return t.result!; };
+
+  it('the Petit au bout: 10 × the contract for the side taking the last trick with it', () => {
+    const r = playLast(lastTrick({ a: ['T1'], b: ['S2'], c: ['H2'], d: ['C2'] }, true));
+    expect(r.petit).toBe('taker');
+    const r2 = playLast(lastTrick({ a: ['S3'], b: ['T1'], c: ['H3'], d: ['C3'] }, false));
+    expect(r2.petit).toBe('defense');
+  });
+
+  it('a chelem: +200 made unannounced, +400 announced; the Excuse led last wins it', () => {
+    const t = lastTrick({ a: ['EX'], b: ['S2'], c: ['H2'], d: ['C2'] }, true);
+    const r = playLast(t);
+    expect(t.winners.at(-1)).toBe('a');   // the Excuse, led by the side that took everything, takes the last trick
+    expect(r.chelem).toBe(200);
+    const t2 = lastTrick({ a: ['T21'], b: ['S2'], c: ['H2'], d: ['C2'] }, true);
+    t2.chelem = 'a';
+    expect(playLast(t2).chelem).toBe(400);
+    const t3 = lastTrick({ a: ['S3'], b: ['T21'], c: ['H3'], d: ['C3'] }, true);
+    t3.chelem = 'a';
+    expect(playLast(t3).chelem).toBe(-200);   // announced, one trick lost
+  });
+
+  it('a poignée: shown before the first card, its points to the side that wins the deal', () => {
+    const t = T.deal(['a', 'b', 'c', 'd'], null);
+    Object.assign(t, { phase: 'play', taker: 'a', bid: 'prise', turn: 'b' });
+    t.hands.b = [...T.deck().filter(c => c.kind === 'trump').slice(0, 10), ...t.hands.b!.slice(0, 8)];
+    expect(T.handfulLevels(t, 'b')).toEqual([1]);
+    expect(T.declareHandful(t, 'b', 1)).toBe(true);
+    expect(t.handfuls.b!.cards).toHaveLength(10);
+    expect(T.declareHandful(t, 'b', 1)).toBe(false);   // once
+    t.started.push('c');
+    expect(T.handfulLevels(t, 'c')).toEqual([]);       // after one's first card: too late
+  });
 });

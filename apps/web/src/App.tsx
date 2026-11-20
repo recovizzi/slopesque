@@ -289,7 +289,8 @@ function GameInfo() {
     : act === 'cards' ? [
       ['Jeu', GAME_HELP[game], game === 'tarot' ? 'Tarot' : 'Trou du cul'],
       ['Joueurs', 'Des robots complètent les places libres', `${room.cards.settings[game]}${game === 'tarot' && room.cards.settings.tarot === 5 ? ' · Roi appelé' : ''}`],
-      ...(game === 'tarot' ? [['Revoir les plis gagnés', 'Au survol d\'un joueur ou de sa pile', room.cards.showTricks ? 'Oui' : 'Non'] as Row] : [])]
+      ...(game === 'tarot' ? [['Revoir les plis gagnés', 'Au survol d\'un joueur ou de sa pile', room.cards.showTricks ? 'Oui' : 'Non'] as Row,
+        ['Niveau des robots', 'Ils jouent avec ce que leur place voit', ({ facile: 'Facile', moyen: 'Moyen', fort: 'Fort' } as const)[room.cards.settings.bots ?? 'moyen']] as Row] : [])]
     : act === 'lowtide' ? [['Adresse', 'La page du jeu, vérifiée par l\'hôte', <span className="ro-url">{Object.values(room.web)[0] ?? '—'}</span>]] : [];
   return <>
     <div className="ro-head"><span className="ro-who">Réglé par l'hôte</span>{host && <span className="ro-host"><Avatar name={host.name} hue={host.hue} photo={host.photo} size="sm" />{host.name}</span>}</div>
@@ -340,6 +341,9 @@ function CardsSettings() {
     <p className="note">À partir de la donne suivante. Prends une place à la table avant la donne ; des robots complètent les places libres. Les règles se lisent avec le bouton « i » de la table.</p>
     {game === 'tarot' && <><label className="check"><input type="checkbox" checked={room.cards.showTricks} disabled={!host} onChange={e => void request('tarot:tricks', { show: e.target.checked })} /><span>Revoir les plis gagnés (au survol)</span></label>
       <p className="note">Décoché, la partie est plus dure : personne ne peut revoir les plis déjà joués.</p>
+      <label className="field"><span>Niveau des robots</span><select value={room.cards.settings.bots ?? 'moyen'} disabled={!host} onChange={async e => ack(await request('tarot:bots', { level: e.target.value as 'moyen' }))}>
+        <option value="facile">Facile — des fautes, des enchères prudentes</option><option value="moyen">Moyen — les règles du jeu, un peu de hasard</option><option value="fort">Fort — il calcule la fin de la donne</option></select></label>
+      <p className="note">Les robots jouent comme un joueur : avec ce que leur place voit, jamais les mains des autres.</p>
       <TrumpArt edit={host} /></>}
   </>;
 }

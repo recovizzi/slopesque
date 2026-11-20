@@ -24,10 +24,12 @@ export interface Step {
   gather: string | null;                 // Tarot: the trick just taken, to show then send to this seat
   take: { seat: string; bid: string } | null;
   call: { taker: string; card: NonNullable<NonNullable<CardsView['tarot']>['called']> } | null;
+  handfuls: { seat: string; level: 1 | 2 | 3; cards: NonNullable<CardsView['tarot']>['chien'] }[];   // poignées just shown
+  chelem: string | null;                                                                         // a chelem just announced
 }
 /** What happened between two views of the table (nothing when the deal changed). */
 export function diff(a: CardsView, b: CardsView): Step {
-  const none: Step = { played: [], gather: null, take: null, call: null };
+  const none: Step = { played: [], gather: null, take: null, call: null, handfuls: [], chelem: null };
   if (!sameDeal(a, b)) return none;
   const seen = new Set(plays(a).flatMap(p => p.cards.map(c => c.id)));
   const played = plays(b).filter(p => p.cards.some(c => !seen.has(c.id)));
@@ -39,6 +41,8 @@ export function diff(a: CardsView, b: CardsView): Step {
     gather: closed ? tb.lastWinner : null,
     take: !ta.taker && tb.taker && tb.bid ? { seat: tb.taker, bid: tb.bid } : null,
     call: !ta.called && tb.called && tb.taker ? { taker: tb.taker, card: tb.called } : null,
+    handfuls: Object.entries(tb.handfuls ?? {}).filter(([seat]) => !ta.handfuls?.[seat]).map(([seat, h]) => ({ seat, level: h.level, cards: h.cards })),
+    chelem: !ta.chelem && tb.chelem ? tb.chelem : null,
   };
 }
 

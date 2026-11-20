@@ -7,7 +7,7 @@ import type { Server, Socket } from 'socket.io';
 import type postgres from 'postgres';
 import { castVote, closeVote, creditWord, defaultHue, startVote, tierOf, type Vote } from '@slopesque/engines';
 import * as D from '@slopesque/engines';
-import { Poll, Table, Tarot, Tdc, Wheel, KICK_AFTER_MS } from '@slopesque/engines';
+import { Poll, Table, Tarot, TarotAI, Tdc, Wheel, KICK_AFTER_MS } from '@slopesque/engines';
 import { CARD_PLAYERS, EFFECT_MS, EFFECT_PARALLEL, ON_PHOTO, PRESENCE, SCORE_NAMES, scoreKey, type EffectKind, type EffectView, READY_ACTIVITIES, READY_CARD_GAMES, type CardsView, type PollAnswer, type PollView, type WheelView, type PollPicView, type ActivityChoice, type EmojiView, type GifRef, type MemberView, type RoomEvent, type RoomState, type StickerView } from '@slopesque/shared';
 import { DB, SQL, type Db } from '../db/db.module.js';
 import { ENV, type Env } from '../config/config.module.js';
@@ -23,7 +23,7 @@ import type { Account } from '../accounts/accounts.service.js';
 interface MemberRt { sockets: Set<string>; awaySince: number | null; grace: NodeJS.Timeout | null }
 interface PollRt { phase: PollView['phase']; round: number; seconds: number; secret: boolean; poll: PollView['poll']; answers: Record<string, PollAnswer>; host: string | null; deadline: number | null; timer: NodeJS.Timeout | null }
 interface WheelRt { phase: WheelView['phase']; items: WheelView['items']; spin: WheelView['spin']; needle: number; round: number; timer: NodeJS.Timeout | null }
-interface CardsRt { game: 'tdc' | 'tarot'; players: number; settings: { tdc: number; tarot: number }; showTricks: boolean; tarot: Tarot.Tarot | null; settled: boolean; seats: Table.CardSeat[]; tdc: Tdc.Tdc | null; paid: Record<string, string | null>; turnSince: number; robot: NodeJS.Timeout | null; late: NodeJS.Timeout | null; art: Record<string, string> }
+interface CardsRt { game: 'tdc' | 'tarot'; players: number; settings: { tdc: number; tarot: number; bots?: TarotAI.Level }; showTricks: boolean; tarot: Tarot.Tarot | null; settled: boolean; seats: Table.CardSeat[]; tdc: Tdc.Tdc | null; paid: Record<string, string | null>; turnSince: number; robot: NodeJS.Timeout | null; late: NodeJS.Timeout | null; art: Record<string, string> }
 interface RoomRt { cards: CardsRt; room: Room; seq: number; members: Map<string, MemberRt>; vote: { id: number; v: Vote; timer: NodeJS.Timeout } | null; disk: D.DiskState; diskTimer: NodeJS.Timeout | null; poll: PollRt; wheel: WheelRt; fx: Record<string, number[]>; notice: { id: string; title: string; text: string; at: number } | null }
 export interface SocketData { account: Account; ip: string; roomId: string | null }
 
@@ -910,6 +910,10 @@ export class RoomHub implements OnModuleInit {
     const name = (id: string) => this.seatName(rt, id);
     if (before === 'bid' && t.phase !== 'bid') await this.say(rt, null, t.taker ? `${await name(t.taker)} prend : ${Tarot.BIDS[t.bid!].name}.` : t.note);
     if ('call' in act && t.called) await this.say(rt, null, `${await name(seat)} appelle ${Tarot.cardName(t.called)}.`);
+    if (before !== 'play' && t.phase === 'play' && t.taker && !rt.cards.seats.find(s => s.id === t.taker)?.user
+      && TarotAI.aiChelem(Tarot.tarotView(t, t.taker), t.taker, rt.cards.settings.bots ?? 'moyen') && Tarot.announceChelem(t, t.taker)) {
+      await this.say(rt, null, `${await name(t.taker)} annonce un chelem : tous les plis !`);
+    }
     if (!revealed && t.revealed && t.partner) await this.say(rt, null, `${await name(t.partner)} joue ${Tarot.cardName(t.called!)} : ${t.partner === t.taker ? 'seul contre 4' : `partenaire de ${await name(t.taker!)}`}.`);
     // the tables show it before the robots go on: the take (2 s), the called card (2,8 s), the trick taken (2 s)
     const pause = before === 'bid' && t.taker ? 2.6 : 'call' in act ? 3.4 : 'play' in act && !t.trick.length ? 2.4 : 1;
@@ -953,9 +957,42 @@ export class RoomHub implements OnModuleInit {
     if (!t || t.phase === 'done') return;
     const seat = t.phase === 'dog' ? t.taker! : t.turn!;
     if (rt.cards.seats.find(s => s.id === seat)?.user) return;
-    const view = Tarot.tarotView(t, seat);   // a robot plays on what its seat may see
-    await this.tarotApply(rt, seat, t.phase === 'bid' ? { bid: Tarot.botBid(view, seat) } : t.phase === 'call' ? { call: Tarot.botCall(view) }
-      : t.phase === 'dog' ? { discard: Tarot.botDiscard(view) } : { play: Tarot.botPlay(view, seat) }).catch(() => { /* a robot never makes an illegal move */ });
+    const view = Tarot.tarotView(t, seat), level = rt.cards.settings.bots ?? 'moyen';   // a robot plays on what its seat may see, at the host's level
+    const d = TarotAI.decide(view, seat, level, Math.random, Tarot.play);
+    if ('play' in d && d.handful && Tarot.declareHandful(t, seat, d.handful)) await this.sayHandful(rt, seat);
+    await this.tarotApply(rt, seat, d).catch(() => { /* a robot never makes an illegal move */ });
+  }
+
+  /** A poignée shown: said in the chat, its trumps seen by everyone (the table shows them a moment). */
+  private async sayHandful(rt: RoomRt, seat: string) {
+    const h = rt.cards.tarot!.handfuls[seat]!;
+    await this.say(rt, null, `${await this.seatName(rt, seat)} montre une ${Tarot.HANDFUL_NAMES[h.level - 1]} (${h.cards.length} atouts).`);
+  }
+
+  /** A player shows a poignée, before his first card. */
+  async tarotHandful(socket: Socket, level: 1 | 2 | 3) {
+    const rt = this.roomOf(socket), t = rt.cards.tarot, seat = Table.seatOfUser(rt.cards.seats, (socket.data as SocketData).account.id);
+    if (!t || !seat || !Tarot.declareHandful(t, seat.id, level)) throw new UserError(`Poignée impossible : ${Tarot.handfulSizes(t?.seats.length ?? 4)[level - 1]} atouts à montrer, avant ta première carte.`);
+    await this.sayHandful(rt, seat.id);
+    await this.emitCards(rt);
+  }
+
+  /** The taker announces a chelem, before the first card: he leads. */
+  async tarotChelem(socket: Socket) {
+    const rt = this.roomOf(socket), t = rt.cards.tarot, seat = Table.seatOfUser(rt.cards.seats, (socket.data as SocketData).account.id);
+    if (!t || !seat || !Tarot.announceChelem(t, seat.id)) throw new UserError('Le chelem s\'annonce par le preneur, avant la première carte.');
+    await this.say(rt, null, `${await this.seatName(rt, seat.id)} annonce un chelem : tous les plis !`);
+    await this.afterTarot(rt, null);
+  }
+
+  /** The robots' level at the Tarot (host). */
+  async tarotBots(socket: Socket, level: TarotAI.Level) {
+    const rt = this.roomOf(socket);
+    this.hostOnly(rt, socket);
+    rt.cards.settings = { ...rt.cards.settings, bots: level };
+    await this.saveRules(rt, 'cards', rt.cards.settings);
+    await this.say(rt, null, `Robots du Tarot : niveau ${TarotAI.LEVELS[level]}.`);
+    await this.emitCards(rt);
   }
 
   /** The host's number of seats for a game (robots complete them), from the next deal. */

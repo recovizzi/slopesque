@@ -129,14 +129,15 @@ export interface TarotDealView {
   called: TarotCardView | null; partner: string | null; revealed: boolean; bids: Record<string, string>; turn: string | null; taker: string | null;
   bid: string | null; ecart: TarotCardView[]; trick: { by: string; card: TarotCardView }[]; lastTrick: { by: string; card: TarotCardView }[];
   won: Record<string, TarotCardView[]>; tricks: Record<string, { by: string; card: TarotCardView }[][]>; lastWinner: string | null; deal: number; startedAt: number;
-  result: { taker: string; partner: string | null; bid: string; bouts: number; need: number; made: number; won: boolean; score: number; marks: Record<string, number> } | null; note: string;
+  result: { taker: string; partner: string | null; bid: string; bouts: number; need: number; made: number; won: boolean; score: number; marks: Record<string, number>; petit: 'taker' | 'defense' | null; handfuls: number; chelem: number } | null; note: string;
+  shownChien: TarotCardView[]; chelem: string | null; handfuls: Record<string, { level: 1 | 2 | 3; cards: TarotCardView[] }>; started: string[]; winners: string[];
 }
 /** How many seats each card game can have (robots complete the free ones). */
 export const CARD_PLAYERS = { tdc: [3, 4, 5, 6, 7, 8], tarot: [4, 5] } as const;
 export interface CardsView {
   game: 'tdc' | 'tarot';
   players: number;                       // the seats of the table on the table now
-  settings: { tdc: number; tarot: number };   // the host's choice for each game, from the next deal
+  settings: { tdc: number; tarot: number; bots?: 'facile' | 'moyen' | 'fort' };   // the host's choice for each game, from the next deal; bots: the robots' level
   showTricks: boolean;                   // Tarot: the won tricks can be looked at
   seats: CardSeatView[];
   tdc: TdcRoundView | null;
@@ -267,6 +268,9 @@ export const intents = {
   'tarot:call': z.object({ card: z.string().max(4) }),
   'tarot:discard': z.object({ cards: z.array(z.string().max(4)).max(6) }),
   'tarot:tricks': z.object({ show: z.boolean() }),
+  'tarot:bots': z.object({ level: z.enum(['facile', 'moyen', 'fort']) }),
+  'tarot:handful': z.object({ level: z.union([z.literal(1), z.literal(2), z.literal(3)]) }),
+  'tarot:chelem': z.object({}),
   'tarot:art': z.object({ card: z.number().int().min(0).max(21), mediaId: z.string().uuid().nullable() }),
   'tarot:art-reset': z.object({}),
   'effect:play': z.object({ kind: z.enum(EFFECTS), target: z.string().uuid().nullable().optional(),
@@ -333,6 +337,9 @@ export interface IntentResults {
   'tarot:call': null;
   'tarot:discard': null;
   'tarot:tricks': null;
+  'tarot:bots': null;
+  'tarot:handful': null;
+  'tarot:chelem': null;
   'tarot:art': null;
   'tarot:art-reset': null;
   'effect:play': null;

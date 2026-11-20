@@ -7,7 +7,7 @@ import { backSvg, faceSvg, handAngle, head, rulesFrame, SUIT_EMOJI } from './car
 import { avatarHtml, esc } from './html';
 import { Tarot as TA } from '@slopesque/engines';
 
-const { BIDS, bidsFor, callable, canDiscard, cardName, ecartSize, isBout, legal, NEED, suitLabel } = TA;
+const { BIDS, bidsFor, callable, canDiscard, cardName, ecartSize, handfulLevels, handfulSizes, HANDFUL_NAMES, HANDFUL_POINTS, isBout, legal, NEED, suitLabel } = TA;
 type Bid = TA.Bid; type Tarot = TA.Tarot; type TCard = TA.TCard; type TPlay = TA.TPlay;
 
 /** The default dressing of the trumps: an emoji each (0: the Excuse, the jester). */
@@ -69,6 +69,14 @@ export function callAnnounce(name: string, card: TCard, art: Record<string, stri
     ${mine ? '<small>C\'est toi qui l\'as : tu es son partenaire (en secret)</small>' : '<small>Son partenaire se révèle en jouant cette carte</small>'}</div>`;
 }
 
+/** A poignée shown: its trumps, a moment, for everyone. */
+export function handfulAnnounce(name: string, level: 1 | 2 | 3, cards: TCard[], art: Record<string, string>) {
+  return `<div class="announce-box handful"><small>Poignée</small>${esc(name)} montre une ${HANDFUL_NAMES[level - 1]}
+    <div class="handful-cards">${cards.map(cd => `<span class="pcard">${tarotSvg(cd, art)}</span>`).join('')}</div>
+    <small>${HANDFUL_POINTS[level - 1]} points pour le camp qui gagnera la donne</small></div>`;
+}
+export const chelemAnnounce = (name: string) => `<div class="announce-box take"><small>Chelem</small>${esc(name)} annonce un chelem<span class="ann-bid">tous les plis</span></div>`;
+
 /** A player's won tricks, each as a small fan, in a grid that fits the table (hovering his chip or my pile). */
 function tricksView(t: Tarot, id: string, name: string, art: Record<string, string>) {
   const tr = t.tricks[id] ?? [];
@@ -100,6 +108,7 @@ export function tarotTableHtml(c: TarotCtx) {
     return `<li class="cg-seat ${t.turn === id ? 'is-turn' : ''} ${c.wonView === id ? 'is-viewed' : ''}" data-seat="${esc(id)}" ${won && c.showTricks ? `data-won="${esc(id)}"` : ''} style="--c:${p.color}">
       ${avatarHtml(p.name, p.color, p.photo)}<span class="seat-name">${esc(p.name)}</span>
       ${t.taker === id ? `<span class="role-badge role-president">Preneur · ${BIDS[t.bid!].name}</span>` : t.revealed && t.partner === id ? '<span class="role-badge role-vice">Partenaire</span>' : t.phase === 'bid' && b ? `<span class="role-badge">${bidName(b)}</span>` : ''}
+      ${t.handfuls?.[id] ? `<span class="role-badge role-handful" title="${t.handfuls[id].cards.length} atouts montrés">${HANDFUL_NAMES[t.handfuls[id].level - 1]}</span>` : ''}${t.chelem === id ? '<span class="role-badge role-chelem">Chelem annoncé</span>' : ''}
       <span class="seat-cards" title="${t.hands[id].length} cartes"><b>${t.hands[id].length}</b></span>
       ${won ? `<span class="seat-tricks" title="${c.showTricks ? 'Survoler pour voir ses plis' : 'Plis cachés : l\'hôte a désactivé leur consultation'}">${won} pli${won > 1 ? 's' : ''}</span>` : ''}</li>`;
   }).join('');
@@ -125,7 +134,7 @@ export function tarotTableHtml(c: TarotCtx) {
     const r = t.result, alone = t.seats.length === 5 && !r.partner;
     pile = `<div class="cg-results tarot-results"><h3>Donne ${t.deal} : ${esc(name(r.taker))}${r.partner ? ` et ${esc(name(r.partner))}` : ''} ${r.won ? (r.partner ? 'gagnent' : 'gagne') : (r.partner ? 'chutent' : 'chute')}</h3>
       <p class="note">${BIDS[r.bid].name} · ${r.bouts} bout${r.bouts > 1 ? 's' : ''} → ${r.need} points à faire · ${String(r.made).replace('.', ',')} faits
-        → (25 + ${Math.round(Math.abs(r.made - r.need))}) × ${BIDS[r.bid].mult} = ${Math.abs(r.score)}${t.seats.length === 5 ? (alone ? ' · seul contre 4 : × 4' : ' · preneur × 2, partenaire × 1') : ''}</p>
+        → ${r.won ? '' : '−'}(25 + ${Math.round(Math.abs(r.made - r.need))})${r.petit ? ` ${r.petit === 'taker' ? '+' : '−'} 10 (Petit au bout)` : ''} × ${BIDS[r.bid].mult}${r.handfuls ? ` ${r.handfuls > 0 ? '+' : '−'} ${Math.abs(r.handfuls)} (poignée)` : ''}${r.chelem ? ` ${r.chelem > 0 ? '+' : '−'} ${Math.abs(r.chelem)} (chelem)` : ''} = ${r.score}${t.seats.length === 5 ? (alone ? ' · seul contre 4 : × 4' : ' · preneur × 2, partenaire × 1') : ''}</p>
       <ol>${t.seats.map(id => `<li><span class="dot" style="--c:${c.who(id).color}"></span><b>${esc(name(id))}</b>${id === r.taker ? '<span class="role-badge role-president">Preneur</span>' : id === r.partner ? '<span class="role-badge role-vice">Partenaire</span>' : '<span class="role-badge">Défense</span>'}
         <span class="pts ${r.marks[id] < 0 ? 'neg' : ''}">${r.marks[id] > 0 ? '+' : ''}${r.marks[id]}</span></li>`).join('')}</ol>
       ${c.host ? '<button class="btn" type="button" data-action="cards-deal">Donne suivante</button>' : '<p class="note">L\'hôte lance la donne suivante.</p>'}</div>`;
@@ -160,7 +169,12 @@ export function tarotTableHtml(c: TarotCtx) {
       <button class="btn" type="button" data-action="tarot-ecart" ${n === k ? '' : 'disabled'}>Faire l'écart</button></div>`;
   } else {
     const sel = mine.find(cd => c.selected.has(cd.id));
-    actions = `<div class="cg-actions">${chip}<span class="cg-hint">${t.phase !== 'play' ? '' : myTurn ? (sel ? `Jouer ${cardName(sel)} ?` : 'Choisis une carte (les autres sont grisées)') : 'Attends ton tour…'}</span>
+    const sizes = handfulSizes(t.seats.length);
+    const announce = t.phase === 'play' ? [
+      ...(t.taker === me && !t.chelem && !(t.started ?? []).length && !t.trick.length ? ['<button class="btn ghost sm" type="button" data-action="tarot-chelem" title="Tous les plis : +400 réussi, −200 manqué ; tu entames">Annoncer un chelem</button>'] : []),
+      ...(myTurn ? handfulLevels(t, me).map(lv => `<button class="btn ghost sm" type="button" data-action="tarot-handful" data-v="${lv}" title="Montrer ${sizes[lv - 1]} atouts : ${HANDFUL_POINTS[lv - 1]} points pour le camp qui gagne la donne">Montrer une ${HANDFUL_NAMES[lv - 1]} (${sizes[lv - 1]})</button>`) : []),
+    ].join('') : '';
+    actions = `<div class="cg-actions">${chip}${announce}<span class="cg-hint">${t.phase !== 'play' ? '' : myTurn ? (sel ? `Jouer ${cardName(sel)} ?` : 'Choisis une carte (les autres sont grisées)') : 'Attends ton tour…'}</span>
       <button class="btn" type="button" data-action="cards-play" ${t.phase === 'play' && myTurn && sel ? '' : 'disabled'}>Jouer</button></div>`;
   }
   return `<div class="cards-game tarot ${active || (myTurn && (t.phase === 'bid' || t.phase === 'call')) ? 'my-turn' : ''}">${head(`Tarot à ${t.seats.length}`, info)}
@@ -200,6 +214,11 @@ export function tarotRulesHtml(art: Record<string, string>) {
       <p>Marques : le preneur × 2, son partenaire × 1, chaque défenseur × 1 dans l'autre sens. S'il s'est appelé lui-même ou si le Roi est au chien, il joue seul contre 4 : × 4.</p></section>
     <section><h3>Le compte</h3><p>Points à faire selon les bouts du preneur : 0 bout <b>${NEED[0]}</b>, 1 bout <b>${NEED[1]}</b>, 2 bouts <b>${NEED[2]}</b>, 3 bouts <b>${NEED[3]}</b>.
       Marque = (25 + l'écart) × le contrat ; le preneur la gagne 3 fois (ou la perd), chaque défenseur la perd une fois (ou la gagne).</p>
-      <p class="note">Exemple : Garde, 2 bouts, 47 points faits pour ${NEED[2]} → (25 + 6) × 2 = 62 : le preneur +186, chaque défenseur −62. Petit au bout, poignées et chelem : plus tard.</p></section>`);
+      <p class="note">Exemple : Garde, 2 bouts, 47 points faits pour ${NEED[2]} → (25 + 6) × 2 = 62 : le preneur +186, chaque défenseur −62.</p></section>
+    <section><h3>Les primes</h3>
+      <p><b>Petit au bout</b> : le Petit dans le dernier pli rapporte 10 × le contrat au camp qui gagne ce pli, que la donne soit gagnée ou non.</p>
+      <p><b>Poignée</b> : avant ta première carte, montre ${handfulSizes(4).join(', ')} atouts à 4 (${handfulSizes(5).join(', ')} à 5) : simple, double ou triple poignée, ${HANDFUL_POINTS.join(', ')} points (non multipliés) pour le camp qui <b>gagne</b> la donne. L'Excuse compte pour un atout si c'est le dernier.</p>
+      <p><b>Chelem</b> : faire tous les plis. Annoncé par le preneur avant la première carte (il entame) : +400 réussi, −200 manqué ; réussi sans annonce : +200. Dans un chelem, l'Excuse menée au dernier pli le gagne.</p>
+      <p class="note">Marque = ((25 + l'écart) ± Petit au bout) × le contrat ± poignées ± chelem.</p></section>`);
 }
 

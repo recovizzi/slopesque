@@ -44,4 +44,17 @@ describe.skipIf(!up)('Tarot', () => {
     expect(end.paid[mine.id]).toBe(end.tarot!.deal === c.tarot!.deal ? me : null);
     expect(Object.values(end.tarot!.result!.marks).reduce((x, y) => x + y, 0)).toBe(0);
   }, 30_000);
+
+  it('the host sets the robots\' level; at « fort » they finish a deal (with the bonuses in the result)', async () => {
+    expect((await ask(a, 'tarot:bots', { level: 'fort' })).ok).toBe(false);   // the host only
+    const set = cards(host, v => v.settings.bots === 'fort');
+    expect((await ask(host, 'tarot:bots', { level: 'fort' })).ok).toBe(true);
+    await set;
+    const done = cards(host, v => v.tarot?.phase === 'done' && !!v.tarot.result);
+    expect((await ask(host, 'cards:deal')).ok).toBe(true);
+    const end = await done;
+    expect(end.tarot!.result).toHaveProperty('petit');
+    expect(end.tarot!.result).toHaveProperty('chelem');
+    expect(Object.values(end.tarot!.result!.marks).reduce((x, y) => x + y, 0)).toBe(0);
+  }, 60_000);
 });
