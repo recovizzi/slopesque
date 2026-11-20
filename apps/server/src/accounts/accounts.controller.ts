@@ -17,7 +17,7 @@ export class AccountsController {
     const v = intents['account:find'].safeParse(body);
     if (!v.success) return { ok: false, error: 'Demande invalide.' };
     const from = (this.env.TRUST_PROXY && String(req.headers['x-forwarded-for'] ?? '').split(',')[0]?.trim()) || ip;
-    try { return { ok: true, value: await this.accounts.find(v.data.code, from) }; } catch (e) {
+    try { return { ok: true, value: await this.accounts.find(v.data.code, from, v.data.resume) }; } catch (e) {
       if (e instanceof UserError) return { ok: false, error: e.message };
       throw e;
     }

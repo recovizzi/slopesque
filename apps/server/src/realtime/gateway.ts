@@ -118,7 +118,7 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
   saveRooms(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('rooms:save', b, async v => { await this.accounts.saveRooms(this.me(s).id, v.rooms); return null; }); }
 
   @SubscribeMessage('account:find')
-  find(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('account:find', b, v => this.accounts.find(v.code, (s.data as SocketData).ip)); }
+  find(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('account:find', b, v => this.accounts.find(v.code, (s.data as SocketData).ip, v.resume)); }
 
   @SubscribeMessage('account:renew')
   renew(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {

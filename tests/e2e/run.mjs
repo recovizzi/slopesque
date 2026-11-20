@@ -122,6 +122,18 @@ await ph.setFiles({ name: 'moi.png', mimeType: 'image/png', buffer: await png(a.
 check(await until(async () => (await b.frame.locator('.person', { hasText: 'Léa' }).locator('.avatar.has-photo img').count()) === 1, 8000), 'photo: A\'s photo shown to B in the players');
 check(await until(async () => await a.frame.locator('.photo-wrap .avatar img').evaluate(i => i.complete && i.naturalWidth === 256 && i.naturalHeight === 256), 8000), 'photo: a 256 px square');
 await shot(a.page, '05-photo');
+// « Reprendre un compte »: wrong codes counted (3, then 5 min to wait); two here, then a right one counts from zero again
+await a.frame.getByRole('button', { name: 'Changer de code utilisateur' }).click();
+await a.frame.locator('.code-modal .choice', { hasText: 'Reprendre un compte existant' }).click();
+for (const left of ['2 essais', '1 essai']) {
+  await a.frame.locator('[name="codeInput"]').fill('ZZZZ-ZZZZ-ZZZZ-ZZZZ');
+  await a.frame.locator('.code-modal').getByRole('button', { name: 'Continuer' }).click();
+  check(await until(async () => (await a.frame.locator('.code-modal .alert').textContent().catch(() => '')).includes(`Encore ${left} avant 5 min d'attente`)), `account: an unknown code, « encore ${left} » before the 5 min wait`);
+}
+await a.frame.locator('[name="codeInput"]').fill(b.code);
+await a.frame.locator('.code-modal').getByRole('button', { name: 'Continuer' }).click();
+check(await until(async () => (await a.frame.locator('.code-modal').textContent().catch(() => '')).includes('Tu reprends le compte')), 'account: a right code (the counter back to zero)');
+await a.page.keyboard.press('Escape');
 await a.frame.locator('.drawer-right [aria-label="Fermer"]').click();
 await shot(b.page, '06-pictures-dark');
 

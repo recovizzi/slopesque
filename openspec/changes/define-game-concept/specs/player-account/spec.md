@@ -70,6 +70,21 @@ noter. Le code MUST pouvoir être changé à tout moment, autant de fois que vou
 - **WHEN** un joueur confirme « Créer ce compte » avec un nouveau code
 - **THEN** son pseudo redevient « Toi », sans photo ; son ancien compte reste sur le serveur
 
+### Requirement: Trois codes inconnus, cinq minutes d'attente
+Pour « Reprendre un compte existant », un code qu'aucun compte n'a (ou un code remplacé) MUST compter comme une erreur
+pour l'adresse d'où il vient ; à la **troisième** erreur, cette adresse MUST attendre **5 minutes** avant tout nouvel
+essai, même avec le bon code, et le message MUST dire combien de temps il reste. Après une erreur, le message MUST dire
+combien d'essais restent avant l'attente ; le bon code avant la troisième erreur remet le compte à zéro. Une panne du
+serveur ne compte pas, ni la vérification qu'un nouveau code est libre (Renouveler, Repartir de zéro).
+
+#### Scenario: Trois erreurs
+- **WHEN** je tape trois codes inconnus de suite pour reprendre un compte
+- **THEN** le troisième essai répond « Trois codes inconnus : réessaie dans 5 min. », et le bon code est refusé jusque-là
+
+#### Scenario: Un avertissement
+- **WHEN** je me trompe une deuxième fois
+- **THEN** le message ajoute « Encore 1 essai avant 5 min d'attente. »
+
 ### Requirement: Ancien code hors service
 Un code remplacé (renouvelé par le joueur, ou par un admin) MUST devenir inutilisable aussitôt : le serveur MUST
 **déconnecter** les appareils encore connectés avec lui et garder son empreinte comme **retirée**, pour toujours. Un

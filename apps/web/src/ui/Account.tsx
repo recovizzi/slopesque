@@ -97,11 +97,12 @@ export function CodeModal({ first, start, onClose, onDone }: { first: boolean; s
     if (mode !== 'resume' && s.level < 2) return;
     if (mode === 'resume' && canonicalCode(code).length < CODE_MIN_LEN) return;
     setBusy(true);
-    const r = await checkCode(device.server, code);
+    const r = await checkCode(device.server, code, mode === 'resume');
     setBusy(false);
     if (!r.ok) { setError(r.error); return; }
-    if (r.value.retired) setError(mode === 'resume' ? 'Ce code a été remplacé : tape le nouveau (Profil → Compte sur ton autre appareil).' : 'Ce code est déjà pris : choisis-en un autre.');
-    else if (mode === 'resume' && !r.value.exists) setError('Aucun compte avec ce code sur ce serveur. Recopie-le depuis ton autre appareil (Profil → Compte).');
+    const left = r.value.triesLeft ? ` Encore ${r.value.triesLeft} essai${r.value.triesLeft > 1 ? 's' : ''} avant 5 min d'attente.` : '';
+    if (r.value.retired) setError(mode === 'resume' ? `Ce code a été remplacé : tape le nouveau (Profil → Compte sur ton autre appareil).${left}` : 'Ce code est déjà pris : choisis-en un autre.');
+    else if (mode === 'resume' && !r.value.exists) setError(`Aucun compte avec ce code sur ce serveur. Recopie-le depuis ton autre appareil (Profil → Compte).${left}`);
     else if (mode !== 'resume' && r.value.exists) setError('Ce code est déjà pris : choisis-en un autre, ou « Reprendre un compte existant » si c\'est le tien.');
     else { setFound(r.value.name); setStep('confirm'); }
   }

@@ -214,7 +214,7 @@ export const intents = {
   'chat:react': z.object({ id: z.number().int().positive(), emoji: z.string().min(1).max(64) }),
   'profile:update': z.object({ name: z.string().trim().max(20).optional(), hue: z.number().int().min(0).max(359).nullable().optional(), quick: z.string().max(32).nullable().optional() }),
   'rooms:save': z.object({ rooms: z.array(z.object({ key: z.string().max(16), name: z.string().max(40), pending: z.boolean() })).max(100) }),
-  'account:find': z.object({ code: z.string().max(64) }),
+  'account:find': z.object({ code: z.string().max(64), resume: z.boolean().optional() }),   // resume: taking an account back (its wrong codes count)
   'account:renew': z.object({ code: z.string().max(64) }),
   'host:give': z.object({ to: z.string().uuid() }),
   'media:ticket': z.object({ usage: z.enum(['chat', 'sticker', 'emoji', 'photo', 'poll', 'trump']) }),
@@ -282,7 +282,7 @@ export interface IntentResults {
   'chat:react': null;
   'profile:update': AccountView;
   'rooms:save': null;
-  'account:find': { exists: boolean; retired: boolean; name: string | null };
+  'account:find': { exists: boolean; retired: boolean; name: string | null; triesLeft?: number };
   'account:renew': null;
   'host:give': null;
   'media:ticket': { ticket: string; url: string };

@@ -13,6 +13,9 @@ import { UserError } from '../errors.js';
 
 export type Account = typeof accounts.$inferSelect;
 
+/** « 4 min 32 s ». */
+const wait = (ms: number) => { const s = Math.ceil(ms / 1000), m = Math.floor(s / 60); return m ? `${m} min${s % 60 ? ` ${s % 60} s` : ''}` : `${s} s`; };
+
 @Injectable()
 export class AccountsService {
   constructor(@Inject(ENV) private readonly env: Env, @Inject(DB) private readonly db: Db, private readonly cache: CacheService) {}
@@ -41,12 +44,25 @@ export class AccountsService {
 
   view(a: Account): AccountView { return { id: a.id, name: a.name, hue: a.hue, quick: a.quick, rooms: a.rooms, gifFavorites: a.gifFavorites as AccountView['gifFavorites'] }; }
 
-  /** « Reprendre un compte » / « Repartir de zéro »: does an account have this code (limited like unknown codes)? */
-  async find(code: string, ip: string) {
+  /** « Reprendre un compte » / « Repartir de zéro »: does an account have this code (limited like unknown codes)? Taking an
+   *  account back (resume): 3 wrong codes from an address, then 5 min to wait — even a right code waits. */
+  async find(code: string, ip: string, resume = false) {
+    const key = `code-resume:${ip}`, now = Date.now();
+    const fails = resume ? (await this.cache.get<{ n: number; until: number }>(key)) ?? { n: 0, until: 0 } : null;
+    if (fails && fails.until > now) throw new UserError(`Trois codes inconnus : réessaie dans ${wait(fails.until - now)}.`);
     if (!(await this.cache.allow(`code:${ip}`, this.env.CODE_ATTEMPTS_PER_MINUTE, LIMITS.codeAttempts.perMs))) throw new UserError('Trop d\'essais : attends une minute.');
     const h = this.hmac(code);
     const a = await this.db.query.accounts.findFirst({ where: eq(accounts.codeHmac, h) });
-    return { exists: !!a, retired: !a && (await this.isRetired(h)), name: a?.name ?? null };
+    const found = { exists: !!a, retired: !a && (await this.isRetired(h)), name: a?.name ?? null };
+    if (!fails) return found;
+    if (a) { await this.cache.set(key, { n: 0, until: 0 }, 1000); return found; }   // the right code: counted from zero again
+    const n = fails.n + 1, { tries, lockMs } = LIMITS.codeResume;
+    if (n >= tries) {
+      await this.cache.set(key, { n: 0, until: now + lockMs }, lockMs);
+      throw new UserError(`Trois codes inconnus : réessaie dans ${wait(lockMs)}.`);
+    }
+    await this.cache.set(key, { n, until: 0 }, lockMs);
+    return { ...found, triesLeft: tries - n };
   }
 
   /** « Renouveler mon code »: the same account under a new code; the old one retired. */

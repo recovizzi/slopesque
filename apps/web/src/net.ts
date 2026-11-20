@@ -71,9 +71,9 @@ export async function join(key: string, again = false) {
 }
 
 /** HTTP, before any connection: does an account have this code? */
-export async function checkCode(server: string, code: string): Promise<Ack<IntentResults['account:find']>> {
+export async function checkCode(server: string, code: string, resume = false): Promise<Ack<IntentResults['account:find']>> {
   try {
-    const r = await fetch(`${server.replace(/\/+$/, '')}/api/account/check`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code }), signal: AbortSignal.timeout(8000) });
+    const r = await fetch(`${server.replace(/\/+$/, '')}/api/account/check`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code, resume }), signal: AbortSignal.timeout(8000) });
     return await r.json();
   } catch { return { ok: false, error: `Serveur injoignable : ${server}` }; }
 }

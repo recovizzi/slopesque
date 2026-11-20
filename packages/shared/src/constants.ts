@@ -34,6 +34,7 @@ export const LIMITS = {
   uploads: { count: 30, perMs: MINUTE },
   effects: { count: 6, perMs: 10_000 },   // /effet   // the 22 trumps of the Tarot imported at once
   codeAttempts: { count: 10, perMs: MINUTE },   // unknown codes, per IP
+  codeResume: { tries: 3, lockMs: 5 * MINUTE },   // « Reprendre un compte »: 3 unknown codes, then 5 min to wait (per IP)
   maxUploadBytes: 200 * 1024 * 1024,   // not a limit on pictures (any size is compressed), a guard against non-images
   chatPage: 50,                    // a join (or a scroll to the top) loads 50 messages
   chatRefresh: 30,                 // a join with the device's messages: its last 30 refreshed (reactions, votes)
