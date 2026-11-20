@@ -152,12 +152,18 @@ export class RoomHub implements OnModuleInit {
   async say(rt: RoomRt, from: string | null, text: string, replyTo: number | null = null, general = false) {
     const message = await this.chat.send(rt.room.id, from, text, replyTo, from ? 'text' : 'system', from || general ? null : this.scope(rt));
     this.emit(rt, { type: 'message', message });
-    if (from) void this.previews.forText(text).then(async p => {   // the first link's preview, when its site gives one
+    if (from) this.preview(rt, message.id, text);
+    return message;
+  }
+
+  /** The first link's preview of a player's text, when its site gives one (it arrives after the message). */
+  private preview(rt: RoomRt, id: number, text: string) {
+    if (!text) return;
+    void this.previews.forText(text).then(async p => {
       if (!p) return;
-      const updated = await this.chat.setPreview(message.id, p);
+      const updated = await this.chat.setPreview(id, p);
       if (updated && this.live.get(rt.room.id) === rt) this.emit(rt, { type: 'message-updated', message: updated });
     });
-    return message;
   }
 
   // ---------------------------------------------------------------- pictures
@@ -168,15 +174,19 @@ export class RoomHub implements OnModuleInit {
     return row;
   }
 
-  async sendPicture(socket: Socket, kind: 'image' | 'sticker', pic: MediaRow, replyTo: number | null = null) {
+  /** A picture in the chat, with what was written with it (and the message it answers). */
+  async sendPicture(socket: Socket, kind: 'image' | 'sticker', pic: MediaRow, replyTo: number | null = null, text = '') {
     const rt = this.roomOf(socket);
-    const message = await this.chat.sendMedia(rt.room.id, (socket.data as SocketData).account.id, kind, pic, replyTo);
+    const message = await this.chat.sendMedia(rt.room.id, (socket.data as SocketData).account.id, kind, pic, replyTo, text);
     this.emit(rt, { type: 'message', message });
+    this.preview(rt, message.id, text);
   }
 
-  async sendGif(socket: Socket, gif: GifRef) {
+  async sendGif(socket: Socket, gif: GifRef, replyTo: number | null = null, text = '') {
     const rt = this.roomOf(socket);
-    this.emit(rt, { type: 'message', message: await this.chat.sendGif(rt.room.id, (socket.data as SocketData).account.id, gif) });
+    const message = await this.chat.sendGif(rt.room.id, (socket.data as SocketData).account.id, gif, replyTo, text);
+    this.emit(rt, { type: 'message', message });
+    this.preview(rt, message.id, text);
   }
 
   private async stickerViews(rt: RoomRt): Promise<StickerView[]> {
@@ -197,17 +207,19 @@ export class RoomHub implements OnModuleInit {
     else await this.db.insert(stickers).values({ roomId: rt.room.id, mediaId: pic.id, addedBy: me });
     const extra = (await this.db.select({ id: stickers.id, mediaId: stickers.mediaId }).from(stickers).where(eq(stickers.roomId, rt.room.id)).orderBy(desc(stickers.usedAt))).slice(60);
     if (extra.length) { await this.db.delete(stickers).where(inArray(stickers.id, extra.map(x => x.id))); await this.media.sweep(extra.map(x => x.mediaId)); }
-    this.emit(rt, { type: 'stickers', stickers: await this.stickerViews(rt) });
+    const lib = await this.stickerViews(rt);
+    this.emit(rt, { type: 'stickers', stickers: lib });
     if (send) await this.sendPicture(socket, 'sticker', pic);
+    return lib.find(x => x.src === this.media.url(pic.id)) ?? lib[0]!;
   }
 
-  async sendSticker(socket: Socket, id: string) {
+  async sendSticker(socket: Socket, id: string, replyTo: number | null = null, text = '') {
     const rt = this.roomOf(socket);
     const [s] = await this.db.select().from(stickers).where(and(eq(stickers.id, id), eq(stickers.roomId, rt.room.id)));
     if (!s) throw new UserError('Ce sticker n\'existe plus.');
     await this.db.update(stickers).set({ usedAt: new Date() }).where(eq(stickers.id, id));
     this.emit(rt, { type: 'stickers', stickers: await this.stickerViews(rt) });
-    await this.sendPicture(socket, 'sticker', (await this.media.get(s.mediaId))!);
+    await this.sendPicture(socket, 'sticker', (await this.media.get(s.mediaId))!, replyTo, text);
   }
 
   /** Removed from the library: deleted (and its picture, if no other room uses it). */

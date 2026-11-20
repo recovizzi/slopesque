@@ -97,8 +97,10 @@ activité Chat), comme réaction ou message direct ; rien n'est gardé (ni messa
   puis tout disparaît.
 - **/effet tomato Léa** : une tomate lancée en cloche s'écrase sur la photo et y laisse une tache rouge qui coule.
 - **/effet hammer Léa** : un marteau tombe sur la photo et l'écrase en hauteur, puis elle reprend sa forme.
-- **/effet screamer** : ouvre le choix d'une image, d'un sticker, d'un GIF ou d'un emoji, montré **1 s** au premier
-  plan au centre de la zone de tous ; une image envoyée n'est **pas gardée** (envoi unique, jamais stockée).
+- **/effet screamer** : l'image, le sticker ou le GIF qui attend au-dessus du champ (voir « Envoyer une image ou un
+  sticker »), ou un emoji écrit à la suite (`/effet screamer 😱`), montré **1 s** au premier plan au centre de la zone
+  de tous ; sans image qui attend, la commande MUST demander d'en ajouter une. Une image de l'appareil n'est **pas
+  gardée** (envoi unique, jamais stockée).
 Sur une photo : au centre de la zone, en grand ; si l'activité est un jeu de cartes et que la personne visée est à
 table, l'effet MUST se jouer en petit **sur sa place**, en suivant sa position (fenêtre redimensionnée). Feux
 d'artifice et confettis : jusqu'à **3 à la fois** chacun (plusieurs joueurs en même temps), le fond restant noir tant
@@ -327,6 +329,15 @@ survol MUST montrer qui a réagi.
 - **THEN** la barre reste affichée et ses boutons sont cliquables
 
 ### Requirement: Envoyer une image ou un sticker
+Une image, un sticker ou un GIF choisi (menu +, glisser-déposer, fenêtre des stickers ou des GIF) MUST d'abord
+**attendre au-dessus du champ** (aperçu, type, ✕ pour le retirer) sans partir : Entrée l'envoie **avec le texte écrit**
+(dans le même message, le texte sous l'image) ou seul ; une image de l'appareil n'est envoyée au serveur qu'à ce
+moment.
+
+#### Scenario: Une image et son texte
+- **WHEN** je choisis une image, écris « la vue depuis le refuge » puis Entrée
+- **THEN** un seul message part : l'image, et ce texte dessous
+
 Un fichier choisi dans l'explorateur ou glissé sur le chat MUST afficher un aperçu de son contenu, avec en dessous le
 choix « Sticker », « Image » ou « Emoji » (voir Emoji personnalisés). Pendant le glisser, le chat MUST indiquer où déposer le fichier. « Sticker » MUST
 ajouter l'image à la bibliothèque de stickers du salon et l'envoyer en petit format (128 px au plus), ses proportions

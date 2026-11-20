@@ -2,14 +2,14 @@
 // it, hovering shows it), reactions (the bar under a hovered message, my 4 last ones, « + » for the picker, a
 // double click for my quick reaction), links, emoji :codes:, the start of what is kept (30 days).
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { GifRef, MediaView, MemberView, MessageView, Quote } from '@slopesque/shared';
+import type { GifRef, MediaView, MemberView, MessageView, Quote, StickerView } from '@slopesque/shared';
 import { esc } from '../lib/html';
 import { COMMANDS, DEFAULT_REACTIONS, emojiHtml, expandCodes, loadCodes, NAME, placeFloating, suggest, suggestName, SuggestList, useRecent, withCustom, type CustomEmoji, type EmojiPop, type Suggestion } from '../lib/emoji';
 import { GifPop, useGif } from '../lib/gif';
 import { localGif } from '../lib/gif-cache';
 import { wireQuotes } from './hover';
 import { argSuggestions, isComplete, parseActivity, parseCredit, parseEffect } from '../lib/commands';
-import { ScreamerModal } from './Screamer';
+import { lightImage } from '../lib/light-image';
 import { linkify, previewHtml, type Preview } from '../lib/links';
 import { request, ServerGifs, toggleGifFavorite, upload } from '../net';
 import { useStore } from '../store';
@@ -24,14 +24,16 @@ const QUICK = '\u{1F44D}\u{FE0F}';
 
 /** A message in short, for a quote (one line, cut by CSS). */
 function quoteHtml(q: { text: string; kind: string }, custom: CustomEmoji[]) {
+  if ((q.kind === 'image' || q.kind === 'media') && q.text) return `📷 ${withCustom(esc(q.text), custom)}`;   // a picture with its text
   if (q.kind === 'image' || q.kind === 'media') return '📷 Image';
-  if (q.kind === 'sticker') return 'Sticker';
-  if (q.kind === 'gif') return 'GIF';
+  if (q.kind === 'sticker' || q.kind === 'gif') return `${q.kind === 'gif' ? 'GIF' : 'Sticker'}${q.text ? ` · ${withCustom(esc(q.text), custom)}` : ''}`;
   return withCustom(esc(q.text), custom);
 }
 
 const fmtSize = (n: number) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} Ko` : `${(n / 1024 / 1024).toFixed(1).replace('.', ',')} Mo`);
 interface Picked { file: File; url: string; w: number; h: number; error: string }
+/** A picture waiting above the field: an image not sent yet (sent with the message), a sticker of the room, a GIF. */
+type Attach = { kind: 'image'; file: File; url: string; w: number; h: number } | { kind: 'sticker'; id: string; src: string; w: number; h: number } | { kind: 'gif'; gif: GifRef };
 async function pick(file: File): Promise<Picked> {
   const url = URL.createObjectURL(file);
   if (!file.type.startsWith('image/')) return { file, url, w: 0, h: 0, error: 'Ce fichier n\'est pas une image : seules les images peuvent être envoyées (en sticker, en image ou en emoji).' };
@@ -63,7 +65,8 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
   const [playing, setPlaying] = useState<number | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [menu, setMenu] = useState(false);
-  const [modal, setModal] = useState<{ kind: 'activity'; at: string | null } | { kind: 'credit'; to?: string } | { kind: 'screamer' } | null>(null);
+  const [modal, setModal] = useState<{ kind: 'activity'; at: string | null } | { kind: 'credit'; to?: string } | null>(null);
+  const [attach, setAttach] = useState<Attach | null>(null), [sending, setSending] = useState(false);   // the picture waiting above the field
   const [showStickers, setShowStickers] = useState(false);
   const [picked, setPicked] = useState<Picked | 'loading' | null>(null);
   const [naming, setNaming] = useState<string | null>(null), [nameError, setNameError] = useState('');
@@ -139,11 +142,14 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
 
   const toggleFavorite = toggleGifFavorite;
 
-  async function sendGif(g: GifRef) {
-    setDevice({ gifRecent: useGif(useStore.getState().device.gifRecent, g) });
-    const r = await request('chat:gif', { gif: g });
-    if (!r.ok) set({ note: r.error });
+  /** A picture chosen (+ → Fichier, Sticker, GIF): it waits above the field, to go with a text or alone (or as a screamer). */
+  function attachIt(a: Attach) {
+    setAttach(old => { if (old?.kind === 'image' && old.url !== (a.kind === 'image' ? a.url : '')) URL.revokeObjectURL(old.url); return a; });
+    setShowStickers(false); set({ note: '' });
+    requestAnimationFrame(() => inputRef.current?.focus());
   }
+  const dropAttach = () => setAttach(old => { if (old?.kind === 'image') URL.revokeObjectURL(old.url); return null; });
+  const chooseGif = (g: GifRef) => { setDevice({ gifRecent: useGif(useStore.getState().device.gifRecent, g) }); attachIt({ kind: 'gif', gif: g }); };
 
   async function choose(file: File) {
     setMenu(false); setShowStickers(false); setNaming(null); set({ note: '' });
@@ -157,13 +163,22 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
     if (as === 'emoji' && (!naming || !NAME.test(naming))) { setNameError('De 2 à 24 caractères : minuscules sans accent, chiffres et _.'); return; }
     if (as === 'emoji' && custom.some(c => c.name === naming)) { setNameError(`:${naming}: existe déjà dans le salon.`); return; }
     const p = picked;
+    if (as === 'image') { setPicked(null); setNaming(null); attachIt({ kind: 'image', file: p.file, url: p.url, w: p.w, h: p.h }); return; }   // sent with the message
     setPicked('loading');
-    const up = await upload(as === 'image' ? 'chat' : as, p.file);
-    const r = !up.ok ? up : as === 'image' ? await request('chat:media', { mediaId: up.value.id, replyTo: replyTo?.id ?? null })
-      : as === 'sticker' ? await request('sticker:add', { mediaId: up.value.id, send: true }) : await request('emoji:add', { name: naming, mediaId: up.value.id });
+    const up = await upload(as, p.file);
+    if (!up.ok) { setPicked({ ...p, error: up.error }); return; }
+    if (as === 'sticker') {
+      const r = await request('sticker:add', { mediaId: up.value.id, send: false });
+      if (!r.ok) { setPicked({ ...p, error: r.error }); return; }
+      URL.revokeObjectURL(p.url);
+      setPicked(null);
+      attachIt({ kind: 'sticker', id: r.value.id, src: r.value.src, w: r.value.w, h: r.value.h });
+      return;
+    }
+    const r = await request('emoji:add', { name: naming, mediaId: up.value.id });
     if (!r.ok) { setPicked({ ...p, error: r.error }); return; }
     URL.revokeObjectURL(p.url);
-    setPicked(null); setNaming(null); setReplyTo(null);
+    setPicked(null); setNaming(null);
   }
 
   async function react(id: number, emoji: string) {
@@ -194,7 +209,7 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
       if (!arg) { set({ note: 'Effets : /effet firework, /effet confetti (ou confetti Léa), /effet hit Léa, /effet tomato Léa, /effet hammer Léa, /effet screamer.' }); return; }
       const e = parseEffect(arg, room.members);
       if ('error' in e) { set({ note: e.error }); return; }
-      if (e.kind === 'screamer') { setModal({ kind: 'screamer' }); return; }
+      if (e.kind === 'screamer') { await scream(arg.trim().split(/\s+/).slice(1).join(' ')); return; }
       const r = await request('effect:play', { kind: e.kind, target: e.target?.id ?? null });
       if (!r.ok) set({ note: r.error });
     } else if (cmd === 'hote' || cmd === 'host') {
@@ -215,15 +230,43 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
   async function send(e: React.FormEvent) {
     e.preventDefault();
     const text = draft.trim();
-    if (!text) return;
+    if ((!text && !attach) || sending) return;
     suggestRef.current?.hide();
     if (text.startsWith('/')) { await command(text); inputRef.current?.focus(); return; }
     await loadCodes();
     if (useStore.getState().conn !== 'ok') { set({ note: 'Reconnexion en cours : ton message partira quand le salon sera de retour.' }); return; }
-    const r = await request('chat:send', { text: expandCodes(text, custom), replyTo: replyTo?.id ?? null });
-    if (!r.ok) { set({ note: r.error }); return; }
-    setDraft(''); setReplyTo(null); set({ note: '' });
+    const body = { text: expandCodes(text, custom), replyTo: replyTo?.id ?? null };
+    let r: { ok: boolean; error?: string };
+    if (!attach) r = await request('chat:send', body);
+    else {   // the picture, with the text written (or alone)
+      setSending(true);
+      if (attach.kind === 'image') { const up = await upload('chat', attach.file); r = up.ok ? await request('chat:media', { mediaId: up.value.id, ...body }) : up; }
+      else if (attach.kind === 'sticker') r = await request('sticker:send', { id: attach.id, ...body });
+      else r = await request('chat:gif', { gif: attach.gif, ...body });
+      setSending(false);
+    }
+    if (!r.ok) { set({ note: r.error ?? '' }); return; }
+    setDraft(''); setReplyTo(null); dropAttach(); set({ note: '' });
     inputRef.current?.focus();
+  }
+
+  /** /effet screamer: the picture waiting above the field (an image goes once, made light, never stored), or an emoji. */
+  async function scream(arg: string) {
+    const emoji = arg.trim();
+    let pic: { kind: 'image' | 'sticker' | 'gif' | 'emoji'; value: string } | null = null;
+    if (attach?.kind === 'image') {
+      setSending(true);
+      const data = await lightImage(attach.file);
+      setSending(false);
+      if (!data) { set({ note: 'Cette image ne peut pas partir en screamer.' }); return; }
+      pic = { kind: 'image', value: data };
+    } else if (attach?.kind === 'sticker') pic = { kind: 'sticker', value: attach.id };
+    else if (attach?.kind === 'gif') pic = { kind: 'gif', value: attach.gif.url };
+    else if (emoji && !/[\p{L}\p{N}]/u.test(emoji.replace(/^:[a-z0-9_]+:$/, ''))) pic = { kind: 'emoji', value: emoji };
+    if (!pic) { set({ note: 'Ajoute d\'abord une image (+ → Fichier, Sticker ou GIF) : elle partira en screamer. Ou /effet screamer 😱.' }); return; }
+    const r = await request('effect:play', { kind: 'screamer', pic });
+    if (!r.ok) { set({ note: r.error }); return; }
+    dropAttach();
   }
 
   /** An emoji from the window: at the caret (replacing the selection), the caret after it. */
@@ -241,6 +284,7 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
       if (menu) setMenu(false);
       else if (picked) { setPicked(null); setNaming(null); }
       else if (showStickers) setShowStickers(false);
+      else if (attach && document.activeElement === inputRef.current) dropAttach();
       else return;
       e.preventDefault();
     };
@@ -248,7 +292,7 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
     addEventListener('keydown', key);
     addEventListener('pointerdown', click);
     return () => { removeEventListener('keydown', key); removeEventListener('pointerdown', click); };
-  }, [menu, picked, showStickers]);
+  }, [menu, picked, showStickers, attach]);
 
   function complete(s: Suggestion) {
     const input = inputRef.current!, at = input.selectionStart ?? draft.length, code = s.code;
@@ -335,7 +379,7 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
         ? <li key={m.id} className="msg sys" data-msg={m.id}><Html html={withCustom(esc(m.text), custom)} /></li>
         : <li key={m.id} className={`msg${m.media ? ' has-media' : ''}${m.reply ? ' is-reply' : ''}${reacting === m.id ? ' is-reacting' : ''}`} data-msg={m.id}>
           {m.reply && replyRef(m.reply)}
-          <div className="msg-body">{who(m.from)} {m.media ? <MediaBox m={m.media} favorite={!!m.media.gif && favorites.some(f => f.id === m.media!.gif!.id)} onStar={toggleFavorite} /> : <Html html={textHtml(m)} />}</div>
+          <div className="msg-body">{who(m.from)} {m.media ? <><MediaBox m={m.media} favorite={!!m.media.gif && favorites.some(f => f.id === m.media!.gif!.id)} onStar={toggleFavorite} />{m.text && <Html className="msg-caption" html={textHtml(m)} />}</> : <Html html={textHtml(m)} />}</div>
           <div className="react-bar" role="toolbar" aria-label="Réagir au message">
             {recent.map(e => <button key={e} type="button" onClick={() => void react(m.id, e)} title={`Réagir ${e}`} aria-label={`Réagir ${e}`}><Html html={emojiHtml(e, custom)} /></button>)}
             <button type="button" className="react-more" title="Autre emoji" aria-label="Autre emoji" onClick={ev => {
@@ -355,12 +399,16 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
       <Icon name="down" />{unread > 0 && <b>{unread > 99 ? '99+' : unread}</b>}</button></div>}
     {picked ? <UploadPanel p={picked} naming={naming} nameError={nameError} onCancel={() => { setPicked(null); setNaming(null); }} onUse={use}
         onNaming={v => { setNaming(v); setNameError(''); }} onEmoji={() => { if (picked !== 'loading') { setNaming(suggestName(picked.file.name, custom.map(c => c.name))); setNameError(''); } }} />
-      : showStickers && <StickerPanel onClose={() => setShowStickers(false)} onSent={() => setShowStickers(false)} />}
+      : showStickers && <StickerPanel onClose={() => setShowStickers(false)} onPick={st => attachIt({ kind: 'sticker', id: st.id, src: st.src, w: st.w, h: st.h })} />}
     {note && <p className="chat-note">{note}</p>}
+    {attach && <div className={`attach-bar ${sending ? 'is-sending' : ''}`}>
+      <span className="attach-thumb"><img src={attach.kind === 'gif' ? attach.gif.url : attach.kind === 'image' ? attach.url : attach.src} alt="" draggable={false} /></span>
+      <span className="attach-text"><b>{{ image: 'Image', sticker: 'Sticker', gif: 'GIF' }[attach.kind]}</b><small>{sending ? 'Envoi…' : 'Écris un texte pour l\'accompagner (facultatif), puis Entrée — ou /effet screamer'}</small></span>
+      <button className="icon-btn sm" type="button" onClick={dropAttach} title="Retirer" aria-label="Retirer l'image"><Icon name="close" /></button></div>}
     {replyTo && <div className="reply-bar"><Icon name="reply" /><span className="reply-who">Réponse à {who(replyTo.from)}</span><Html className="reply-quote" html={quoteHtml(replyTo, custom)} />
       <button className="icon-btn sm" type="button" onClick={() => setReplyTo(null)} title="Ne plus répondre" aria-label="Ne plus répondre"><Icon name="close" /></button></div>}
     <form className="chat-form" data-form="chat" onSubmit={send}>
-      <input ref={inputRef} name="text" placeholder={replyTo ? 'Ta réponse…' : 'Écrire un message… (/ pour les commandes)'} autoComplete="off" maxLength={500} value={draft}
+      <input ref={inputRef} name="text" placeholder={attach ? 'Un texte avec l\'image (facultatif)…' : replyTo ? 'Ta réponse…' : 'Écrire un message… (/ pour les commandes)'} autoComplete="off" maxLength={500} value={draft}
         onChange={e => onType(e.target.value)} onKeyDown={onKey} onBlur={() => suggestRef.current?.hide()} />
       <button className="icon-btn" title="Envoyer" aria-label="Envoyer"><Icon name="send" /></button>
       <div className="plus-wrap"><button ref={plusRef} className="icon-btn" type="button" title="Fichier, sticker, GIF, emoji" aria-label="Fichier, sticker, GIF, emoji" aria-haspopup="menu" aria-expanded={menu}
@@ -368,7 +416,7 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
         {menu && <div className="plus-menu" role="menu">
           <button type="button" role="menuitem" onClick={() => { setMenu(false); fileRef.current?.click(); }}><Icon name="file" />Fichier</button>
           <button type="button" role="menuitem" onClick={() => { setMenu(false); setPicked(null); setShowStickers(!showStickers); }}><Icon name="sticker" />Sticker</button>
-          <button type="button" role="menuitem" onClick={() => { setMenu(false); gifRef.current?.open(plusRef.current!, g => void sendGif(g)); }}><Icon name="gif" />GIF</button>
+          <button type="button" role="menuitem" onClick={() => { setMenu(false); gifRef.current?.open(plusRef.current!, chooseGif); }}><Icon name="gif" />GIF</button>
           <button type="button" role="menuitem" onClick={() => { setMenu(false); void pop?.open(plusRef.current!, insertAtCaret, { keepOpen: true }); }}><Icon name="smile" />Emoji</button></div>}</div>
     </form>
     <input ref={fileRef} type="file" accept="image/*" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void choose(f); }} />
@@ -376,7 +424,6 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
     {modal?.kind === 'activity' && <ActivityPicker kind={modal.at} current={room.activity.activity} host={room.hostId === account.id}
       busy={room.chat.messages.some(m => m.kind === 'vote' && !(m.data?.vote as Vote | undefined)?.result)}
       onKind={k => setModal({ kind: 'activity', at: k })} onPick={c => void pickActivity(c)} onClose={() => setModal(null)} />}
-    {modal?.kind === 'screamer' && <ScreamerModal gifs={gifRef.current} pop={pop} onClose={() => setModal(null)} />}
     {modal?.kind === 'credit' && <CreditModal members={room.members} me={account.id} initial={modal.to ?? null} onClose={() => setModal(null)} />}
   </div>;
 }
@@ -395,18 +442,18 @@ function UploadPanel({ p, naming, nameError, onCancel, onUse, onNaming, onEmoji 
       {nameError ? <p className="alert" role="alert">{nameError}</p> : <p className="note">Minuscules, chiffres et _ ; tous les joueurs du salon pourront l'utiliser.</p>}
       <div className="row"><button className="btn ghost sm" type="button" onClick={() => onNaming(null)}>Retour</button><button className="btn sm">Ajouter aux emoji</button></div></form>
       : <div className="upload-choice">
-        <button className="choice" type="button" onClick={() => onUse('sticker')}><b>Sticker</b><small>petit format, gardé dans les stickers du salon</small></button>
-        <button className="choice" type="button" onClick={() => onUse('image')}><b>Image</b><small>grand format, envoyée maintenant (gardée une semaine) ; le serveur la compresse</small></button>
+        <button className="choice" type="button" onClick={() => onUse('sticker')}><b>Sticker</b><small>petit format, gardé dans les stickers du salon ; puis il attend d'être envoyé</small></button>
+        <button className="choice" type="button" onClick={() => onUse('image')}><b>Image</b><small>grand format, avec un texte si tu veux (gardée une semaine) ; le serveur la compresse</small></button>
         <button className="choice" type="button" onClick={onEmoji}><b>Emoji</b><small>ajouté aux emoji du salon, pour tous</small></button></div>}</div>;
 }
 
-/** The room's sticker library: a click sends one, its cross removes it from the library. */
-function StickerPanel({ onClose, onSent }: { onClose: () => void; onSent: () => void }) {
-  const list = useStore(s => s.room?.stickers ?? []), set = useStore(s => s.set);
+/** The room's sticker library: a click puts one above the field (to send with a text or alone), its cross removes it. */
+function StickerPanel({ onClose, onPick }: { onClose: () => void; onPick: (st: StickerView) => void }) {
+  const list = useStore(s => s.room?.stickers ?? []);
   const head = <div className="panel-head"><b>Stickers du salon</b><button className="icon-btn sm" type="button" onClick={onClose} title="Fermer" aria-label="Fermer"><Icon name="close" /></button></div>;
   if (!list.length) return <div className="chat-panel stickers">{head}<p className="alert" role="alert">Aucun sticker pour l'instant. Ajoute une image en sticker : + → Fichier, ou glisse-la dans le chat.</p></div>;
   return <div className="chat-panel stickers">{head}<ul className="sticker-grid">{list.map(st => <li key={st.id}>
-    <button className="sticker-item" type="button" title="Envoyer" onClick={async () => { const r = await request('sticker:send', { id: st.id }); if (!r.ok) set({ note: r.error }); else onSent(); }}>
+    <button className="sticker-item" type="button" title="Choisir (il attend au-dessus du champ)" onClick={() => onPick(st)}>
       <img src={st.src} width={st.w} height={st.h} alt="Sticker" /></button>
     <button className="sticker-del" type="button" title="Retirer des stickers du salon" aria-label="Retirer" onClick={() => void request('sticker:remove', { id: st.id })}><Icon name="close" /></button></li>)}</ul></div>;
 }

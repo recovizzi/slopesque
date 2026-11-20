@@ -89,12 +89,12 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** A picture sent in the chat (an image or a sticker), or a GIF (a link to its provider). */
-  async sendMedia(roomId: string, authorId: string, kind: 'image' | 'sticker', pic: MediaRow, replyTo: number | null = null) {
-    const [m] = await this.db.insert(messages).values({ roomId, authorId, kind: 'media', mediaId: pic.id, mediaKind: kind, replyTo }).returning();
+  async sendMedia(roomId: string, authorId: string, kind: 'image' | 'sticker', pic: MediaRow, replyTo: number | null = null, text = '') {
+    const [m] = await this.db.insert(messages).values({ roomId, authorId, kind: 'media', mediaId: pic.id, mediaKind: kind, replyTo, text }).returning();
     return this.withQuote(roomId, m!, pic);
   }
-  async sendGif(roomId: string, authorId: string, gif: GifRef) {
-    const [m] = await this.db.insert(messages).values({ roomId, authorId, kind: 'media', mediaKind: 'gif', gif: gif as unknown as Record<string, unknown> }).returning();
+  async sendGif(roomId: string, authorId: string, gif: GifRef, replyTo: number | null = null, text = '') {
+    const [m] = await this.db.insert(messages).values({ roomId, authorId, kind: 'media', mediaKind: 'gif', gif: gif as unknown as Record<string, unknown>, replyTo, text }).returning();
     return this.withQuote(roomId, m!);
   }
   private async withQuote(roomId: string, m: Row, pic?: MediaRow) {

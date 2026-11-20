@@ -73,6 +73,7 @@ const png = async (frame, w, h, color) => Buffer.from(await frame.evaluate(([w, 
   const x = c.getContext('2d'); x.fillStyle = color; x.fillRect(0, 0, w, h); x.fillStyle = '#fff'; x.beginPath(); x.arc(w / 2, h / 2, Math.min(w, h) / 3, 0, 7); x.fill();
   return c.toDataURL('image/png').split(',')[1];
 }, [w, h, color]), 'base64');
+const say = async (frame, text) => { await frame.locator('[name="text"]').fill(text); await frame.locator('[name="text"]').press('Enter'); };
 const chooseFile = async (frame, name, buffer) => {
   await frame.locator('[aria-label="Fichier, sticker, GIF, emoji"]').click();
   const [chooser] = await Promise.all([frame.page().waitForEvent('filechooser'), frame.getByRole('menuitem', { name: 'Fichier' }).click()]);
@@ -81,13 +82,21 @@ const chooseFile = async (frame, name, buffer) => {
 };
 await chooseFile(a.frame, 'paysage.png', await png(a.frame, 1400, 900, '#2a6f97'));
 await a.frame.getByRole('button', { name: /^Image/ }).click();
+check(await until(async () => (await a.frame.locator('.attach-bar img').count()) === 1), 'image: waiting above the field, not sent yet');
+await shot(a.page, '05a-image-preview');
+check(await b.frame.locator('.msg img.msg-image').count() === 0, 'image: nothing sent before Enter');
+await say(a.frame, 'la vue depuis le refuge');
 const pic = b.frame.locator('.msg img.msg-image');
-check(await until(async () => (await pic.count()) === 1, 8000), 'image: sent by A, shown to B');
+check(await until(async () => (await pic.count()) === 1, 8000), 'image: sent by A with its text, shown to B');
+check(await until(async () => (await b.frame.locator('.msg:has(img.msg-image) .msg-caption').textContent().catch(() => '')) === 'la vue depuis le refuge'), 'image: its text under it, in the same message');
+check(await a.frame.locator('.attach-bar').count() === 0, 'image: the preview gone once sent');
 check(await until(async () => await pic.evaluate(i => i.complete && i.naturalWidth === 1400 && i.src.includes('/media/')), 8000), 'image: served by our server (/media), 1400 px kept under 1600');
 
 await chooseFile(a.frame, 'Bravo Léa.png', await png(a.frame, 400, 400, '#ef476f'));
 await a.frame.getByRole('button', { name: /^Sticker/ }).click();
-check(await until(async () => (await b.frame.locator('.msg img.msg-sticker').count()) === 1, 8000), 'sticker: sent, shown to B');
+check(await until(async () => (await a.frame.locator('.attach-bar img').count()) === 1, 8000), 'sticker: added to the room, waiting above the field');
+await a.frame.locator('[name="text"]').press('Enter');   // alone, without a text
+check(await until(async () => (await b.frame.locator('.msg img.msg-sticker').count()) === 1, 8000), 'sticker: sent alone, shown to B');
 await b.frame.locator('[aria-label="Fichier, sticker, GIF, emoji"]').click();
 await b.frame.getByRole('menuitem', { name: 'Sticker' }).click();
 check(await until(async () => (await b.frame.locator('.sticker-grid .sticker-item').count()) === 1), 'sticker: in the room\'s library, for B too');
@@ -117,7 +126,6 @@ await a.frame.locator('.drawer-right [aria-label="Fermer"]').click();
 await shot(b.page, '06-pictures-dark');
 
 // ---- jalon 4: commands, votes, social credit
-const say = async (frame, text) => { await frame.locator('[name="text"]').fill(text); await frame.locator('[name="text"]').press('Enter'); };
 await b.frame.locator('[name="text"]').fill('/');
 check(await until(async () => (await b.frame.locator('.emoji-suggest li').count()) === 5), 'commands: « / » lists /activity, /hote, /credit-social, /kick, /effet');
 await b.frame.locator('[name="text"]').fill('');
@@ -303,11 +311,13 @@ await say(a.frame, '/effet hammer Hugo');
 check(await until(async () => (await a.frame.locator('.chat-note').textContent().catch(() => '')).includes('Un effet est déjà en cours sur une photo')), '/effet: one effect on a photo at a time (said to A)');
 await b.page.waitForTimeout(3000);
 await say(a.frame, '/effet screamer');
-const scream = a.page.waitForEvent('filechooser');
-await a.frame.locator('.screamer-modal .choice', { hasText: 'Image' }).click();
-await (await scream).setFiles([{ name: 'bou.png', mimeType: 'image/png', buffer: await png(a.frame, 600, 400, '#7b2cbf') }]);
+check(await until(async () => (await a.frame.locator('.chat-note').textContent().catch(() => '')).includes('Ajoute d\'abord une image')), '/effet screamer without a picture waiting: asks for one');
+await chooseFile(a.frame, 'bou.png', await png(a.frame, 600, 400, '#7b2cbf'));
+await a.frame.getByRole('button', { name: /^Image/ }).click();
+await say(a.frame, '/effet screamer');
 check(await until(async () => ((await b.frame.locator('.fx-screamer img').getAttribute('src').catch(() => '')) ?? '').startsWith('data:image/webp'), 4000), '/effet screamer: A\'s image a second on B\'s screen, sent once (not stored)');
 check(await until(async () => (await b.frame.locator('.fx-screamer').count()) === 0, 4000), '/effet screamer: gone after its second');
+check(await a.frame.locator('.attach-bar').count() === 0 && (await b.frame.locator('.msg img.msg-image').count()) === 1, '/effet screamer: the picture used, not sent in the chat');
 
 // the Palmarès in the Chat activity too; the Partie tab, read only for a player who isn't the host
 if (!(await a.frame.evaluate(() => document.body.classList.contains('left-open')))) await a.frame.locator('.bar [aria-label="Joueurs"]').click();

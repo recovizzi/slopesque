@@ -138,17 +138,17 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
 
   @SubscribeMessage('chat:media')
   chatMedia(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {
-    return this.run('chat:media', b, async v => { await this.limit(s, 'messages'); await this.hub.sendPicture(s, 'image', await this.hub.picture(v.mediaId, 'chat'), v.replyTo ?? null); return null; });
+    return this.run('chat:media', b, async v => { await this.limit(s, 'messages'); await this.hub.sendPicture(s, 'image', await this.hub.picture(v.mediaId, 'chat'), v.replyTo ?? null, v.text ?? ''); return null; });
   }
 
   @SubscribeMessage('chat:gif')
-  chatGif(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('chat:gif', b, async v => { await this.limit(s, 'messages'); await this.hub.sendGif(s, v.gif); return null; }); }
+  chatGif(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('chat:gif', b, async v => { await this.limit(s, 'messages'); await this.hub.sendGif(s, v.gif, v.replyTo ?? null, v.text ?? ''); return null; }); }
 
   @SubscribeMessage('sticker:add')
-  stickerAdd(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('sticker:add', b, async v => { await this.hub.addSticker(s, await this.hub.picture(v.mediaId, 'sticker'), v.send); return null; }); }
+  stickerAdd(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('sticker:add', b, async v => { return this.hub.addSticker(s, await this.hub.picture(v.mediaId, 'sticker'), v.send); }); }
 
   @SubscribeMessage('sticker:send')
-  stickerSend(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('sticker:send', b, async v => { await this.limit(s, 'messages'); await this.hub.sendSticker(s, v.id); return null; }); }
+  stickerSend(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('sticker:send', b, async v => { await this.limit(s, 'messages'); await this.hub.sendSticker(s, v.id, v.replyTo ?? null, v.text ?? ''); return null; }); }
 
   @SubscribeMessage('sticker:remove')
   stickerRemove(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('sticker:remove', b, async v => { await this.hub.removeSticker(s, v.id); return null; }); }

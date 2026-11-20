@@ -218,10 +218,10 @@ export const intents = {
   'account:renew': z.object({ code: z.string().max(64) }),
   'host:give': z.object({ to: z.string().uuid() }),
   'media:ticket': z.object({ usage: z.enum(['chat', 'sticker', 'emoji', 'photo', 'poll', 'trump']) }),
-  'chat:media': z.object({ mediaId: z.string().uuid(), replyTo: z.number().int().positive().nullable().optional() }),
-  'chat:gif': z.object({ gif: z.object({ id: z.string().max(64), provider: z.string().max(16), url: z.url(), w: z.number().int(), h: z.number().int(), title: z.string().max(200) }) }),
+  'chat:media': z.object({ mediaId: z.string().uuid(), text: z.string().trim().max(MAX_TEXT).optional(), replyTo: z.number().int().positive().nullable().optional() }),   // text: what is written with the picture
+  'chat:gif': z.object({ gif: z.object({ id: z.string().max(64), provider: z.string().max(16), url: z.url(), w: z.number().int(), h: z.number().int(), title: z.string().max(200) }), text: z.string().trim().max(MAX_TEXT).optional(), replyTo: z.number().int().positive().nullable().optional() }),
   'sticker:add': z.object({ mediaId: z.string().uuid(), send: z.boolean() }),
-  'sticker:send': z.object({ id: z.string().uuid() }),
+  'sticker:send': z.object({ id: z.string().uuid(), text: z.string().trim().max(MAX_TEXT).optional(), replyTo: z.number().int().positive().nullable().optional() }),
   'sticker:remove': z.object({ id: z.string().uuid() }),
   'emoji:add': z.object({ name: z.string().regex(/^[a-z0-9_]{2,24}$/), mediaId: z.string().uuid() }),
   'photo:set': z.object({ mediaId: z.string().uuid().nullable() }),
@@ -288,7 +288,7 @@ export interface IntentResults {
   'media:ticket': { ticket: string; url: string };
   'chat:media': null;
   'chat:gif': null;
-  'sticker:add': null;
+  'sticker:add': StickerView;   // the sticker (to show it in the preview before sending it)
   'sticker:send': null;
   'sticker:remove': null;
   'emoji:add': null;
