@@ -176,6 +176,17 @@ secrets, du développement testable en local sans aucune clé.
 20. **Revue de sécurité du 2026-11-20** : historique réécrit (e-mail professionnel → noreply GitHub, noms de la machine
     retirés), six failles corrigées avec leurs tests (`security.test.ts`) ; le rapport détaillé et les risques ouverts
     sont dans `SECURITE.md`, non versionné.
+21. **Texas Hold'em** (2026-11-20, demandé par l'utilisateur « au complet, comme le Tarot ») : No Limit, règles TDA
+    (relance minimale, tapis court qui ne rouvre pas, pots annexes, jeton impair à gauche du bouton ; à deux, le bouton
+    est petite blinde). Joué en **tournoi** de jetons fictifs (Sit & Go) plutôt qu'en partie d'argent : une fin nette,
+    des places, des points au classement — 10 × (places − place), robots compris dans les places mais sans points ; le
+    palmarès garde la place. Bouton simplifié (il avance d'une place encore en jeu ; pas de « bouton mort » TDA, sans
+    effet à quelques joueurs). Réglages : joueurs 2 à 8, tapis 500 à 5 000, blindes 10 / 20 montant toutes les 5, 10,
+    20 mains ou jamais. Les mains s'enchaînent seules ; la partie s'arrête d'elle-même quand plus aucune place en jeu
+    n'appartient à un joueur. Robots : formule de Chen avant le flop, Monte-Carlo contre la cote du pot ensuite,
+    niveaux communs aux cartes (`cards:bots`, qui remplace `tarot:bots`) ; mesurés par `pnpm holdem:duel` : Moyen
+    bat Facile (+32 grosses blindes / 100 mains), Fort bat Moyen (+10 à +13) et Facile (+77). *Rejeté* : points selon les jetons gagnés à
+    chaque main (un tapis de départ différent changerait l'échelle du classement) ; Limit (moins joué).
 
 ## Risks / Trade-offs
 

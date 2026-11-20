@@ -136,6 +136,7 @@ chaque jalon, les tâches sont groupées par partie du monorepo (`[racine]`, `[i
 - [x] 10q.4 [server+web] Versions : extension trop ancienne refusée avec le lien de la dernière release, version dans l'onglet Extension
 - [x] 10q.5 [engines+server+web] Tarot complet : Petit au bout, poignées, chelem (règles FFT), et l'écart du preneur caché en Garde sans / contre
 - [x] 10q.6 [engines] Robots du Tarot : nouvelle IA (mémoire des cartes, camp et partenaire deviné, charger / ne pas charger, sauver le Petit, 21, Excuse, poignée, chelem), niveaux Facile / Moyen / Fort (simulation Monte-Carlo), réglés par l'hôte ; `pnpm tarot:duel` mesure les niveaux
+- [x] 10q.8 [engines+server+web] Texas Hold'em : moteur No Limit (TDA), tournoi, robots Facile / Moyen / Fort (Chen, Monte-Carlo, cote du pot), table, règles illustrées, réglages, classement et palmarès ; `pnpm holdem:duel`
 - [x] 10q.7 [repo] La machine nommée seulement dans le `.env` de l'utilisateur (aucun alias ni compte dans le dépôt)
 
 ## 11. Jalon 11 : releases et déploiement

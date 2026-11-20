@@ -27,7 +27,7 @@ const KINDS: Kind[] = [
   { id: 'cards', name: 'Cartes', help: 'Des jeux de cartes à plusieurs', formats: [
     { label: 'Trou du cul', help: 'Se débarrasser de ses cartes le premier · de 3 à 8 joueurs', choice: { activity: 'cards', cardGame: 'tdc' } },
     { label: 'Tarot', help: 'Le preneur contre les autres · à 4, ou à 5 avec un Roi appelé', choice: { activity: 'cards', cardGame: 'tarot' } },
-    { label: 'Texas Hold\'em', help: 'Bientôt', choice: { activity: 'cards', cardGame: 'holdem' }, soon: true },
+    { label: 'Texas Hold\'em', help: 'Le poker en tournoi, jetons fictifs · de 2 à 8 joueurs', choice: { activity: 'cards', cardGame: 'holdem' } },
     { label: 'Coinche', help: 'Bientôt', choice: { activity: 'cards', cardGame: 'coinche' }, soon: true }] },
   { id: 'web', name: 'Jeux web', help: 'Le jeu d\'un autre site, dans le salon', formats: [
     { label: 'Low Tide', help: 'Course de bateaux, sur sa propre page', choice: { activity: 'lowtide' } }] },

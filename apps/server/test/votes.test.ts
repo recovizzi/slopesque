@@ -46,7 +46,7 @@ describe.skipIf(!up)('commands and votes', () => {
 
   it('/activity: a ready activity applied by the host; a coming one refused', async () => {
     expect(await ask(b, 'activity:choose', { choice: { activity: 'chat' } })).toMatchObject({ ok: true, value: 'applied' });
-    expect(await ask(b, 'activity:choose', { choice: { activity: 'cards', cardGame: 'holdem' } })).toMatchObject({ ok: false, error: 'Cette activité arrive bientôt.' });
+    expect(await ask(b, 'activity:choose', { choice: { activity: 'cards', cardGame: 'coinche' } })).toMatchObject({ ok: false, error: 'Cette activité arrive bientôt.' });
   });
 
   it('social credit: never to oneself; said in the chat; the credit follows', async () => {

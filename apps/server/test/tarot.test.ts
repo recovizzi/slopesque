@@ -46,9 +46,9 @@ describe.skipIf(!up)('Tarot', () => {
   }, 30_000);
 
   it('the host sets the robots\' level; at « fort » they finish a deal (with the bonuses in the result)', async () => {
-    expect((await ask(a, 'tarot:bots', { level: 'fort' })).ok).toBe(false);   // the host only
+    expect((await ask(a, 'cards:bots', { level: 'fort' })).ok).toBe(false);   // the host only
     const set = cards(host, v => v.settings.bots === 'fort');
-    expect((await ask(host, 'tarot:bots', { level: 'fort' })).ok).toBe(true);
+    expect((await ask(host, 'cards:bots', { level: 'fort' })).ok).toBe(true);
     await set;
     const done = cards(host, v => v.tarot?.phase === 'done' && !!v.tarot.result);
     expect((await ask(host, 'cards:deal')).ok).toBe(true);

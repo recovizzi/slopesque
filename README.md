@@ -2,10 +2,10 @@
 
 Des jeux entre amis dans un panneau flottant du navigateur. Un salon s'ouvre sur le **Chat** ; on y lance le
 **Demi-disque** (placer un mot entre deux extrémités), un **Sondage**, une **Roulette**, des **Cartes** (Trou du cul,
-Tarot) ou une page web intégrée. Pas de compte ni de mot de passe : un **code utilisateur** relie la sauvegarde d'un
+Tarot, Texas Hold'em) ou une page web intégrée. Pas de compte ni de mot de passe : un **code utilisateur** relie la sauvegarde d'un
 joueur sur ses appareils.
 
-> Statut : **V1 jouable en local** (chat, Demi-disque, Sondage, Roulette, Trou du cul, Tarot à 4 et 5, Low Tide, palmarès). Le concept et ses décisions sont dans [`openspec/`](openspec/) ; la maquette de
+> Statut : **V1 jouable en local** (chat, Demi-disque, Sondage, Roulette, Trou du cul, Tarot à 4 et 5, Texas Hold'em de 2 à 8, Low Tide, palmarès). Le concept et ses décisions sont dans [`openspec/`](openspec/) ; la maquette de
 > référence vit dans le dépôt `semicirculardisk`.
 
 ## Monorepo

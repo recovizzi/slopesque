@@ -5,7 +5,8 @@ import { hueColor } from '@slopesque/engines';
 import type { CardsView, MemberView } from '@slopesque/shared';
 import * as K from '../lib/cards';
 import * as TV from '../lib/tarot-view';
-import { Tarot as TA } from '@slopesque/engines';
+import * as HV from '../lib/holdem-view';
+import { Holdem as HE, Tarot as TA } from '@slopesque/engines';
 import { request } from '../net';
 import { useStore } from '../store';
 import { LiveHtml } from './LiveHtml';
@@ -28,12 +29,15 @@ export function CardsStage() {
   const box = useRef<HTMLDivElement>(null), shown = useRef(c), queue = useRef<CardsView[]>([]), busy = useRef(false), hidden = useRef(new Set<string>());
   const want = room.activity.cardGame ?? 'tdc';   // the game the host chose (the table may still hold the other)
   const t = c.game === 'tdc' && want === 'tdc' ? c.tdc : null, tarot = c.game === 'tarot' && want === 'tarot' ? c.tarot : null;
+  const holdem = c.game === 'holdem' && want === 'holdem' ? c.holdem as unknown as HE.Holdem | null : null;
+  const raise = useRef(0), [fresh, setFresh] = useState<Set<string>>(new Set());
   const [wonView, setWonView] = useState<string | null>(null);
   const members = new Map(room.members.map(m => [m.id, m]));
   const [sel, setSel] = useState<Set<string>>(new Set()), [rules, setRules] = useState(false), [full, setFull] = useState(false), [note, setNote] = useState('');
   useEscape(() => setRules(false), rules);
   const mySeat = c.seats.find(s => s.user === me)?.id ?? '';
   useEffect(() => { setSel(new Set()); }, [t?.round, t?.turn, tarot?.deal, tarot?.phase]);
+  useEffect(() => { raise.current = 0; }, [holdem?.hand, holdem?.turn, holdem?.street]);
 
   const who = (id: string) => {
     const s = c.seats.find(x => x.id === id), uid = s ? s.user ?? s.credit : null, m: MemberView | undefined = uid ? members.get(uid) : undefined;
@@ -41,18 +45,22 @@ export function CardsStage() {
   };
   const free = c.seats.filter(s => !s.user), mine = free.find(s => s.credit === me);
   const late = c.late ? { seat: c.late.seat, secs: c.late.secs, vote: room.chat.messages.some(m => m.kind === 'vote' && !(m.data?.vote as { result?: string } | undefined)?.result) } : null;
-  const html = tarot ? TV.tarotTableHtml({ t: tarot as unknown as TA.Tarot, me: mySeat, playing: !!mySeat, host: room.hostId === me, selected: sel,
+  const html = holdem ? HV.holdemTableHtml({ g: holdem, me: mySeat, playing: !!mySeat, host: room.hostId === me, who, fresh, raise: raise.current,
+      late: late && late.seat !== mySeat ? late : null,
+      seats: (() => { const open = c.seats.filter(st => !holdem.out.includes(st.id) || holdem.over), freeOpen = open.filter(st => !st.user), mineOpen = freeOpen.find(st => st.credit === me);
+        return { free: freeOpen.length, total: open.length, mine: !!mineOpen, takes: freeOpen[0] ? who(freeOpen[0].id).name : '', full }; })() })
+    : tarot ? TV.tarotTableHtml({ t: tarot as unknown as TA.Tarot, me: mySeat, playing: !!mySeat, host: room.hostId === me, selected: sel,
       fan: fan((tarot.hands[mySeat]?.length ?? 0), box.current), who, art: c.art ?? {}, showLast, wonView, showTricks: c.showTricks })
     : t ? K.tableHtml({ t: t as unknown as K.TableCtx['t'], me: mySeat, playing: !!mySeat, host: room.hostId === me, selected: sel, fan: fan(t.hands[mySeat]?.length ?? 0, box.current),
     who, elapsed: '', late: late && late.seat !== mySeat ? late : null,
     seats: { free: free.length, total: c.seats.length, mine: !!mine, takes: free[0] ? who(free[0].id).name : '', full,
       paid: id => { const u = c.paid[id]; const m = u ? members.get(u) : undefined; return u ? { name: u === me ? 'Toi' : m?.name ?? '?', color: m ? hueColor(m.hue) : '#8a8f98', bot: false } : { ...who(id), bot: true }; } } })
     : (() => {   // before the first deal: the seats (take one, or leave it), the host deals when the players are seated
-      const n = want === 'tarot' ? c.settings.tarot : c.settings.tdc, seats = c.game === want ? c.seats : [];
+      const n = c.settings[want as 'tdc'] ?? 2, seats = c.game === want ? c.seats : [];
       const chips = seats.map(st => { const w = who(st.id); return `<li class="cg-seat" style="--c:${w.color}">${K.seatLabel(w)}</li>`; }).join('');
       const freeSeats = seats.filter(st => !st.user).length;
       const mine = !!mySeat;
-      return `<div class="cards-game"><header class="cg-head"><b class="cg-title">${want === 'tarot' ? `Tarot à ${c.settings.tarot}` : `Trou du cul à ${c.settings.tdc}`}</b>
+      return `<div class="cards-game"><header class="cg-head"><b class="cg-title">${want === 'tarot' ? `Tarot à ${c.settings.tarot}` : want === 'holdem' ? `Texas Hold'em à ${n}` : `Trou du cul à ${c.settings.tdc}`}</b>
         <span class="cg-info">Avant la donne : prends une place ; des robots jouent les places libres.</span></header>
         <div class="cg-table"><ul class="cg-seats">${chips}</ul><div class="cg-pile">${room.hostId === me ? `<button class="btn big" type="button" data-action="cards-deal">Distribuer</button>` : ''}</div>
           <p class="cg-pile-text">${seats.length - freeSeats} joueur${seats.length - freeSeats > 1 ? 's' : ''} sur ${n} place${n > 1 ? 's' : ''}${room.hostId === me ? '' : ' · l\'hôte distribue'}</p></div>
@@ -64,7 +72,16 @@ export function CardsStage() {
     queue.current.push(room.cards);
     void play();
   }, [room.cards]);
-  const show = (v: CardsView, last = false) => { shown.current = v; setShown(v); setShowLast(last); };
+  const show = (v: CardsView, last = false) => {
+    const a = shown.current.holdem, b = v.holdem;
+    if (b && v.game === 'holdem') {   // Hold'em: the cards just dealt or turned over (their animation, once)
+      const same = !!a && a.hand === b.hand && a.startedAt === b.startedAt, f = new Set<string>();
+      for (const cd of b.board) if (!same || !a!.board.some(x => x.id === cd.id)) f.add(cd.id);
+      for (const [seat, h] of Object.entries(b.holes)) h.forEach((cd, i) => { if (!same || (cd.r && !a!.holes[seat]?.[i]?.r)) f.add(`${seat}:${i}`); });
+      setFresh(f);
+    }
+    shown.current = v; setShown(v); setShowLast(last);
+  };
   async function play() {
     if (busy.current) return;
     busy.current = true;
@@ -83,6 +100,14 @@ export function CardsStage() {
         const name = (id: string) => { const s = next.seats.find(x => x.id === id), u = s?.user ?? s?.credit; return u === me ? 'Toi' : (u && useStore.getState().room?.members.find(m => m.id === u)?.name) || s?.bot || '?'; };
         if (step.take) { setAnnounce(TV.takeAnnounce(name(step.take.seat), step.take.bid as Exclude<TA.Bid, 'pass'>)); await A.wait(2000); setAnnounce(''); }
         for (const h of step.handfuls) { setAnnounce(TV.handfulAnnounce(name(h.seat), h.level, h.cards as TA.TCard[], next.art ?? {})); await A.wait(2400); setAnnounce(''); }
+        const ha = prev.holdem, hb = next.holdem;
+        if (ha && hb && ha.startedAt === hb.startedAt) {   // Hold'em: an all-in, the players out, the blinds up, the winner
+          for (const [seat, l] of Object.entries(hb.last)) if (l.act === 'allin' && ha.last[seat]?.act !== 'allin') { setAnnounce(HV.allinAnnounce(name(seat), hb.bets[seat] ?? l.amount)); await A.wait(1300); setAnnounce(''); }
+          if (hb.street !== ha.street && hb.board.length > ha.board.length) await A.wait(250 * (hb.board.length - ha.board.length) + 300);
+          for (const s of hb.out.filter(x => !ha.out.includes(x))) { await A.wait(900); setAnnounce(HV.outAnnounce(name(s), hb.places[s] ?? 0, s === seat)); await A.wait(2000); setAnnounce(''); }
+          if (hb.over && !ha.over) { const w = Object.keys(hb.places).find(x => hb.places[x] === 1); if (w) { setAnnounce(HV.winAnnounce(name(w), w === seat)); await A.wait(2400); setAnnounce(''); } }
+          if (hb.hand !== ha.hand && hb.levelUp) { setAnnounce(HV.levelAnnounce(hb.sb, hb.bb)); await A.wait(1800); setAnnounce(''); }
+        }
         if (step.chelem) { setAnnounce(TV.chelemAnnounce(name(step.chelem))); await A.wait(2000); setAnnounce(''); }
         if (step.call) {
           const mine = step.call.taker !== seat && !!next.tarot?.hands[seat]?.some(x => x.id === step.call!.card.id);
@@ -102,13 +127,29 @@ export function CardsStage() {
     cards.forEach((el, i) => el.style.setProperty('--a', `${((i - (n - 1) / 2) * step).toFixed(4)}rad`));
   });
   useEffect(() => {   // the clock of the game
-    const start = (tarot ?? t)?.startedAt;
+    const start = (holdem ?? tarot ?? t)?.startedAt;
     const id = setInterval(() => { const el = box.current?.querySelector('[data-card-clock]'); if (el && start) el.textContent = fmtClock(Date.now() - start); }, 1000);
     return () => clearInterval(id);
-  }, [t, tarot]);
+  }, [t, tarot, holdem]);
 
   const ack = (r: { ok: boolean; error?: string }) => setNote(r.ok ? '' : r.error ?? '');
+  const raiseLabel = (v: number) => {   // the slider moved: the button says the amount (the table is not redrawn)
+    const z = holdem ? HV.sizes(holdem, mySeat) : null, b = box.current?.querySelector('[data-raise-label]');
+    if (!z || !b) return;
+    const range = box.current?.querySelector<HTMLInputElement>('[data-hd="raise"]');
+    if (range && Number(range.value) !== v) range.value = String(v);
+    b.textContent = v >= z.max ? `Tapis ${HV.fmt(z.max)}` : `${holdem!.current === 0 ? 'Miser' : 'Relancer à'} ${HV.fmt(v)}`;
+    box.current?.querySelectorAll<HTMLElement>('[data-action="holdem-size"]').forEach(x => x.setAttribute('aria-pressed', String(Number(x.dataset.v) === v)));
+  };
   const onAction = async (a: string, el: HTMLElement) => {
+    if (a.startsWith('holdem-') && holdem) {
+      if (a === 'holdem-size') { raise.current = Number(el.dataset.v); raiseLabel(raise.current); return; }
+      const z = HV.sizes(holdem, mySeat), to = z ? Math.min(z.max, Math.max(z.min, raise.current || z.min)) : 0;
+      const move = a === 'holdem-fold' ? { act: 'fold' as const } : a === 'holdem-check' ? { act: 'check' as const } : a === 'holdem-call' ? { act: 'call' as const }
+        : a === 'holdem-allin' || (z && to >= z.max) ? { act: 'allin' as const } : { act: 'raise' as const, to };
+      ack(await request('holdem:act', move));
+      return;
+    }
     if (a === 'card-pick' && tarot) {
       const hand = tarot.hands[mySeat] ?? [], card = hand.find(x => x.id === el.dataset.card) as TA.TCard | undefined;
       if (!card) return;
@@ -145,9 +186,10 @@ export function CardsStage() {
   return <div className="cards-stage" ref={box}
     onMouseOver={e => { const w = (e.target as Element).closest<HTMLElement>('[data-won]')?.dataset.won ?? null; if (w !== wonView) setWonView(w); }}
     onMouseLeave={() => setWonView(null)}>
-    <LiveHtml className="cards-holder" html={html} onAction={(a, el) => void onAction(a, el)} />
+    <LiveHtml className="cards-holder" html={html} onAction={(a, el) => void onAction(a, el)}
+      onInput={el => { if ((el as HTMLElement).dataset.hd === 'raise') { raise.current = Number(el.value); raiseLabel(raise.current); } }} />
     {note && <p className="alert cards-note" role="alert">{note}</p>}
     {announce && <div className="announce-layer"><LiveHtml className="announce" html={announce} /></div>}
-    {rules && <LiveHtml html={c.game === 'tarot' ? TV.tarotRulesHtml(c.art ?? {}) : K.rulesHtml()} onAction={(a, el) => void onAction(a, el)} />}
+    {rules && <LiveHtml html={want === 'holdem' ? HV.holdemRulesHtml() : c.game === 'tarot' ? TV.tarotRulesHtml(c.art ?? {}) : K.rulesHtml()} onAction={(a, el) => void onAction(a, el)} />}
   </div>;
 }

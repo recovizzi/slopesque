@@ -6,7 +6,7 @@ import { esc } from './html';
 import type { Tdc } from '@slopesque/engines';
 type Role = Tdc.Role;
 
-export type StatGame = 'disk' | 'tdc' | 'tarot';
+export type StatGame = 'disk' | 'tdc' | 'tarot' | 'holdem';
 /** One player's result in one round / deal (the room keeps them; the name and colour as they were). */
 export interface StatEvent {
   at: number; game: StatGame; id: string; name: string; color: string; won: boolean;
@@ -15,6 +15,8 @@ export interface StatEvent {
   role?: Role;           // tdc
   taker?: boolean;       // tarot: took
   partner?: boolean;     // tarot at 5: was called
+  place?: number;        // holdem: the place in the game…
+  of?: number;           // … of so many seats
 }
 
 export const GAMES: Record<StatGame | 'all', { name: string; unit: string; win: string }> = {
@@ -22,6 +24,7 @@ export const GAMES: Record<StatGame | 'all', { name: string; unit: string; win: 
   disk: { name: 'Demi-disque', unit: 'tours', win: 'tours gagnés (meilleur score du tour)' },
   tdc: { name: 'Trou du cul', unit: 'manches', win: 'présidences' },
   tarot: { name: 'Tarot', unit: 'donnes', win: 'donnes gagnées (dans le camp gagnant)' },
+  holdem: { name: 'Texas Hold\'em', unit: 'parties', win: 'parties gagnées (1re place)' },
 };
 
 export interface Row {
@@ -30,6 +33,7 @@ export interface Row {
   perfects: number; avg: number;               // disk
   trous: number;                               // tdc
   takes: number; takesWon: number; takeRate: number; best: number;   // tarot
+  avgPlace: number; podiums: number;           // holdem: the average place, the games in the first half
   games: number;                               // all: how many games played
   last: number;
 }
@@ -40,6 +44,7 @@ export const SORTS: Record<StatGame | 'all', { key: keyof Row; label: string; ra
   disk: [{ key: 'won', label: 'Tours gagnés' }, { key: 'rate', label: '% de tours gagnés', rate: true }, { key: 'perfects', label: 'Perfects' }, { key: 'avg', label: 'Points moyens par tour', rate: true }, { key: 'played', label: 'Tours joués' }],
   tdc: [{ key: 'won', label: 'Présidences' }, { key: 'rate', label: '% de présidences', rate: true }, { key: 'trous', label: 'Le moins souvent Trou du cul', rate: true, asc: true }, { key: 'played', label: 'Manches jouées' }],
   tarot: [{ key: 'won', label: 'Donnes gagnées' }, { key: 'rate', label: '% de donnes gagnées', rate: true }, { key: 'takes', label: 'Prises' }, { key: 'takeRate', label: '% de prises réussies', rate: true }, { key: 'best', label: 'Meilleure marque' }, { key: 'played', label: 'Donnes jouées' }],
+  holdem: [{ key: 'won', label: 'Parties gagnées' }, { key: 'rate', label: '% de parties gagnées', rate: true }, { key: 'avgPlace', label: 'Place moyenne', rate: true, asc: true }, { key: 'podiums', label: 'Dans la première moitié' }, { key: 'played', label: 'Parties jouées' }],
 };
 export const MIN_PLAYED = 5;
 export const PERIODS = { all: 'Depuis toujours', 30: '30 derniers jours', 7: '7 derniers jours' } as const;
@@ -50,12 +55,12 @@ export interface Filter { game: StatGame | 'all'; sort: string; period: Period }
 /** One row per player who played this game in the period (players gone from the room too). */
 export function rows(events: StatEvent[], f: Filter, now = Date.now()): Row[] {
   const since = f.period === 'all' ? 0 : now - Number(f.period) * 86_400_000;
-  const map = new Map<string, Row & { gameSet: Set<StatGame>; ptsSum: number; ptsN: number }>();
+  const map = new Map<string, Row & { gameSet: Set<StatGame>; ptsSum: number; ptsN: number; placeSum: number; placeN: number }>();
   for (const e of events) {
     if (e.at < since || (f.game !== 'all' && e.game !== f.game)) continue;
     let r = map.get(e.id);
     if (!r) {
-      r = { id: e.id, name: e.name, color: e.color, played: 0, won: 0, rate: 0, perfects: 0, avg: 0, trous: 0, takes: 0, takesWon: 0, takeRate: 0, best: -Infinity, games: 0, last: 0, gameSet: new Set(), ptsSum: 0, ptsN: 0 };
+      r = { id: e.id, name: e.name, color: e.color, played: 0, won: 0, rate: 0, perfects: 0, avg: 0, trous: 0, takes: 0, takesWon: 0, takeRate: 0, best: -Infinity, avgPlace: 0, podiums: 0, games: 0, last: 0, gameSet: new Set(), ptsSum: 0, ptsN: 0, placeSum: 0, placeN: 0 };
       map.set(e.id, r);
     }
     if (e.at >= r.last) { r.last = e.at; r.name = e.name; r.color = e.color; }   // the latest name and colour
@@ -64,10 +69,11 @@ export function rows(events: StatEvent[], f: Filter, now = Date.now()): Row[] {
     if (e.perfect) r.perfects++;
     if (e.role === 'tdc') r.trous++;
     if (e.taker) { r.takes++; if (e.won) r.takesWon++; }
+    if (e.place) { r.placeSum += e.place; r.placeN++; if (e.place <= Math.ceil((e.of ?? 2) / 2)) r.podiums++; }
     if (e.pts !== undefined) { r.ptsSum += e.pts; r.ptsN++; if (e.game === 'tarot') r.best = Math.max(r.best, e.pts); }
   }
-  return [...map.values()].map(({ gameSet, ptsSum, ptsN, ...r }) => ({
-    ...r, rate: r.played ? r.won / r.played : 0, avg: ptsN ? ptsSum / ptsN : 0, takeRate: r.takes ? r.takesWon / r.takes : 0,
+  return [...map.values()].map(({ gameSet, ptsSum, ptsN, placeSum, placeN, ...r }) => ({
+    ...r, avgPlace: placeN ? placeSum / placeN : 0, rate: r.played ? r.won / r.played : 0, avg: ptsN ? ptsSum / ptsN : 0, takeRate: r.takes ? r.takesWon / r.takes : 0,
     trous: r.played ? r.trous / r.played : 0, best: r.best === -Infinity ? 0 : r.best, games: gameSet.size,
   }));
 }
@@ -86,12 +92,13 @@ const ago = (t: number, now: number) => { const d = Math.floor((now - t) / 86_40
 
 /** The main value of a row for the measure, and its context in small. */
 function cells(r: Row, f: Filter, key: keyof Row): { main: string; sub: string[] } {
-  const main = key === 'rate' || key === 'takeRate' ? pct(r[key] as number) : key === 'trous' ? pct(r.trous) : key === 'avg' ? num(Math.round(r.avg * 10) / 10) : key === 'best' ? (r.best > 0 ? `+${r.best}` : String(r.best)) : String(r[key]);
+  const main = key === 'rate' || key === 'takeRate' ? pct(r[key] as number) : key === 'trous' ? pct(r.trous) : key === 'avg' || key === 'avgPlace' ? num(Math.round((r[key] as number) * 10) / 10) : key === 'best' ? (r.best > 0 ? `+${r.best}` : String(r.best)) : String(r[key]);
   const unit = GAMES[f.game].unit;
   const sub = [`${r.won} / ${r.played} ${unit}`, pct(r.rate)];
   if (f.game === 'all') sub.push(`${r.games} jeu${r.games > 1 ? 'x' : ''}`);
   if (f.game === 'disk') sub.push(`${r.perfects} perfect${r.perfects > 1 ? 's' : ''}`, `moy. ${num(Math.round(r.avg * 10) / 10)}`);
   if (f.game === 'tdc') sub.push(`Trou du cul ${pct(r.trous)}`);
+  if (f.game === 'holdem') sub.push(`place moyenne ${num(Math.round(r.avgPlace * 10) / 10)}`);
   if (f.game === 'tarot') sub.push(`${r.takes} prise${r.takes > 1 ? 's' : ''}${r.takes ? ` (${pct(r.takeRate)})` : ''}`, `meilleure ${r.best > 0 ? '+' : ''}${r.best}`);
   return { main, sub };
 }

@@ -19,7 +19,7 @@ import { TrumpArt } from './ui/TrumpArt';
 import { Palmares } from './ui/Palmares';
 import { WebSettings, WebStage } from './ui/WebStage';
 import { EXT_VERSION } from './version';
-import { CARD_PLAYERS, READY_ACTIVITIES, SCORE_NAMES, scoreKey, versionBelow } from '@slopesque/shared';
+import { CARD_PLAYERS, HOLDEM_EVERY, HOLDEM_STACKS, cardGameOf, READY_ACTIVITIES, SCORE_NAMES, scoreKey, versionBelow } from '@slopesque/shared';
 
 const EMBED = new URLSearchParams(location.search).has('embed');
 const RELEASES = 'https://github.com/recovizzi/slopesque/releases/latest';
@@ -238,13 +238,17 @@ const ACT_HELP: Record<string, string> = {
   poll: 'Une question, posée dans la zone de jeu : choix définis, choix libre ou gradient. Pas de points.',
   wheel: 'Une roue de propositions, chacune avec un poids, construite dans la zone de jeu sous les yeux de tous ; l\'hôte la lance, l\'aiguille désigne le résultat. Pas de points.',
   chat: 'Pas de jeu : le chat en plein écran, la liste des joueurs à gauche. Les scores sont gardés.',
-  cards: 'Des jeux de cartes à plusieurs : le Trou du cul et le Tarot (Texas Hold\'em et Coinche à venir). Les manches donnent des points au classement.',
+  cards: 'Des jeux de cartes à plusieurs : le Trou du cul, le Tarot et le Texas Hold\'em (la Coinche à venir). Les manches donnent des points au classement.',
   lowtide: 'Le jeu Low Tide, sur sa propre page, dans la zone de jeu. Pas de points.',
 };
 const GAME_HELP = {
   tdc: 'Aussi appelé Président. Se débarrasser de ses cartes le premier : les rôles de la manche donnent des points et des échanges de cartes.',
   tarot: 'À 4 : le preneur contre les trois autres ; à 5, il appelle un Roi. Enchères (Prise, Garde, Garde sans, Garde contre), chien et écart, 21 atouts et l\'Excuse ; les points du preneur dépendent de ses bouts.',
+  holdem: 'Le poker No Limit en tournoi, avec des jetons fictifs : deux cartes cachées, cinq communes, des mises à chaque tour ; le dernier à garder des jetons gagne. Points selon la place.',
 };
+const GAME_NAMES = { tdc: 'Trou du cul', tarot: 'Tarot', holdem: 'Texas Hold\'em' };
+const LEVEL_NAMES = { facile: 'Facile', moyen: 'Moyen', fort: 'Fort' } as const;
+const fmtEvery = (n: number) => (n ? `Toutes les ${n} mains` : 'Jamais');
 
 function GameTab() {
   const room = useStore(s => s.room), me = useStore(s => s.account)?.id, set = useStore(s => s.set);
@@ -273,7 +277,8 @@ const fmtDur = (s: number) => (s < 3600 ? `${s / 60} min` : `${s / 3600} h`);
  *  host's choice on the right — read only. */
 function GameInfo() {
   const room = useStore(s => s.room)!, act = room.activity.activity, host = room.members.find(m => m.id === room.hostId);
-  const d = { ...room.disk.rules, ...room.disk.pending }, game = room.activity.cardGame === 'tarot' ? 'tarot' : 'tdc';
+  const hr = room.cards.settings.holdemRules ?? { stack: 1000, every: 10 };
+  const d = { ...room.disk.rules, ...room.disk.pending }, game = cardGameOf(room.activity);
   type Row = [label: string, help: string, value: React.ReactNode];
   const rows: Row[] = act === 'disk' ? [
       ['Sujet', 'La question posée à chaque tour', d.topic],
@@ -287,10 +292,13 @@ function GameInfo() {
       ['Propositions', 'Écrites par l\'hôte dans la zone de jeu', String(room.wheel.items.filter(i => i.label.trim()).length)],
       ['Tirage', 'Le numéro du tirage en cours', `n° ${room.wheel.round}`]]
     : act === 'cards' ? [
-      ['Jeu', GAME_HELP[game], game === 'tarot' ? 'Tarot' : 'Trou du cul'],
+      ['Jeu', GAME_HELP[game], GAME_NAMES[game]],
       ['Joueurs', 'Des robots complètent les places libres', `${room.cards.settings[game]}${game === 'tarot' && room.cards.settings.tarot === 5 ? ' · Roi appelé' : ''}`],
       ...(game === 'tarot' ? [['Revoir les plis gagnés', 'Au survol d\'un joueur ou de sa pile', room.cards.showTricks ? 'Oui' : 'Non'] as Row,
-        ['Niveau des robots', 'Ils jouent avec ce que leur place voit', ({ facile: 'Facile', moyen: 'Moyen', fort: 'Fort' } as const)[room.cards.settings.bots ?? 'moyen']] as Row] : [])]
+        ['Niveau des robots', 'Ils jouent avec ce que leur place voit', LEVEL_NAMES[room.cards.settings.bots ?? 'moyen']] as Row] : []),
+      ...(game === 'holdem' ? [['Tapis de départ', `Les mêmes jetons pour tous ; blindes de départ 10 / 20`, `${hr.stack} jetons`] as Row,
+        ['Montée des blindes', '20 / 40, 30 / 60, 40 / 80… : la partie finit plus vite', fmtEvery(hr.every)] as Row,
+        ['Niveau des robots', 'Ils jouent avec ce que leur place voit', LEVEL_NAMES[room.cards.settings.bots ?? 'moyen']] as Row] : [])]
     : act === 'lowtide' ? [['Adresse', 'La page du jeu, vérifiée par l\'hôte', <span className="ro-url">{Object.values(room.web)[0] ?? '—'}</span>]] : [];
   return <>
     <div className="ro-head"><span className="ro-who">Réglé par l'hôte</span>{host && <span className="ro-host"><Avatar name={host.name} hue={host.hue} photo={host.photo} size="sm" />{host.name}</span>}</div>
@@ -329,22 +337,34 @@ function ExtensionOptions() {
  *  free seats, from the next deal), and the Tarot's won tricks shown or not. */
 function CardsSettings() {
   const room = useStore(s => s.room)!, me = useStore(s => s.account)?.id, set = useStore(s => s.set), host = room.hostId === me;
-  const game = room.activity.cardGame === 'tarot' ? 'tarot' : 'tdc', players = room.cards.settings[game];
+  const game = cardGameOf(room.activity), players = room.cards.settings[game] ?? CARD_PLAYERS[game][0];
+  const hr = room.cards.settings.holdemRules ?? { stack: 1000, every: 10 }, holdemOn = room.cards.game === 'holdem' && !!room.cards.holdem && !room.cards.holdem.over;
   const ack = (r: { ok: boolean; error?: string }) => { if (!r.ok) set({ note: r.error ?? '' }); };
+  const bots = <><label className="field"><span>Niveau des robots</span><select value={room.cards.settings.bots ?? 'moyen'} disabled={!host} onChange={async e => ack(await request('cards:bots', { level: e.target.value as 'moyen' }))}>
+      {game === 'holdem' ? <><option value="facile">Facile — suit trop, se trompe, bluffe peu</option><option value="moyen">Moyen — ses chances contre la cote du pot</option><option value="fort">Fort — devine les mains d'après les mises, bluffe mieux</option></>
+        : <><option value="facile">Facile — des fautes, des enchères prudentes</option><option value="moyen">Moyen — les règles du jeu, un peu de hasard</option><option value="fort">Fort — il calcule la fin de la donne</option></>}</select></label>
+    <p className="note">Les robots jouent comme un joueur : avec ce que leur place voit, jamais les cartes des autres. Le niveau vaut pour tous les jeux de cartes.</p></>;
   return <>
     <label className="field"><span>Jeu</span><select value={game} disabled={!host} onChange={async e => ack(await request('activity:choose', { choice: { activity: 'cards', cardGame: e.target.value as 'tdc' } }))}>
-      <option value="tdc">Trou du cul</option><option value="tarot">Tarot</option>
-      <option disabled>Texas Hold'em (bientôt)</option><option disabled>Coinche (bientôt)</option></select></label>
+      <option value="tdc">Trou du cul</option><option value="tarot">Tarot</option><option value="holdem">Texas Hold'em</option>
+      <option disabled>Coinche (bientôt)</option></select></label>
     <p className="note">{GAME_HELP[game]}</p>
     <label className="field"><span>Joueurs</span><select value={players} disabled={!host} onChange={async e => ack(await request('cards:players', { game, players: Number(e.target.value) }))}>
-      {CARD_PLAYERS[game].map(n => <option key={n} value={n}>{n} joueurs{game === 'tarot' && n === 5 ? ' (le preneur appelle un Roi)' : ''}</option>)}</select></label>
-    <p className="note">À partir de la donne suivante. Prends une place à la table avant la donne ; des robots complètent les places libres. Les règles se lisent avec le bouton « i » de la table.</p>
+      {CARD_PLAYERS[game].map(n => <option key={n} value={n}>{n} joueurs{game === 'tarot' && n === 5 ? ' (le preneur appelle un Roi)' : game === 'holdem' && n === 2 ? ' (en tête-à-tête)' : ''}</option>)}</select></label>
+    <p className="note">À partir de la {game === 'holdem' ? 'partie' : 'donne'} suivante. Prends une place à la table avant la donne ; des robots complètent les places libres. Les règles se lisent avec le bouton « i » de la table.</p>
     {game === 'tarot' && <><label className="check"><input type="checkbox" checked={room.cards.showTricks} disabled={!host} onChange={e => void request('tarot:tricks', { show: e.target.checked })} /><span>Revoir les plis gagnés (au survol)</span></label>
       <p className="note">Décoché, la partie est plus dure : personne ne peut revoir les plis déjà joués.</p>
-      <label className="field"><span>Niveau des robots</span><select value={room.cards.settings.bots ?? 'moyen'} disabled={!host} onChange={async e => ack(await request('tarot:bots', { level: e.target.value as 'moyen' }))}>
-        <option value="facile">Facile — des fautes, des enchères prudentes</option><option value="moyen">Moyen — les règles du jeu, un peu de hasard</option><option value="fort">Fort — il calcule la fin de la donne</option></select></label>
-      <p className="note">Les robots jouent comme un joueur : avec ce que leur place voit, jamais les mains des autres.</p>
+      {bots}
       <TrumpArt edit={host} /></>}
+    {game === 'holdem' && <>
+      <label className="field"><span>Tapis de départ</span><select value={hr.stack} disabled={!host} onChange={async e => ack(await request('holdem:rules', { stack: Number(e.target.value) }))}>
+        {HOLDEM_STACKS.map(n => <option key={n} value={n}>{n} jetons ({n / 20} grosses blindes)</option>)}</select></label>
+      <label className="field"><span>Montée des blindes</span><select value={hr.every} disabled={!host} onChange={async e => ack(await request('holdem:rules', { every: Number(e.target.value) }))}>
+        {HOLDEM_EVERY.map(n => <option key={n} value={n}>{n ? `Toutes les ${n} mains` : 'Jamais (blindes fixes 10 / 20)'}</option>)}</select></label>
+      <p className="note">Blindes de départ 10 / 20, puis 20 / 40, 30 / 60, 40 / 80… Plus le tapis est petit et les blindes montent vite, plus la partie est courte. À partir de la partie suivante.</p>
+      {bots}
+      {host && holdemOn && <><button className="btn danger" type="button" onClick={async () => { if (confirm('Terminer la partie ? Les joueurs encore en jeu sont classés selon leurs jetons.')) ack(await request('holdem:end')); }}>Terminer la partie</button>
+        <p className="note">Les joueurs encore en jeu sont classés selon leurs jetons ; chacun reçoit les points de sa place.</p></>}</>}
   </>;
 }
 

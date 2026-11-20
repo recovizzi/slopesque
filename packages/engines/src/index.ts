@@ -11,3 +11,5 @@ export * as Tdc from './tdc.js';
 export * as Table from './table.js';
 export * as Tarot from './tarot.js';
 export * as TarotAI from './tarot-ai.js';
+export * as Holdem from './holdem.js';
+export * as HoldemAI from './holdem-ai.js';

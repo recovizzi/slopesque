@@ -135,22 +135,43 @@ export interface TarotDealView {
   result: { taker: string; partner: string | null; bid: string; bouts: number; need: number; made: number; won: boolean; score: number; marks: Record<string, number>; petit: 'taker' | 'defense' | null; handfuls: number; chelem: number } | null; note: string;
   shownChien: TarotCardView[]; chelem: string | null; handfuls: Record<string, { level: 1 | 2 | 3; cards: TarotCardView[] }>; started: string[]; winners: string[];
 }
+/** The Hold'em's game as a seat sees it (engines' holdemView: the others' cards as backs until turned over). */
+export interface HoldemView {
+  seats: string[]; settings: HoldemRules; stacks: Record<string, number>; out: string[]; places: Record<string, number>; over: boolean;
+  hand: number; level: number; sb: number; bb: number; levelUp: boolean; button: string | null; sbSeat: string | null; bbSeat: string | null;
+  holes: Record<string, PlayingCard[]>; board: PlayingCard[]; street: 'preflop' | 'flop' | 'turn' | 'river' | 'showdown';
+  inHand: string[]; folded: string[]; bets: Record<string, number>; paid: Record<string, number>; current: number; minRaise: number;
+  acted: string[]; faced: Record<string, number>; aggressor: string | null; turn: string | null;
+  last: Record<string, { act: HoldemAct; amount: number }>; log: { by: string; street: string; act: HoldemAct; amount: number }[];
+  revealed: boolean; startStacks: Record<string, number>; startedAt: number;
+  result: { awards: { amount: number; winners: string[]; hand: string; side: number }[]; uncontested: boolean; shown: string[];
+    best: Record<string, { cat: number; name: string; five: string[] }>; won: Record<string, number>; out: string[] } | null;
+}
+export type HoldemAct = 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'allin' | 'sb' | 'bb';
+/** The Hold'em's game: the starting chips, the blinds up every N hands (0: never). */
+export interface HoldemRules { stack: number; every: number }
+export const HOLDEM_STACKS = [500, 1000, 2000, 5000] as const;
+export const HOLDEM_EVERY = [5, 10, 20, 0] as const;
 /** How many seats each card game can have (robots complete the free ones). */
-export const CARD_PLAYERS = { tdc: [3, 4, 5, 6, 7, 8], tarot: [4, 5] } as const;
+export const CARD_PLAYERS = { tdc: [3, 4, 5, 6, 7, 8], tarot: [4, 5], holdem: [2, 3, 4, 5, 6, 7, 8] } as const;
+export type CardGameKey = keyof typeof CARD_PLAYERS;
 export interface CardsView {
-  game: 'tdc' | 'tarot';
+  game: CardGameKey;
   players: number;                       // the seats of the table on the table now
-  settings: { tdc: number; tarot: number; bots?: 'facile' | 'moyen' | 'fort' };   // the host's choice for each game, from the next deal; bots: the robots' level
+  settings: { tdc: number; tarot: number; holdem: number; bots?: 'facile' | 'moyen' | 'fort'; holdemRules?: HoldemRules };   // the host's choice for each game, from the next deal; bots: the robots' level
   showTricks: boolean;                   // Tarot: the won tricks can be looked at
   seats: CardSeatView[];
   tdc: TdcRoundView | null;
   tarot: TarotDealView | null;
+  holdem: HoldemView | null;
   paid: Record<string, string | null>;   // the last round: who got each seat's points (null: a robot)
   turnSince: number;
   late: { seat: string; user: string; secs: number } | null;   // a player's turn has lasted 30 s: /kick possible
   art: Record<string, string>;           // Tarot: the room's pictures of the trumps (« 0 » the Excuse … « 21 »), their address
 }
-export const READY_CARD_GAMES = ['tdc', 'tarot'];
+export const READY_CARD_GAMES = ['tdc', 'tarot', 'holdem'];
+/** The card game an activity choice plays (the Trou du cul by default). */
+export const cardGameOf = (a: { cardGame?: string }): CardGameKey => (a.cardGame === 'tarot' || a.cardGame === 'holdem' ? a.cardGame : 'tdc');
 /** /effet: a visual effect on everyone's screen (not kept). On a player's photo: hit, tomato, hammer. */
 export const EFFECTS = ['firework', 'confetti', 'hit', 'tomato', 'hammer', 'screamer'] as const;
 export type EffectKind = typeof EFFECTS[number];
@@ -161,10 +182,10 @@ export const EFFECT_PARALLEL: Partial<Record<EffectKind, number>> = { firework: 
 /** An effect sent to the room's players (the « fx » channel, outside the numbered events: a missed one is not replayed). */
 export interface EffectView { id: string; kind: EffectKind; by: string; target: string | null; hue: number | null; pic: { kind: 'image' | 'emoji'; src: string } | null }
 /** The ranking an activity shows (and resets): each game its own; null: an activity without points. */
-export const scoreKey = (a: { activity: string; cardGame?: string }) => (a.activity === 'disk' ? 'disk' : a.activity === 'cards' ? (a.cardGame === 'tarot' ? 'tarot' : 'tdc') : null);
-export const SCORE_NAMES: Record<string, string> = { disk: 'du Demi-disque', tdc: 'du Trou du cul', tarot: 'du Tarot' };
+export const scoreKey = (a: { activity: string; cardGame?: string }) => (a.activity === 'disk' ? 'disk' : a.activity === 'cards' ? cardGameOf(a) : null);
+export const SCORE_NAMES: Record<string, string> = { disk: 'du Demi-disque', tdc: 'du Trou du cul', tarot: 'du Tarot', holdem: 'du Texas Hold\'em' };
 /** One player's result in one round (the Palmarès, kept with the room). */
-export interface PalmaresEvent { at: number; game: 'disk' | 'tdc' | 'tarot'; id: string; name: string; hue: number; won: boolean; pts?: number; perfect?: boolean; role?: string; taker?: boolean; partner?: boolean }
+export interface PalmaresEvent { at: number; game: 'disk' | 'tdc' | 'tarot' | 'holdem'; id: string; name: string; hue: number; won: boolean; pts?: number; perfect?: boolean; role?: string; taker?: boolean; partner?: boolean; place?: number; of?: number }
 
 export type PollAnswer = number | string | [number, number];
 export interface PollPicView { kind: 'image' | 'sticker' | 'gif'; src: string; w: number; h: number }
@@ -271,14 +292,17 @@ export const intents = {
   'tarot:call': z.object({ card: z.string().max(4) }),
   'tarot:discard': z.object({ cards: z.array(z.string().max(4)).max(6) }),
   'tarot:tricks': z.object({ show: z.boolean() }),
-  'tarot:bots': z.object({ level: z.enum(['facile', 'moyen', 'fort']) }),
+  'cards:bots': z.object({ level: z.enum(['facile', 'moyen', 'fort']) }),
+  'holdem:act': z.object({ act: z.enum(['fold', 'check', 'call', 'raise', 'allin']), to: z.number().int().min(1).max(100_000_000).optional() }),
+  'holdem:rules': z.object({ stack: z.number().int().refine(n => (HOLDEM_STACKS as readonly number[]).includes(n)).optional(), every: z.number().int().refine(n => (HOLDEM_EVERY as readonly number[]).includes(n)).optional() }),
+  'holdem:end': z.object({}),
   'tarot:handful': z.object({ level: z.union([z.literal(1), z.literal(2), z.literal(3)]) }),
   'tarot:chelem': z.object({}),
   'tarot:art': z.object({ card: z.number().int().min(0).max(21), mediaId: z.string().uuid().nullable() }),
   'tarot:art-reset': z.object({}),
   'effect:play': z.object({ kind: z.enum(EFFECTS), target: z.string().uuid().nullable().optional(),
     pic: z.object({ kind: z.enum(['image', 'sticker', 'gif', 'emoji']), value: z.string().min(1).max(700_000) }).optional() }),
-  'cards:players': z.object({ game: z.enum(['tdc', 'tarot']), players: z.number().int().min(3).max(8) }),
+  'cards:players': z.object({ game: z.enum(['tdc', 'tarot', 'holdem']), players: z.number().int().min(2).max(8) }),
   'table:join': z.object({}),
   'table:leave': z.object({}),
   'gif:favorites': z.object({ favorites: z.array(gifRef).max(200) }),
@@ -340,7 +364,10 @@ export interface IntentResults {
   'tarot:call': null;
   'tarot:discard': null;
   'tarot:tricks': null;
-  'tarot:bots': null;
+  'cards:bots': null;
+  'holdem:act': null;
+  'holdem:rules': null;
+  'holdem:end': null;
   'tarot:handful': null;
   'tarot:chelem': null;
   'tarot:art': null;

@@ -240,8 +240,14 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
   cardsPlay(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('cards:play', b, async v => { await this.hub.cardsMove(s, { play: v.cards }); return null; }); }
   @SubscribeMessage('cards:pass')
   cardsPass(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('cards:pass', b, async () => { await this.hub.cardsMove(s, { pass: true }); return null; }); }
-  @SubscribeMessage('tarot:bots')
-  tarotBots(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('tarot:bots', b, async v => { await this.hub.tarotBots(s, v.level); return null; }); }
+  @SubscribeMessage('cards:bots')
+  cardsBots(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('cards:bots', b, async v => { await this.hub.cardsBots(s, v.level); return null; }); }
+  @SubscribeMessage('holdem:act')
+  holdemAct(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('holdem:act', b, async v => { await this.hub.holdemDo(s, v); return null; }); }
+  @SubscribeMessage('holdem:rules')
+  holdemRules(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('holdem:rules', b, async v => { await this.hub.holdemSetRules(s, v); return null; }); }
+  @SubscribeMessage('holdem:end')
+  holdemEnd(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('holdem:end', b, async () => { await this.hub.holdemEnd(s); return null; }); }
   @SubscribeMessage('tarot:handful')
   tarotHandful(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('tarot:handful', b, async v => { await this.hub.tarotHandful(s, v.level); return null; }); }
   @SubscribeMessage('tarot:chelem')

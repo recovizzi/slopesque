@@ -17,7 +17,8 @@ export const ACTS: Act[] = [
   { code: 'roulette', label: 'Roulette', kind: 'wheel', names: ['roulette', 'roue', 'wheel'], choice: { activity: 'wheel' } },
   { code: 'cartes', label: 'Cartes', kind: 'cards', names: ['cartes', 'carte', 'cards'], formats: [
     { code: 'trou-du-cul', label: 'Trou du cul', names: ['trou du cul', 'tdc', 'president'], choice: { activity: 'cards', cardGame: 'tdc' } },
-    { code: 'tarot', label: 'Tarot', names: ['tarot'], choice: { activity: 'cards', cardGame: 'tarot' } }] },
+    { code: 'tarot', label: 'Tarot', names: ['tarot'], choice: { activity: 'cards', cardGame: 'tarot' } },
+    { code: 'holdem', label: 'Texas Hold\'em', names: ['texas holdem', 'holdem', 'texas', 'poker'], choice: { activity: 'cards', cardGame: 'holdem' } }] },
   { code: 'low-tide', label: 'Low Tide', kind: 'web', names: ['low tide', 'lowtide', 'jeux web', 'web'], choice: { activity: 'lowtide' } },
 ];
 

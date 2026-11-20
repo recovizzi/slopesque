@@ -30,7 +30,8 @@
     "deploy:prod": "node tools/deploy.mjs",
     "prod:admin": "node tools/deploy.mjs admin",
     "release": "node tools/release.mjs",
-    "tarot:duel": "pnpm --filter @slopesque/engines build && node packages/engines/tools/duel.mjs"
+    "tarot:duel": "pnpm --filter @slopesque/engines build && node packages/engines/tools/duel.mjs",
+    "holdem:duel": "pnpm --filter @slopesque/engines build && node packages/engines/tools/holdem-duel.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",

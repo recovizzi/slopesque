@@ -1,8 +1,9 @@
 ## ADDED Requirements
 
 ### Requirement: Nombre de joueurs d'un jeu de cartes
-L'hôte MUST choisir d'abord le jeu (Trou du cul, Tarot), puis, dans l'onglet Partie, le nombre de joueurs parmi les
-valeurs que ce jeu permet : de 3 à 8 au Trou du cul, 4 ou 5 au Tarot (à 5, le preneur appelle un Roi). Le choix MUST
+L'hôte MUST choisir d'abord le jeu (Trou du cul, Tarot, Texas Hold'em), puis, dans l'onglet Partie, le nombre de
+joueurs parmi les valeurs que ce jeu permet : de 3 à 8 au Trou du cul, 4 ou 5 au Tarot (à 5, le preneur appelle un
+Roi), de 2 à 8 au Texas Hold'em. Le choix MUST
 valoir à partir de la donne suivante ; les joueurs qui ont cliqué « Participer » prennent les places, des robots
 complètent les autres.
 
@@ -19,7 +20,7 @@ jeux de cartes MUST donner des points au classement du salon, comme le Demi-disq
 
 #### Scenario: Choisir le jeu
 - **WHEN** l'hôte ouvre Paramètres → Partie avec l'activité Cartes
-- **THEN** la liste Jeu propose Trou du cul et Tarot, et montre Texas Hold'em et Coinche « (bientôt) », désactivés
+- **THEN** la liste Jeu propose Trou du cul, Tarot et Texas Hold'em, et montre la Coinche « (bientôt) », désactivée
 
 ### Requirement: Présentation des cartes
 Une carte MUST être un petit rectangle aux angles arrondis, dessiné en SVG : en haut, la valeur dans l'angle gauche et
@@ -127,6 +128,73 @@ attendre la fin d'une annonce.
 - **THEN** « Léa prend · Garde » s'affiche, puis une carte se retourne sur le Roi de cœur, et l'en-tête montre
   « appelle R♥ »
 
+### Requirement: Texas Hold'em
+Le Texas Hold'em MUST se jouer en **No Limit**, de 2 à 8 places, comme un **tournoi** (une partie) avec des
+**jetons fictifs** : chacun commence avec le même tapis, la partie continue de main en main jusqu'à ce qu'un seul
+joueur ait tous les jetons (ou que l'hôte la termine). Règles (TDA, les plus répandues) :
+- **Une main** : 52 cartes ; un **bouton** (donneur, « D »), la **petite blinde** à sa gauche, la **grosse blinde**
+  ensuite ; 2 cartes cachées chacun ; un tour d'enchères, puis le **flop** (3 cartes communes), un tour, le **turn**
+  (1 carte), un tour, la **river** (1 carte), un dernier tour. Le bouton avance d'une place encore en jeu à chaque main.
+- **Parler** : avant le flop, le joueur à gauche de la grosse blinde parle le premier, la grosse blinde la dernière
+  (elle peut relancer si tout le monde a suivi) ; ensuite, le premier joueur encore en jeu à gauche du bouton. **À
+  deux**, le bouton est la petite blinde : il parle le premier avant le flop, le dernier ensuite.
+- **Actions** : se coucher, parler (check, sans mise à suivre), suivre, miser / relancer, tapis. Une relance MUST
+  valoir au moins la mise ou relance précédente la plus haute du tour (la première mise : au moins la grosse blinde) ;
+  un tapis plus court ne rouvre pas les enchères pour ceux qui ont déjà parlé (ils suivent ou se couchent).
+- **Tapis et pots** : un joueur à tapis ne gagne que ce qu'il a pu suivre ; le reste fait des **pots annexes**. La
+  mise que personne n'a suivie revient à son joueur. Quand plus personne ne peut miser, les cartes restantes sortent
+  sans enchères, les mains retournées.
+- **Abattage** : la meilleure combinaison de 5 cartes parmi ses 2 et les 5 communes gagne (« les cartes parlent »)
+  ; à égalité, le pot est partagé, le jeton impair au premier gagnant à gauche du bouton. Un joueur seul en jeu (les
+  autres couchés) gagne sans montrer ses cartes.
+- **Combinaisons**, de la plus forte : quinte flush (royale : As en tête), carré, full, couleur, quinte (l'As
+  peut faire 5-4-3-2-A), brelan, double paire, paire, carte haute ; les cartes restantes (kickers) départagent.
+- **Blindes** : elles commencent à 10 / 20 et **montent** toutes les N mains (réglage) : 20 / 40, 30 / 60, 40 / 80,
+  60 / 120, 80 / 160, 100 / 200, 150 / 300…
+- **Éliminé** : un joueur sans jetons à la fin d'une main sort ; sa place est fixée (le dernier éliminé est 2ᵉ…). Les
+  éliminés de la même main se départagent par leur tapis au début de la main.
+
+Réglages de l'hôte (Partie, Texas Hold'em ; pour la partie suivante) : **joueurs** (2 à 8), **tapis de départ**
+(500, 1 000, 2 000 ou 5 000 jetons, soit 25 à 250 grosses blindes), **montée des blindes** (toutes les 5, 10 ou 20
+mains, ou jamais) et **niveau des robots**. Les mains s'enchaînent seules ; l'hôte lance la partie (« Distribuer ») et
+peut la **terminer** : les places restantes se rangent alors par tapis. **Points au classement** à la fin de la partie
+: 10 × (nombre de places − sa place) — à 6, le premier +50, le deuxième +40… le dernier 0 ; le palmarès garde la place
+de chacun. La table MUST montrer à chaque place son tapis, sa mise du tour, sa dernière action, le bouton et les
+blindes, ses cartes (dos, ou retournées à l'abattage) ; au centre les cartes communes et le pot (et les pots
+annexes) ; en bas mes deux cartes, **ce que je tiens** (« Paire de Rois »), et des boutons qui disent le montant
+(« Suivre 40 », « Relancer à 120 », raccourcis ½ pot, pot, tapis). L'abattage MUST montrer les mains retournées, la
+combinaison gagnante et ses 5 cartes mises en avant, et le gain. Les règles (« i ») MUST montrer les combinaisons
+dessinées avec les mêmes cartes, de la plus forte à la plus faible.
+
+#### Scenario: Pot annexe
+- **WHEN** Léa (300 jetons) part à tapis, Malo et Zoé (1 000 chacun) suivent puis misent encore 400 chacun, et Léa a
+  la meilleure main, Malo la deuxième
+- **THEN** Léa gagne le pot principal (900), Malo le pot annexe (800)
+
+#### Scenario: Relance minimale
+- **WHEN** les blindes sont 10 / 20 et Zoé relance à 60
+- **THEN** le joueur suivant ne peut pas relancer à moins de 100 (60 + la relance de 40) ; « Tapis » reste possible
+
+#### Scenario: Fin de partie
+- **WHEN** à 4 places, Malo prend les derniers jetons de Léa
+- **THEN** Malo est 1ᵉʳ (+30), Léa 2ᵉ (+20) ; les places 3 et 4 (éliminées avant) ont +10 et 0 ; une place tenue par
+  un robot du début à la fin ne rapporte rien
+
+### Requirement: Robots du Texas Hold'em
+Les robots du Hold'em MUST jouer avec ce qu'un joueur voit (leurs 2 cartes, les cartes communes, les mises, les
+tapis), jamais les cartes des autres. Avant le flop, ils MUST jouer selon la force de leurs 2 cartes (formule de
+Chen), leur position, le nombre de joueurs et les relances ; tapis court (moins de 10 grosses blindes) : tapis ou se
+coucher. Après le flop, ils MUST estimer leurs chances de gagner (Monte-Carlo : des milliers de fins de main tirées
+parmi les cartes qu'ils ne voient pas) et les comparer à la **cote du pot** (ce qu'il faut suivre / le pot après
+avoir suivi) : se coucher en dessous, suivre au-dessus, miser ou relancer avec une main forte, parfois **bluffer**.
+Niveaux (le réglage de l'hôte, commun aux jeux de cartes) : *Facile* (suit trop, se trompe, bluffe peu), *Moyen*
+(les cotes et les chances, un peu de hasard), *Fort* (mains adverses estimées d'après leurs mises, tailles de mise
+variées, bluffs mieux placés). Un peu de hasard à chaque niveau.
+
+#### Scenario: La cote du pot
+- **WHEN** au turn, le pot fait 300 et un adversaire mise 100 ; Robot 2 a un tirage couleur (environ 20 % de chances)
+- **THEN** il faut 100 pour gagner 500 (20 %) : Robot 2 suit ou se couche selon ses chances estimées, il ne relance pas
+
 ### Requirement: Plis gagnés et leur consultation
 Un pli complet MUST rester visible un instant (« Hugo remporte le pli »), puis ses cartes MUST se rassembler et partir
 vers leur gagnant : vers **mon tas**, en bas à droite de la table, ou vers la **pastille** d'un adversaire (où elles
@@ -167,7 +235,8 @@ au palmarès. Dans la V1, un robot MUST aussi reprendre la place d'un joueur ret
 
 ### Requirement: Regarder, rejoindre ou quitter une table
 Une table de cartes MUST avoir un **nombre de places** fixé par le jeu (Tarot : 4 ou 5, le réglage de l'hôte ;
-Trou du cul : les joueurs de la première manche). Une place MUST être tenue soit par un joueur, soit par un robot.
+Trou du cul : les joueurs de la première manche ; Hold'em : 2 à 8). Au Hold'em, la « manche » est la partie entière :
+prendre la place d'un robot, c'est prendre son tapis ; une place éliminée ne se prend plus. Une place MUST être tenue soit par un joueur, soit par un robot.
 Un joueur du salon sans place MUST **regarder** la partie (spectateur) :
 - **Rejoindre** : il MUST pouvoir prendre une place tenue par un robot, d'abord la sienne si un robot la joue
   encore pour lui (« Reprendre ma place »), sinon une autre (« Prendre la place de Pépin »). Il MUST jouer la main
@@ -272,7 +341,7 @@ reprendre celle d'un absent ; des **paris** sur ses gains (une part de ses point
 pouvoir **parier leurs points sur un joueur** de la table pour en gagner (à spécifier : cotes, plafond, moment des
 mises) ; un **temps par tour** (dépassé : le robot joue) ; le **vote** pour faire quitter la table au joueur qui la
 fait attendre (« Faire quitter la table un joueur qui la fait attendre », côté serveur) ; la possibilité de **rallonger** la
-partie (manches ou objectif, à la fin de la manche en cours) ; le Tarot, le Texas Hold'em et la Coinche.
+partie (manches ou objectif, à la fin de la manche en cours) ; le Tarot, le Texas Hold'em et la Coinche (à venir).
 
 #### Scenario: Joueur absent
 - **WHEN** le tour d'un joueur dure depuis 30 s
