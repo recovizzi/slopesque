@@ -81,10 +81,17 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
 
   // the chat opens at its bottom and follows the last message when it was there (or when I just wrote); higher up, a
   // button brings it back down (with the number of messages arrived since)
-  const atBottom = useRef(true), lastSeen = useRef(0);
+  const atBottom = useRef(true), lastSeen = useRef(0), goingDown = useRef(0);   // goingDown: the button was clicked (until the bottom)
   const [away, setAway] = useState(false), [unread, setUnread] = useState(0);
   const count = room.chat.messages.length, last = room.chat.messages.at(-1);
-  const toBottom = (smooth = false) => { const el = listRef.current; if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' }); };
+  const toBottom = (smooth = false) => {
+    const el = listRef.current;
+    if (!el) return;
+    atBottom.current = true; setAway(false); setUnread(0);
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+    clearTimeout(goingDown.current);   // what grew meanwhile (a picture loaded): at the very bottom in the end
+    goingDown.current = window.setTimeout(() => { goingDown.current = 0; if (atBottom.current) el.scrollTop = el.scrollHeight; }, 700);
+  };
   useLayoutEffect(() => {
     const el = listRef.current;
     if (el && (atBottom.current || last?.from === account.id)) el.scrollTop = el.scrollHeight;
@@ -370,7 +377,13 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
       if (li) void react(+li.dataset.msg!, account.quick || QUICK);
     }}
     onMouseDown={e => { if (e.detail > 1 && (e.target as Element).closest('.msg-body')) e.preventDefault(); }}>
-    <ul className="chat" ref={listRef} data-chat onScroll={e => { const el = e.currentTarget; atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40; setAway(!atBottom.current); if (atBottom.current) setUnread(0); if (el.scrollTop < 40) void more(); }}>
+    <ul className="chat" ref={listRef} data-chat onScroll={e => {
+      const el = e.currentTarget;
+      if (el.scrollTop < 40) void more();
+      if (goingDown.current) return;   // on its way down (the button): not « away »
+      atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40; setAway(!atBottom.current); if (atBottom.current) setUnread(0);
+    }}
+    onWheel={e => { if (e.deltaY < 0 && goingDown.current) { clearTimeout(goingDown.current); goingDown.current = 0; } }}>
       {room.chat.hasMore ? <li className="msg sys chat-start">{loadingMore ? 'Chargement…' : <button className="btn ghost sm" type="button" onClick={more}>Messages plus anciens</button>}</li>
         : room.chat.start && <li className="msg sys chat-start">{room.chat.start === 'begin' ? 'Début de la conversation' : 'Les messages de plus de 30 jours ont été supprimés'}</li>}
       {room.chat.messages.filter(m => !m.scope || m.scope === room.scope).map(m => m.kind === 'vote' && m.data?.vote ? <VoteCard key={m.id} id={m.id} v={m.data.vote as Vote} members={members} me={account.id} />
@@ -394,7 +407,7 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
           })}</div>}
         </li>)}
     </ul>
-    {away && <div className="to-bottom-anchor"><button className={`to-bottom ${unread ? 'has-new' : ''}`} type="button" onClick={() => { toBottom(true); setUnread(0); }}
+    {away && <div className="to-bottom-anchor"><button className={`to-bottom ${unread ? 'has-new' : ''}`} type="button" onClick={() => toBottom(true)}
       title={unread ? `${unread} nouveau${unread > 1 ? 'x' : ''} message${unread > 1 ? 's' : ''} : revenir en bas` : 'Revenir en bas du chat'} aria-label="Revenir en bas du chat">
       <Icon name="down" />{unread > 0 && <b>{unread > 99 ? '99+' : unread}</b>}</button></div>}
     {picked ? <UploadPanel p={picked} naming={naming} nameError={nameError} onCancel={() => { setPicked(null); setNaming(null); }} onUse={use}
