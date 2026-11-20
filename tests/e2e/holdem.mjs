@@ -73,11 +73,17 @@ check(await frame.evaluate(() => globalThis.__fly) > 0, `pieces fly on the table
 check(sawFlop || await frame.locator('.hd-awards').count() > 0, 'the flop turned over (or the hand won before)');
 if (sawFlop) { await page.waitForTimeout(1200); await shot(page, '32-holdem-flop'); }
 
+// I keep playing (check or call) while waiting for something to happen at the table
+const playing = cond => until(async () => {
+  if (await cond()) return true;
+  const mine = frame.locator('.hd-actions.is-mine [data-action="holdem-check"], .hd-actions.is-mine [data-action="holdem-call"]');
+  if (await mine.count()) await mine.first().click().catch(() => {});
+  return false;
+}, 60000);
 // the showdown or a hand won: the pots and who took them
-check(await until(async () => (await frame.locator('.hd-awards li').count()) > 0 || (await frame.locator('.cg-pile-text', { hasText: 'remporte' }).count()) > 0, 60000)
-  || (await frame.locator('.hd-actions.is-mine').count()) > 0, 'a hand ends: who takes the pot');
+check(await playing(async () => (await frame.locator('.hd-awards li').count()) > 0), 'a hand ends: who takes the pot');
 await shot(page, '33-holdem-pot');
-check(await until(async () => (await frame.locator('.hd-crown').count()) >= 1, 30000), 'a crown on the biggest bank (once the banks differ)');
+check(await playing(async () => (await frame.locator('.hd-crown').count()) >= 1), 'a crown on the biggest bank (once the banks differ)');
 
 // the rules: the hands drawn, strongest first
 await frame.locator('[data-action="cards-rules"]').click();
