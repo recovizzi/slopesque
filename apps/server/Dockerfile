@@ -1,7 +1,7 @@
 # The Slopesque server image (build from the repository's root: docker build -f apps/server/Dockerfile .).
 # Multi-stage: the workspace built with pnpm, then only the server and its production dependencies, run as a user
 # without privileges. Secrets come from the environment (the machine's .env), never from the image.
-FROM node:22-alpine AS build
+FROM node:26-alpine AS build
 RUN corepack enable
 WORKDIR /repo
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc* ./
@@ -16,7 +16,7 @@ COPY apps/server ./apps/server
 RUN pnpm --filter @slopesque/shared --filter @slopesque/engines --filter @slopesque/server run build \
  && pnpm --filter @slopesque/server deploy --prod --legacy /out
 
-FROM node:22-alpine
+FROM node:26-alpine
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build /out/package.json ./
