@@ -974,19 +974,34 @@ body.is-welcome [data-region="header"], body.is-welcome [data-action="toggle-lef
 .lp-player { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 6px; background: #000; }
 
 /* ---------------------------------------------------------------- Texas Hold'em (lib/holdem-view.ts) */
-.hd-chip { display: inline-block; width: 10px; height: 10px; margin-right: 3px; border-radius: 50%; vertical-align: -1px; flex: none;
-  background: radial-gradient(circle, #ffd34d 0 34%, #c0392b 36% 100%); box-shadow: 0 0 0 1px #00000040; }
-.hd-seat { flex-wrap: wrap; row-gap: 2px; padding-right: 7px; }
+.chip-svg { display: block; width: 100%; height: 100%; }
+.chip-svg .chip-v { font: 800 6.4px system-ui, sans-serif; }
+/* a pile: chips seen from above, each one a little higher */
+.hd-pile { position: relative; display: inline-block; width: var(--chip, 20px); height: calc(var(--chip, 20px) + (var(--n) - 1) * 3px); }
+.hd-pile i { position: absolute; left: 0; bottom: calc(var(--k) * 3px); width: var(--chip, 20px); height: var(--chip, 20px); filter: drop-shadow(0 1px 0 rgb(0 0 0 / .45)); }
+.hd-pile small { position: absolute; left: 50%; top: -13px; transform: translateX(-50%); font-size: 9.5px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px #000; white-space: nowrap; }
+.hd-chips { display: inline-flex; align-items: flex-end; gap: 2px; }
+.hd-chips.is-pending { opacity: .75; outline: 2px dashed #ffd34d; outline-offset: 2px; border-radius: 6px; }
+.hd-fly { display: flex; align-items: flex-end; }
+.hd-fly .hd-chips { --chip: 18px; }
+.cg-seats.cg-seats { align-items: flex-start; }
+.hd-place { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.hd-seat { position: relative; flex-wrap: wrap; row-gap: 2px; padding-right: 7px; }
+.hd-bet-spot { min-height: 30px; display: flex; align-items: flex-end; justify-content: center; gap: 4px; --chip: 16px; }
+.hd-bet-spot b { padding: 0 6px; border-radius: 99px; font-size: 11px; background: rgb(0 0 0 / .35); color: #fff; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hd-bet-spot b i { font-style: normal; color: #ffd34d; }
+.hd-bet-spot.mine { min-height: 34px; --chip: 18px; }
+.hd-crown { position: absolute; z-index: 2; left: -4px; top: -11px; width: 22px; height: 15px; transform: rotate(-14deg); filter: drop-shadow(0 1px 1px rgb(0 0 0 / .4)); }
 .hd-who { display: flex; flex-direction: column; line-height: 1.15; }
-.hd-stack { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; color: #3a3833; white-space: nowrap; }
-.hd-stack.big { font-size: 15px; color: inherit; }
+.hd-stack { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; color: #3a3833; white-space: nowrap; }
+.hd-stack .chip-svg { width: 12px; height: 12px; }
+.hd-stack.big { font-size: 17px; color: inherit; }
 .hd-pos { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 3px; border-radius: 99px; font-size: 9.5px; font-weight: 800; background: #2c6b48; color: #fff; }
 .hd-pos.dealer { background: #fffdf8; color: #1c1b19; box-shadow: 0 0 0 1.5px #1c1b19; }
 .hd-act { padding: 0 6px; border-radius: 99px; font-size: 10.5px; font-weight: 800; white-space: nowrap; background: #e8e5dc; color: #4a463f; }
 .hd-act.act-raise, .hd-act.act-bet { background: #ffd34d; color: #5a4300; }
 .hd-act.act-allin { background: #c62828; color: #fff; }
 .hd-act.act-fold { background: transparent; color: #6b6860; font-style: italic; font-weight: 600; }
-.hd-bet { display: inline-flex; align-items: center; padding: 0 6px; border-radius: 99px; font-size: 11px; font-weight: 800; background: #164a30; color: #fff; font-variant-numeric: tabular-nums; }
 .hd-won { padding: 0 7px; border-radius: 99px; font-size: 11px; font-weight: 800; background: #2c6b48; color: #fff; }
 .hd-hand { flex-basis: 100%; text-align: center; font-size: 10.5px; font-weight: 700; color: #2c6b48; }
 .hd-holes { display: inline-flex; gap: 2px; }
@@ -994,46 +1009,71 @@ body.is-welcome [data-region="header"], body.is-welcome [data-action="toggle-lef
 .hd-card.mini .card-svg { width: 100%; height: 100%; filter: drop-shadow(0 1px 1px rgb(0 0 0 / .3)); }
 .cg-seat.is-winner { border-color: #2c6b48; box-shadow: 0 0 0 3px rgb(44 107 72 / .35); }
 .hd-middle { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+.hd-felt { display: flex; align-items: center; gap: 14px; }
+.hd-deck { position: relative; width: calc(var(--cw) * .8); height: calc(var(--ch) * .8); }
+.hd-deck-card { position: absolute; inset: 0; transform: translate(calc(var(--k) * -1.5px), calc(var(--k) * -1.5px)); }
+.hd-deck-card .card-svg { width: 100%; height: 100%; filter: drop-shadow(0 1px 1px rgb(0 0 0 / .35)); }
 .hd-board { display: flex; gap: 6px; }
 .hd-slot { width: var(--cw); height: var(--ch); border-radius: 7px; border: 2px dashed rgb(255 255 255 / .22); }
-.hd-pot { margin: 0; padding: 2px 12px; border-radius: 99px; background: rgb(0 0 0 / .28); color: #fff; font-size: 13px; }
-.hd-pot small { opacity: .8; }
+.hd-pot { display: flex; align-items: flex-end; gap: 8px; min-height: 30px; --chip: 18px; }
+.hd-pot-n { padding: 2px 12px; border-radius: 99px; background: rgb(0 0 0 / .28); color: #fff; font-size: 13px; }
+.hd-pot-n small { opacity: .8; }
 .hd-awards { list-style: none; margin: 0; padding: 4px 12px; border-radius: 10px; background: rgb(0 0 0 / .32); color: #fff; font-size: 12.5px; display: flex; flex-direction: column; gap: 2px; text-align: center; }
 .hd-awards small { opacity: .8; }
 .hd-card.is-best .card-svg { filter: drop-shadow(0 0 6px #ffd34d) drop-shadow(0 2px 3px rgb(0 0 0 / .35)); }
 .hd-card.is-best { transform: translateY(-6px); transition: transform .3s; }
 .hd-card.is-dim { filter: brightness(.6) grayscale(.4); transition: filter .3s; }
-.hd-card.is-turned { animation: hd-turn .5s cubic-bezier(.2, .7, .2, 1) both; animation-delay: calc(var(--i, 0) * 220ms); }
-.hd-card.is-dealt { animation: hd-deal .45s cubic-bezier(.2, .7, .2, 1) both; animation-delay: calc(var(--i, 0) * 120ms); }
-@keyframes hd-turn { from { transform: perspective(400px) rotateY(90deg) scale(.9); opacity: .3; } to { transform: none; opacity: 1; } }
-@keyframes hd-deal { from { transform: translateY(-40px) scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+.hd-card.is-turned { animation: hd-turn .45s cubic-bezier(.2, .7, .2, 1) both; animation-delay: calc(var(--i, 0) * 160ms); }
+@keyframes hd-turn { 0% { transform: perspective(400px) rotateY(90deg); } 100% { transform: none; } }
 .hd-me { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 4px 10px; border-radius: 12px; border: 2px solid transparent; }
 .hd-me.is-turn { border-color: #ffd34d; }
 .hd-me.is-out .hd-hole { opacity: .5; }
-.hd-hole { display: flex; gap: 4px; }
-.hd-hole .pcard { width: calc(var(--cw) * 1.1); height: calc(var(--ch) * 1.1); }
+.hd-hole { position: relative; display: flex; gap: 4px; }
+.hd-hole .hd-crown { left: -10px; top: -10px; width: 26px; height: 18px; }
+.hd-hole .pcard { width: 56px; height: 78px; }
 .hd-none { color: var(--muted); }
-.hd-mine { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.hd-mine { display: flex; flex-direction: column; gap: 4px; }
+.hd-mine-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .hd-mine .hd-hand { flex-basis: auto; }
+.hd-rack { display: flex; align-items: flex-end; gap: 6px; min-height: 30px; padding-top: 12px; --chip: 22px; }
+.hd-rack-pile { padding: 0; border: 0; background: none; color: inherit; line-height: 0; }
+button.hd-rack-pile { cursor: pointer; transition: transform .12s; }
+button.hd-rack-pile:hover:not(:disabled), button.hd-rack-pile:focus-visible { transform: translateY(-4px); outline: none; }
+button.hd-rack-pile:disabled { cursor: default; opacity: .4; }
+.hd-rack.is-active .hd-pile i:last-child { filter: drop-shadow(0 0 4px #ffd34d) drop-shadow(0 1px 0 rgb(0 0 0 / .45)); }
 .hd-actions { flex-wrap: wrap; justify-content: center; row-gap: 6px; }
 .hd-holding { font-size: 12px; color: var(--muted); }
 .hd-holding b { color: var(--text); }
-.hd-raise { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; }
 .hd-sizes { display: inline-flex; gap: 3px; }
 .btn.xs { padding: 3px 7px; font-size: 11.5px; }
 .btn.xs[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
-.hd-range { width: 120px; accent-color: var(--accent); }
-.hd-go { min-width: 9.5em; }
+.hd-go { min-width: 10em; }
 .hd-results .rank-n { width: 14px; }
 .hd-results li { gap: 6px; }
 .hd-ranks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .hd-ranks li { display: flex; align-items: center; gap: 8px; }
 .hd-rank-name { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .hd-rank-name small { color: var(--muted); font-size: 11.5px; }
-.rule-off { opacity: .35; }
+.hd-rule-chips { display: flex; flex-wrap: wrap; gap: 12px; }
+.hd-rule-chips span { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 12px; }
+.hd-rule-chips .chip-svg { width: 30px; height: 30px; }
+.hd-rule-chips small { color: var(--muted); }
+.hd-rule-crown .hd-crown { position: static; display: inline-block; vertical-align: -2px; transform: none; }
+.cards-game.holdem { --cw: 44px; --ch: 62px; }
+.hd-table { justify-content: space-around; gap: 4px; padding: 6px; }
+.hd-table .cg-seats { gap: 4px 8px; }
+.hd-seat { padding: 2px 7px 2px 2px; gap: 4px; }
+.hd-bet-spot .hd-act { align-self: center; }
+.hd-table.is-many .hd-seat .avatar { display: none; }
+.hd-table.is-many .hd-seat { padding-left: 7px; }
+.hd-table.is-many .hd-card.mini { width: 16px; height: 23px; }
+.hd-table.is-many .hd-bet-spot { min-height: 24px; --chip: 13px; }
 @container stage (max-width: 480px) {
-  .hd-range { width: 90px; }
+  .cards-game.holdem { --cw: 36px; --ch: 50px; }
+  .hd-hole .pcard { width: 46px; height: 64px; }
   .hd-board { gap: 3px; }
+  .hd-felt { gap: 6px; }
   .hd-seat .avatar { display: none; }
+  .hd-rack { --chip: 18px; gap: 4px; }
 }
-@media (prefers-reduced-motion: reduce) { .hd-card.is-turned, .hd-card.is-dealt { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .hd-card.is-turned { animation: none; } }

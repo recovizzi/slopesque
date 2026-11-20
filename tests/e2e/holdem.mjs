@@ -2,7 +2,7 @@
 // at a human pace. My two cards only, the button and the blinds, the betting bar (its sizes say the amounts), the
 // board turned over, the showdown, the rules with the hands drawn, the host ends the game: places and points.
 // Run after run.mjs (`pnpm e2e`), on the same port.
-process.env.ROBOT_DELAY_MS ??= '150';
+process.env.ROBOT_DELAY_MS ??= '500';
 const { admin, check, failures, player, shot, startServer, stopServer, until } = await import('./lib.mjs');
 
 await startServer();
@@ -39,16 +39,28 @@ check(myCards.length === 2 && myCards.every(Boolean), `my two cards, face up (${
 check(await frame.locator('.hd-seat .hd-holes .back').count() >= 4, 'the others\' cards: backs');
 check(await frame.locator('.hd-pos.dealer').count() === 1 && await frame.locator('.hd-pos', { hasText: 'GB' }).count() === 1, 'the button and the big blind shown');
 
-// my turns: I look at the sizes, then call (or check); until a flop is turned over
+// the flights, seen as they happen (cards from the deck, chips to the felt, to the pot, to the winner)
+await frame.evaluate(() => {
+  globalThis.__fly = 0;
+  new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n instanceof HTMLElement && n.classList.contains('hd-fly')) globalThis.__fly++; })
+    .observe(document.body, { childList: true, subtree: true });
+});
+check(await frame.locator('[data-deck]').count() === 1, 'the deck on the felt');
+check(await until(async () => (await frame.locator('.hd-bet-spot .hd-chips').count()) >= 1, 8000), 'the blinds in chips under their players');
+
+// my turns: I click my chips (they go to my bet), clear them, then call (or check); until a flop is turned over
 let sawFlop = false, sawBar = false;
 for (let k = 0; k < 30 && !sawFlop; k++) {
   if (await frame.locator('.hd-board .pcard').count() >= 3) { sawFlop = true; break; }
   if (await frame.locator('.hd-actions.is-mine').count()) {
-    if (!sawBar && await frame.locator('[data-action="holdem-size"]').count()) {
-      await frame.getByRole('button', { name: 'Pot', exact: true }).click();
-      const label = await frame.locator('[data-raise-label]').textContent();
-      check(/^(Relancer à|Miser|Tapis) [\d\s ]+$/.test(label ?? ''), `the raise button says its amount (« ${label} »)`);
+    if (!sawBar && await frame.locator('[data-action="holdem-chip"]:not([disabled])').count() >= 2) {
+      const chips = frame.locator('[data-action="holdem-chip"]:not([disabled])');
+      for (let n = 0; n < 4; n++) await chips.nth(1).click();   // four red chips (25): 100 more
+      const label = await frame.locator('[data-action="holdem-bet"]').textContent();
+      check(/^(Relancer à|Miser|Tapis|Suivre) [\d\s ]+$/.test(label?.trim() ?? ''), `my clicked chips make a bet, its button says the amount (« ${label?.trim()} »)`);
+      check(await frame.locator('.hd-bet-spot.mine .hd-chips.is-pending').count() === 1, 'the clicked chips wait on the felt under me');
       await shot(page, '31-holdem-my-turn');
+      await frame.locator('[data-action="holdem-clear"]').click();
       sawBar = true;
     }
     const call = frame.locator('[data-action="holdem-call"], [data-action="holdem-check"]').first();
@@ -56,7 +68,8 @@ for (let k = 0; k < 30 && !sawFlop; k++) {
   }
   await page.waitForTimeout(500);
 }
-check(sawBar, 'the betting bar on my turn (Min, ½ pot, Pot, Tapis)');
+check(sawBar, 'my chips in piles, clickable on my turn');
+check(await frame.evaluate(() => globalThis.__fly) > 0, `pieces fly on the table (${await frame.evaluate(() => globalThis.__fly)})`);
 check(sawFlop || await frame.locator('.hd-awards').count() > 0, 'the flop turned over (or the hand won before)');
 if (sawFlop) { await page.waitForTimeout(1200); await shot(page, '32-holdem-flop'); }
 
@@ -64,6 +77,7 @@ if (sawFlop) { await page.waitForTimeout(1200); await shot(page, '32-holdem-flop
 check(await until(async () => (await frame.locator('.hd-awards li').count()) > 0 || (await frame.locator('.cg-pile-text', { hasText: 'remporte' }).count()) > 0, 60000)
   || (await frame.locator('.hd-actions.is-mine').count()) > 0, 'a hand ends: who takes the pot');
 await shot(page, '33-holdem-pot');
+check(await until(async () => (await frame.locator('.hd-crown').count()) >= 1, 30000), 'a crown on the biggest bank (once the banks differ)');
 
 // the rules: the hands drawn, strongest first
 await frame.locator('[data-action="cards-rules"]').click();

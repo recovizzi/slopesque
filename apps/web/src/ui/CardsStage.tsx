@@ -12,6 +12,7 @@ import { useStore } from '../store';
 import { LiveHtml } from './LiveHtml';
 import { useEscape } from './common';
 import * as A from './cards-anim';
+import * as HA from './holdem-anim';
 
 /** My hand's fan for the hand's width: the outer cards stay inside, a flat arc (as the maquette). */
 function fan(n: number, box: HTMLElement | null) {
@@ -30,14 +31,14 @@ export function CardsStage() {
   const want = room.activity.cardGame ?? 'tdc';   // the game the host chose (the table may still hold the other)
   const t = c.game === 'tdc' && want === 'tdc' ? c.tdc : null, tarot = c.game === 'tarot' && want === 'tarot' ? c.tarot : null;
   const holdem = c.game === 'holdem' && want === 'holdem' ? c.holdem as unknown as HE.Holdem | null : null;
-  const raise = useRef(0), [fresh, setFresh] = useState<Set<string>>(new Set());
+  const [pending, setPending] = useState<number[]>([]), [pay, setPay] = useState(false), [fresh, setFresh] = useState<Set<string>>(new Set()), hideSel = useRef(new Set<string>());
   const [wonView, setWonView] = useState<string | null>(null);
   const members = new Map(room.members.map(m => [m.id, m]));
   const [sel, setSel] = useState<Set<string>>(new Set()), [rules, setRules] = useState(false), [full, setFull] = useState(false), [note, setNote] = useState('');
   useEscape(() => setRules(false), rules);
   const mySeat = c.seats.find(s => s.user === me)?.id ?? '';
   useEffect(() => { setSel(new Set()); }, [t?.round, t?.turn, tarot?.deal, tarot?.phase]);
-  useEffect(() => { raise.current = 0; }, [holdem?.hand, holdem?.turn, holdem?.street]);
+  useEffect(() => { setPending([]); }, [holdem?.hand, holdem?.turn, holdem?.street]);
 
   const who = (id: string) => {
     const s = c.seats.find(x => x.id === id), uid = s ? s.user ?? s.credit : null, m: MemberView | undefined = uid ? members.get(uid) : undefined;
@@ -45,7 +46,7 @@ export function CardsStage() {
   };
   const free = c.seats.filter(s => !s.user), mine = free.find(s => s.credit === me);
   const late = c.late ? { seat: c.late.seat, secs: c.late.secs, vote: room.chat.messages.some(m => m.kind === 'vote' && !(m.data?.vote as { result?: string } | undefined)?.result) } : null;
-  const html = holdem ? HV.holdemTableHtml({ g: holdem, me: mySeat, playing: !!mySeat, host: room.hostId === me, who, fresh, raise: raise.current,
+  const html = holdem ? HV.holdemTableHtml({ g: holdem, me: mySeat, playing: !!mySeat, host: room.hostId === me, who, fresh, pending, pay,
       late: late && late.seat !== mySeat ? late : null,
       seats: (() => { const open = c.seats.filter(st => !holdem.out.includes(st.id) || holdem.over), freeOpen = open.filter(st => !st.user), mineOpen = freeOpen.find(st => st.credit === me);
         return { free: freeOpen.length, total: open.length, mine: !!mineOpen, takes: freeOpen[0] ? who(freeOpen[0].id).name : '', full }; })() })
@@ -74,10 +75,9 @@ export function CardsStage() {
   }, [room.cards]);
   const show = (v: CardsView, last = false) => {
     const a = shown.current.holdem, b = v.holdem;
-    if (b && v.game === 'holdem') {   // Hold'em: the cards just dealt or turned over (their animation, once)
-      const same = !!a && a.hand === b.hand && a.startedAt === b.startedAt, f = new Set<string>();
-      for (const cd of b.board) if (!same || !a!.board.some(x => x.id === cd.id)) f.add(cd.id);
-      for (const [seat, h] of Object.entries(b.holes)) h.forEach((cd, i) => { if (!same || (cd.r && !a!.holes[seat]?.[i]?.r)) f.add(`${seat}:${i}`); });
+    if (b && v.game === 'holdem') {   // Hold'em: the hands just turned over (they flip, once)
+      const same = !!a && a.hand === b.hand && a.startedAt === b.startedAt, f = new Set<string>(), mine = v.seats.find(x => x.user === me)?.id;
+      if (same) for (const [seat, h] of Object.entries(b.holes)) h.forEach((cd, i) => { if (seat !== mine && cd.r && !a!.holes[seat]?.[i]?.r) f.add(`${seat}:${i}`); });
       setFresh(f);
     }
     shown.current = v; setShown(v); setShowLast(last);
@@ -88,8 +88,9 @@ export function CardsStage() {
     try {
       while (queue.current.length) {
         const el = box.current;
-        if (!el || queue.current.length > 6 || document.hidden || A.reduced()) { show(queue.current.at(-1)!); queue.current = []; break; }   // too far behind: the last view
+        if (!el || queue.current.length > 6 || document.hidden || A.reduced()) { hideSel.current.clear(); setPay(false); show(queue.current.at(-1)!); queue.current = []; break; }   // too far behind: the last view
         const next = queue.current.shift()!, prev = shown.current, step = A.diff(prev, next);
+        if (next.game === 'holdem' && next.holdem) { await holdemStep(el, prev, next); continue; }
         const seat = prev.seats.find(s => s.user === me)?.id ?? '';
         const from = step.played.map(p => A.sources(el, p, p.by === seat));
         from.forEach(f => f.forEach((_, id) => hidden.current.add(id)));
@@ -100,14 +101,6 @@ export function CardsStage() {
         const name = (id: string) => { const s = next.seats.find(x => x.id === id), u = s?.user ?? s?.credit; return u === me ? 'Toi' : (u && useStore.getState().room?.members.find(m => m.id === u)?.name) || s?.bot || '?'; };
         if (step.take) { setAnnounce(TV.takeAnnounce(name(step.take.seat), step.take.bid as Exclude<TA.Bid, 'pass'>)); await A.wait(2000); setAnnounce(''); }
         for (const h of step.handfuls) { setAnnounce(TV.handfulAnnounce(name(h.seat), h.level, h.cards as TA.TCard[], next.art ?? {})); await A.wait(2400); setAnnounce(''); }
-        const ha = prev.holdem, hb = next.holdem;
-        if (ha && hb && ha.startedAt === hb.startedAt) {   // Hold'em: an all-in, the players out, the blinds up, the winner
-          for (const [seat, l] of Object.entries(hb.last)) if (l.act === 'allin' && ha.last[seat]?.act !== 'allin') { setAnnounce(HV.allinAnnounce(name(seat), hb.bets[seat] ?? l.amount)); await A.wait(1300); setAnnounce(''); }
-          if (hb.street !== ha.street && hb.board.length > ha.board.length) await A.wait(250 * (hb.board.length - ha.board.length) + 300);
-          for (const s of hb.out.filter(x => !ha.out.includes(x))) { await A.wait(900); setAnnounce(HV.outAnnounce(name(s), hb.places[s] ?? 0, s === seat)); await A.wait(2000); setAnnounce(''); }
-          if (hb.over && !ha.over) { const w = Object.keys(hb.places).find(x => hb.places[x] === 1); if (w) { setAnnounce(HV.winAnnounce(name(w), w === seat)); await A.wait(2400); setAnnounce(''); } }
-          if (hb.hand !== ha.hand && hb.levelUp) { setAnnounce(HV.levelAnnounce(hb.sb, hb.bb)); await A.wait(1800); setAnnounce(''); }
-        }
         if (step.chelem) { setAnnounce(TV.chelemAnnounce(name(step.chelem))); await A.wait(2000); setAnnounce(''); }
         if (step.call) {
           const mine = step.call.taker !== seat && !!next.tarot?.hands[seat]?.some(x => x.id === step.call!.card.id);
@@ -116,6 +109,30 @@ export function CardsStage() {
       }
     } finally { busy.current = false; }
   }
+  /** Hold'em: the step's flights (cards from the deck, chips to the felt, to the pot, to the winners), then what is
+   *  announced (an all-in, a player out, the winner, the blinds up). */
+  async function holdemStep(el: HTMLElement, prev: CardsView, next: CardsView) {
+    const a = prev.game === 'holdem' ? prev.holdem : null, b = next.holdem!, seat = next.seats.find(x => x.user === me)?.id ?? '';
+    const name = (id: string) => { const s = next.seats.find(x => x.id === id), u = s?.user ?? s?.credit; return u === me ? 'Toi' : (u && useStore.getState().room?.members.find(m => m.id === u)?.name) || s?.bot || '?'; };
+    const p = HA.plan(el, a, b, seat, () => setPay(false));
+    hideSel.current = new Set(p?.hide ?? []);
+    setPay(!!p && !!a && a.hand === b.hand && a.street !== 'showdown' && b.street === 'showdown' && !!b.result);
+    show(next);
+    const same = !!a && a.startedAt === b.startedAt;
+    if (same) for (const [s, l] of Object.entries(b.last)) if (l.act === 'allin' && a!.last[s]?.act !== 'allin') {   // an all-in: said a moment, the table goes on
+      const html = HV.allinAnnounce(name(s), b.bets[s] || l.amount);
+      setAnnounce(html); setTimeout(() => setAnnounce(x => (x === html ? '' : x)), 1300);
+    }
+    if (same && b.hand !== a!.hand && b.levelUp) { setAnnounce(HV.levelAnnounce(b.sb, b.bb)); await A.wait(1800); setAnnounce(''); }
+    if (p) await p.run(el, sel => { hideSel.current.delete(sel); el.querySelectorAll<HTMLElement>(sel).forEach(x => { x.style.visibility = ''; }); });
+    hideSel.current.clear(); setPay(false);
+    if (!same) return;
+    for (const s of b.out.filter(x => !a!.out.includes(x))) { setAnnounce(HV.outAnnounce(name(s), b.places[s] ?? 0, s === seat)); await A.wait(2000); setAnnounce(''); }
+    if (b.over && !a!.over) { const w = Object.keys(b.places).find(x => b.places[x] === 1); if (w) { setAnnounce(HV.winAnnounce(name(w), w === seat)); await A.wait(2400); setAnnounce(''); } }
+  }
+  useLayoutEffect(() => {   // Hold'em: the pieces on their way stay hidden at their place until they land
+    for (const sel of hideSel.current) box.current?.querySelectorAll<HTMLElement>(sel).forEach(x => x.style.setProperty('visibility', 'hidden'));
+  });
   useLayoutEffect(() => {   // the cards on their way stay hidden at their place until they land
     for (const id of hidden.current) box.current?.querySelector<HTMLElement>(`.on-table[data-card="${CSS.escape(id)}"]`)?.style.setProperty('visibility', 'hidden');
   });
@@ -133,21 +150,16 @@ export function CardsStage() {
   }, [t, tarot, holdem]);
 
   const ack = (r: { ok: boolean; error?: string }) => setNote(r.ok ? '' : r.error ?? '');
-  const raiseLabel = (v: number) => {   // the slider moved: the button says the amount (the table is not redrawn)
-    const z = holdem ? HV.sizes(holdem, mySeat) : null, b = box.current?.querySelector('[data-raise-label]');
-    if (!z || !b) return;
-    const range = box.current?.querySelector<HTMLInputElement>('[data-hd="raise"]');
-    if (range && Number(range.value) !== v) range.value = String(v);
-    b.textContent = v >= z.max ? `Tapis ${HV.fmt(z.max)}` : `${holdem!.current === 0 ? 'Miser' : 'Relancer à'} ${HV.fmt(v)}`;
-    box.current?.querySelectorAll<HTMLElement>('[data-action="holdem-size"]').forEach(x => x.setAttribute('aria-pressed', String(Number(x.dataset.v) === v)));
-  };
   const onAction = async (a: string, el: HTMLElement) => {
     if (a.startsWith('holdem-') && holdem) {
-      if (a === 'holdem-size') { raise.current = Number(el.dataset.v); raiseLabel(raise.current); return; }
-      const z = HV.sizes(holdem, mySeat), to = z ? Math.min(z.max, Math.max(z.min, raise.current || z.min)) : 0;
-      const move = a === 'holdem-fold' ? { act: 'fold' as const } : a === 'holdem-check' ? { act: 'check' as const } : a === 'holdem-call' ? { act: 'call' as const }
-        : a === 'holdem-allin' || (z && to >= z.max) ? { act: 'allin' as const } : { act: 'raise' as const, to };
-      ack(await request('holdem:act', move));
+      const stack = holdem.stacks[mySeat] ?? 0;
+      const sum = (vs: number[]) => vs.reduce((x, y) => x + y, 0), v = Number(el.dataset.v);
+      if (a === 'holdem-chip') { setPending(p => (sum(p) + v <= stack ? [...p, v] : p)); return; }   // a chip clicked: on my bet
+      if (a === 'holdem-pend') { setPending(HE.chipsOf(Math.min(stack, v)).flatMap(([c, n]) => Array<number>(n).fill(c))); return; }
+      if (a === 'holdem-clear') { setPending([]); return; }
+      const move = a === 'holdem-bet' ? HV.pendingMove(holdem, mySeat, sum(pending)).move : a === 'holdem-fold' ? { act: 'fold' as const } : a === 'holdem-check' ? { act: 'check' as const }
+        : a === 'holdem-call' ? { act: 'call' as const } : { act: 'allin' as const };
+      if (move) ack(await request('holdem:act', move));
       return;
     }
     if (a === 'card-pick' && tarot) {
@@ -186,8 +198,7 @@ export function CardsStage() {
   return <div className="cards-stage" ref={box}
     onMouseOver={e => { const w = (e.target as Element).closest<HTMLElement>('[data-won]')?.dataset.won ?? null; if (w !== wonView) setWonView(w); }}
     onMouseLeave={() => setWonView(null)}>
-    <LiveHtml className="cards-holder" html={html} onAction={(a, el) => void onAction(a, el)}
-      onInput={el => { if ((el as HTMLElement).dataset.hd === 'raise') { raise.current = Number(el.value); raiseLabel(raise.current); } }} />
+    <LiveHtml className="cards-holder" html={html} onAction={(a, el) => void onAction(a, el)} />
     {note && <p className="alert cards-note" role="alert">{note}</p>}
     {announce && <div className="announce-layer"><LiveHtml className="announce" html={announce} /></div>}
     {rules && <LiveHtml html={want === 'holdem' ? HV.holdemRulesHtml() : c.game === 'tarot' ? TV.tarotRulesHtml(c.art ?? {}) : K.rulesHtml()} onAction={(a, el) => void onAction(a, el)} />}

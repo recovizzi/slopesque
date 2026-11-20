@@ -124,6 +124,15 @@ describe('Hold\'em betting', () => {
     expect(g.stacks.b + g.stacks.c).toBe(2100);
   });
 
+  it('in chips: amounts by 5 (an all-in excepted); a bank as piles, a bet in the fewest chips', () => {
+    const g = table({ a: 1000, b: 1000, c: 1000 }, {}, undefined, 'c');
+    expect(H.act(g, 'c', { act: 'raise', to: 62 })).toBe(false);
+    expect(H.act(g, 'c', { act: 'raise', to: 65 })).toBe(true);
+    expect(H.chipsOf(1630)).toEqual([[1000, 1], [500, 1], [100, 1], [25, 1], [5, 1]]);
+    expect(H.rackOf(1000)).toEqual([[5, 5], [25, 7], [100, 3], [500, 1]]);
+    for (const n of [5, 20, 135, 500, 2000, 4995, 12345 - 0]) expect(H.rackOf(n).reduce((x, [v, k]) => x + v * k, 0)).toBe(Math.floor(n / 5) * 5);
+  });
+
   it('the blinds rise every N hands', () => {
     const g = H.newGame(['a', 'b', 'c'], { stack: 5000, every: 2 });
     expect(g.bb).toBe(20);

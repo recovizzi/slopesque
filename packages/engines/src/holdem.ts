@@ -20,6 +20,30 @@ export const DEFAULT_SETTINGS: Settings = { stack: 1000, every: 10 };
 /** The big blind of each level (the small one is half): 10 / 20, 20 / 40, 30 / 60… */
 export const BLINDS = [20, 40, 60, 80, 120, 160, 200, 300, 400, 600, 800, 1000, 1500, 2000, 3000, 4000, 6000, 8000, 10000, 15000, 20000, 30000, 40000, 60000, 80000, 100000];
 export const MAX_SEATS = 8;
+/** The chips: every amount is a multiple of the smallest (5), so that it is paid in chips. */
+export const CHIP_VALUES = [5, 25, 100, 500, 1000, 5000];
+export const UNIT = 5;
+/** An amount in the fewest chips (a bet, the pot): [value, count] from the biggest. */
+export function chipsOf(amount: number): [number, number][] {
+  const out: [number, number][] = [];
+  let rest = Math.max(0, Math.floor(amount / UNIT) * UNIT);
+  for (const v of [...CHIP_VALUES].reverse()) { const n = Math.floor(rest / v); if (n) { out.push([v, n]); rest -= n * v; } }
+  return out;
+}
+/** A bank as a player keeps it (a playable mix, small chips too): [value, count] from the smallest. 1 000 → 5 × 5,
+ *  7 × 25, 3 × 100, 1 × 500. */
+export function rackOf(amount: number): [number, number][] {
+  const out: [number, number][] = [];
+  let rest = Math.max(0, Math.floor(amount / UNIT) * UNIT);
+  CHIP_VALUES.forEach((v, i) => {
+    const next = CHIP_VALUES[i + 1];
+    if (!next) { if (rest) out.push([v, rest / v]); rest = 0; return; }
+    let n = (rest % next) / v;                             // what the bigger chips can't make
+    if (rest - n * v >= next * 2) n += next / v;           // and one bigger chip in change
+    if (n) { out.push([v, n]); rest -= n * v; }
+  });
+  return out;
+}
 
 export interface Award { amount: number; winners: string[]; hand: string; side: number }   // side 0: the main pot
 export interface HandResult {
@@ -217,7 +241,7 @@ export function act(g: Holdem, s: string, m: Move) {
   else if (m.act === 'call') { if (o.check) return false; put(g, s, o.call); kind = g.stacks[s] === 0 ? 'allin' : 'call'; }
   else {
     const to = m.act === 'allin' ? o.allin : Math.floor(m.to ?? 0);
-    if (!to || to > bet + g.stacks[s]!) return false;
+    if (!to || to > bet + g.stacks[s]! || (to % UNIT && to !== bet + g.stacks[s]!)) return false;   // in chips (an all-in: whatever is left)
     if (to > g.current) {
       if (!o.raise || (to < o.raise.min && to !== o.raise.max)) return false;   // under the minimum: only an all-in
       if (to - g.current >= g.minRaise) g.minRaise = to - g.current;            // a full raise (a shorter all-in doesn't change it)
@@ -295,9 +319,9 @@ function showdown(g: Holdem) {
   for (const p of pots(g)) {
     if (p.seats.length === 1) { g.stacks[p.seats[0]!]! += p.amount; continue; }   // a bet nobody called: back to its player
     const best = Math.max(...p.seats.map(s => ev[s]!.score)), winners = order.filter(s => p.seats.includes(s) && ev[s]!.score === best);
-    const share = Math.floor(p.amount / winners.length);
+    const share = Math.floor(p.amount / winners.length / UNIT) * UNIT;   // in chips: the odd ones (5 each) from the left of the button
     let odd = p.amount - share * winners.length;
-    for (const w of winners) { const n = share + (odd-- > 0 ? 1 : 0); g.stacks[w]! += n; won[w] = (won[w] ?? 0) + n; }
+    for (const w of winners) { const n = share + Math.min(odd, UNIT); odd -= n - share; g.stacks[w]! += n; won[w] = (won[w] ?? 0) + n; }
     awards.push({ amount: p.amount, winners, hand: handName(ev[winners[0]!]!), side: side++ });
   }
   const best = Object.fromEntries(live.map(s => [s, { cat: ev[s]!.cat, name: handName(ev[s]!), five: ev[s]!.five.map(c => c.id) }]));

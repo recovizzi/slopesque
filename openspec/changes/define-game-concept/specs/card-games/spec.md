@@ -166,6 +166,17 @@ annexes) ; en bas mes deux cartes, **ce que je tiens** (« Paire de Rois »), et
 combinaison gagnante et ses 5 cartes mises en avant, et le gain. Les règles (« i ») MUST montrer les combinaisons
 dessinées avec les mêmes cartes, de la plus forte à la plus faible.
 
+**Jetons et animations** : les montants MUST être des multiples de 5 (les jetons) : 5 blanc, 25 rouge, 100 noir, 500
+violet, 1 000 jaune, 5 000 bleu. Mes jetons MUST être montrés en **piles par couleur** ; je mise en **cliquant les
+jetons** (ils s'ajoutent à ma mise, un bouton la confirme : « Relancer à 120 »), ou avec les boutons explicites (se
+coucher, parler / suivre, tapis ; raccourcis min, ½ pot, pot ; effacer). Une mise MUST apparaître en jetons **sous la
+vignette** du joueur, sur le tapis ; à la fin du tour d'enchères, les mises MUST glisser au **pot**, au centre ; à la
+fin de la main, le pot MUST glisser vers le ou les gagnants. Le joueur à la plus grosse banque MUST porter une
+**couronne**, en plus du montant de sa banque. Le **paquet** MUST être sur le tapis : les cartes en partent, vers
+chaque joueur à la donne, vers le tapis pour le flop, le turn et la river, puis se retournent ; à l'abattage, les
+mains se retournent et chacun a le temps de lire avant que les jetons partent au gagnant (les robots attendent les
+animations).
+
 #### Scenario: Pot annexe
 - **WHEN** Léa (300 jetons) part à tapis, Malo et Zoé (1 000 chacun) suivent puis misent encore 400 chacun, et Léa a
   la meilleure main, Malo la deuxième

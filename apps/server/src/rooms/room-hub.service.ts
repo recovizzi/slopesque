@@ -23,7 +23,7 @@ import type { Account } from '../accounts/accounts.service.js';
 interface MemberRt { sockets: Set<string>; awaySince: number | null; grace: NodeJS.Timeout | null }
 interface PollRt { phase: PollView['phase']; round: number; seconds: number; secret: boolean; poll: PollView['poll']; answers: Record<string, PollAnswer>; host: string | null; deadline: number | null; timer: NodeJS.Timeout | null }
 interface WheelRt { phase: WheelView['phase']; items: WheelView['items']; spin: WheelView['spin']; needle: number; round: number; timer: NodeJS.Timeout | null }
-interface CardsRt { game: CardGameKey; players: number; settings: { tdc: number; tarot: number; holdem: number; bots?: TarotAI.Level; holdemRules?: HoldemRules }; showTricks: boolean; tarot: Tarot.Tarot | null; holdem: Holdem.Holdem | null; handDone: number; settled: boolean; seats: Table.CardSeat[]; tdc: Tdc.Tdc | null; paid: Record<string, string | null>; turnSince: number; robot: NodeJS.Timeout | null; late: NodeJS.Timeout | null; art: Record<string, string> }
+interface CardsRt { game: CardGameKey; players: number; settings: { tdc: number; tarot: number; holdem: number; bots?: TarotAI.Level; holdemRules?: HoldemRules }; showTricks: boolean; tarot: Tarot.Tarot | null; holdem: Holdem.Holdem | null; handDone: number; shownAt: { hand: number; street: string }; settled: boolean; seats: Table.CardSeat[]; tdc: Tdc.Tdc | null; paid: Record<string, string | null>; turnSince: number; robot: NodeJS.Timeout | null; late: NodeJS.Timeout | null; art: Record<string, string> }
 interface RoomRt { cards: CardsRt; room: Room; seq: number; members: Map<string, MemberRt>; vote: { id: number; v: Vote; timer: NodeJS.Timeout } | null; disk: D.DiskState; diskTimer: NodeJS.Timeout | null; poll: PollRt; wheel: WheelRt; fx: Record<string, number[]>; notice: { id: string; title: string; text: string; at: number } | null }
 const GAME_ROUND: Record<CardGameKey, string> = { tdc: 'la manche du Trou du cul', tarot: 'la donne de Tarot', holdem: 'la partie de Texas Hold\'em' };
 const GAME_NAME: Record<CardGameKey, string> = { tdc: 'Trou du cul', tarot: 'Tarot', holdem: 'Texas Hold\'em' };
@@ -50,7 +50,7 @@ export class RoomHub implements OnModuleInit {
     const disk = { ...D.newDisk({ ...D.DEFAULT_RULES, ...saved.rules }), round: saved.round ?? 1, phase: (saved.round ?? 1) > 1 ? 'writing' as const : 'lobby' as const };
     const ps = (room.rules.poll ?? {}) as { seconds?: number; secret?: boolean; round?: number };
     const ws = (room.rules.wheel ?? {}) as { items?: WheelView['items']; needle?: number; round?: number };
-    const rt: RoomRt = { cards: { game: 'tdc', players: 4, settings: { tdc: 4, tarot: 4, holdem: 6, ...((room.rules.cards as object | undefined) ?? {}) }, showTricks: true, tarot: null, holdem: null, handDone: 0, settled: false, seats: [], tdc: null, paid: {}, turnSince: 0, robot: null, late: null, art: {} }, room, seq: 0, members: new Map(), vote: null, disk, diskTimer: null,
+    const rt: RoomRt = { cards: { game: 'tdc', players: 4, settings: { tdc: 4, tarot: 4, holdem: 6, ...((room.rules.cards as object | undefined) ?? {}) }, showTricks: true, tarot: null, holdem: null, handDone: 0, shownAt: { hand: 0, street: '' }, settled: false, seats: [], tdc: null, paid: {}, turnSince: 0, robot: null, late: null, art: {} }, room, seq: 0, members: new Map(), vote: null, disk, diskTimer: null,
       poll: { phase: 'writing', round: ps.round ?? 1, seconds: ps.seconds ?? 300, secret: ps.secret ?? false, poll: null, answers: {}, host: null, deadline: null, timer: null },
       wheel: { phase: 'writing', items: ws.items ?? [{ label: '', weight: '' }, { label: '', weight: '' }], spin: null, needle: ws.needle ?? 0, round: ws.round ?? 1, timer: null }, fx: {}, notice: null };
     for (const a of await this.db.select().from(trumpArt).where(eq(trumpArt.roomId, room.id))) rt.cards.art[a.card] = a.mediaId;   // the trumps' pictures
@@ -1031,7 +1031,7 @@ export class RoomHub implements OnModuleInit {
     if (c.game !== 'holdem' || c.seats.length !== n) this.prepareTable(rt, 'holdem');
     c.game = 'holdem'; c.players = n; c.tdc = null; c.tarot = null;
     c.seats = c.seats.map(s => ({ ...s, credit: s.user }));
-    c.paid = {}; c.settled = false; c.handDone = 0;
+    c.paid = {}; c.settled = false; c.handDone = 0; c.shownAt = { hand: 0, street: '' };
     const rules = this.holdemRules(rt);
     c.holdem = Holdem.newGame(c.seats.map(s => s.id), rules);
     await this.setLive(rt, 'cards', 'holdem');
@@ -1050,16 +1050,20 @@ export class RoomHub implements OnModuleInit {
     if (g.turn !== seat.id) throw new UserError('Ce n\'est pas ton tour.');
     if (!Holdem.act(g, seat.id, move)) {
       const o = Holdem.options(g, seat.id);
-      throw new UserError(move.act === 'raise' && o?.raise ? `Relance de ${o.raise.min} à ${o.raise.max} (au moins la dernière relance).` : move.act === 'raise' ? 'Tu ne peux plus relancer : suis ou couche-toi.' : 'Coup impossible.');
+      throw new UserError(move.act === 'raise' && o?.raise ? `Relance de ${o.raise.min} à ${o.raise.max}, par multiples de 5 (au moins la dernière relance).` : move.act === 'raise' ? 'Tu ne peux plus relancer : suis ou couche-toi.' : 'Coup impossible.');
     }
     await this.afterHoldem(rt, seat.id);
   }
 
   /** After a move: a hand's end (the players out, said), the game's end (each place's points to the seat's last
    *  player), the next hand after a pause, the robots (on their seat's view). */
-  private async afterHoldem(rt: RoomRt, before: string | null = null, street: string | null = null) {
+  private async afterHoldem(rt: RoomRt, before: string | null = null) {
     const c = rt.cards, g = c.holdem;
     if (!g) { await this.emitCards(rt); return; }
+    // the tables show each step (ui/holdem-anim.ts, the same durations): the deal, a new card on the board, the showdown
+    const pace = this.env.ROBOT_DELAY_MS / 900, newHand = g.hand !== c.shownAt.hand, newCards = !newHand && g.street !== c.shownAt.street;
+    const dealMs = newHand ? g.inHand.length * 2 * 90 + 380 + 380 + 300 + (g.levelUp ? 1800 : 0) : 0, cardsMs = newCards ? 450 + 3 * 260 + 380 + 450 + 300 : 0;
+    c.shownAt = { hand: g.hand, street: g.street };
     if (g.turn !== before) c.turnSince = Date.now();
     if (c.robot) { clearTimeout(c.robot); c.robot = null; }
     if (c.late) { clearTimeout(c.late); c.late = null; }
@@ -1083,12 +1087,11 @@ export class RoomHub implements OnModuleInit {
       await this.say(rt, null, `Fin de la partie de Texas Hold'em (${g.hand} main${g.hand > 1 ? 's' : ''}) : ${parts.join(', ')}.`);
       c.seats = Table.settle(c.seats).seats;
     } else if (!g.over && g.street === 'showdown') {   // the hand shown a moment, then the next one
-      const shown = g.result && !g.result.uncontested ? 5 + (g.revealed ? 2 : 0) : 2.5;
-      c.robot = setTimeout(() => { if (rt.cards.holdem === g) void this.holdemNext(rt).catch(() => {}); }, this.env.ROBOT_DELAY_MS * shown);
+      const r = g.result, read = !r || r.uncontested ? 450 + 900 + 650 + 1200 : 450 + (g.revealed ? 5 * 260 + 830 : 0) + 2400 + 650 + 2000;   // gather, run out, read, pay
+      c.robot = setTimeout(() => { if (rt.cards.holdem === g) void this.holdemNext(rt).catch(() => {}); }, pace * (read + 2000 * (r?.out.length ?? 0)));
     } else if (g.turn) {
       const s = c.seats.find(x => x.id === g.turn);
-      const pause = street && street !== g.street ? 1.8 : 1;   // a new card on the board: seen before the robots go on
-      if (!s?.user) c.robot = setTimeout(() => void this.holdemRobot(rt), this.env.ROBOT_DELAY_MS * pause);
+      if (!s?.user) c.robot = setTimeout(() => void this.holdemRobot(rt), this.env.ROBOT_DELAY_MS + pace * (dealMs + cardsMs));
       else c.late = setTimeout(() => void this.emitCards(rt), KICK_AFTER_MS + 200);
     }
     await this.emitCards(rt);
@@ -1109,10 +1112,10 @@ export class RoomHub implements OnModuleInit {
   private async holdemRobot(rt: RoomRt) {
     const g = rt.cards.holdem;
     if (!g || !g.turn || rt.cards.seats.find(s => s.id === g.turn)?.user) return;
-    const seat = g.turn, street = g.street;
+    const seat = g.turn;
     const m = HoldemAI.decide(Holdem.holdemView(g, seat), seat, rt.cards.settings.bots ?? 'moyen');   // its seat's view, the host's level
     if (!Holdem.act(g, seat, m)) Holdem.act(g, seat, { act: Holdem.options(g, seat)?.check ? 'check' : 'fold' });
-    await this.afterHoldem(rt, seat, street);
+    await this.afterHoldem(rt, seat);
   }
 
   /** The host's game: starting chips, the blinds' pace (from the next game). */
