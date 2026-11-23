@@ -19,7 +19,7 @@ import { TrumpArt } from './ui/TrumpArt';
 import { Palmares } from './ui/Palmares';
 import { WebSettings, WebStage } from './ui/WebStage';
 import { EXT_VERSION } from './version';
-import { CARD_PLAYERS, HOLDEM_EVERY, HOLDEM_STACKS, cardGameOf, READY_ACTIVITIES, SCORE_NAMES, scoreKey, versionBelow } from '@slopesque/shared';
+import { CARD_PLAYERS, COINCHE_TARGETS, HOLDEM_EVERY, HOLDEM_STACKS, cardGameOf, READY_ACTIVITIES, SCORE_NAMES, scoreKey, versionBelow } from '@slopesque/shared';
 
 const EMBED = new URLSearchParams(location.search).has('embed');
 const RELEASES = 'https://github.com/recovizzi/slopesque/releases/latest';
@@ -238,15 +238,16 @@ const ACT_HELP: Record<string, string> = {
   poll: 'Une question, posée dans la zone de jeu : choix définis, choix libre ou gradient. Pas de points.',
   wheel: 'Une roue de propositions, chacune avec un poids, construite dans la zone de jeu sous les yeux de tous ; l\'hôte la lance, l\'aiguille désigne le résultat. Pas de points.',
   chat: 'Pas de jeu : le chat en plein écran, la liste des joueurs à gauche. Les scores sont gardés.',
-  cards: 'Des jeux de cartes à plusieurs : le Trou du cul, le Tarot et le Texas Hold\'em (la Coinche à venir). Les manches donnent des points au classement.',
+  cards: 'Des jeux de cartes à plusieurs : le Trou du cul, le Tarot, le Texas Hold\'em et la Coinche. Les manches donnent des points au classement.',
   lowtide: 'Le jeu Low Tide, sur sa propre page, dans la zone de jeu. Pas de points.',
 };
 const GAME_HELP = {
   tdc: 'Aussi appelé Président. Se débarrasser de ses cartes le premier : les rôles de la manche donnent des points et des échanges de cartes.',
   tarot: 'À 4 : le preneur contre les trois autres ; à 5, il appelle un Roi. Enchères (Prise, Garde, Garde sans, Garde contre), chien et écart, 21 atouts et l\'Excuse ; les points du preneur dépendent de ses bouts.',
+  coinche: 'La belote coinchée, deux contre deux : enchères de 80 à 160 (ou le capot) avec une couleur d\'atout, coinche et surcoinche ; Valet et 9 d\'atout les plus forts, belote-rebelote ; partie en 1 000 points ou plus.',
   holdem: 'Le poker No Limit en tournoi, avec des jetons fictifs : deux cartes cachées, cinq communes, des mises à chaque tour ; le dernier à garder des jetons gagne. Points selon la place.',
 };
-const GAME_NAMES = { tdc: 'Trou du cul', tarot: 'Tarot', holdem: 'Texas Hold\'em' };
+const GAME_NAMES = { tdc: 'Trou du cul', tarot: 'Tarot', holdem: 'Texas Hold\'em', coinche: 'Coinche' };
 const LEVEL_NAMES = { facile: 'Facile', moyen: 'Moyen', fort: 'Fort' } as const;
 const fmtEvery = (n: number) => (n ? `Toutes les ${n} mains` : 'Jamais');
 
@@ -298,6 +299,8 @@ function GameInfo() {
         ['Niveau des robots', 'Ils jouent avec ce que leur place voit', LEVEL_NAMES[room.cards.settings.bots ?? 'moyen']] as Row] : []),
       ...(game === 'holdem' ? [['Tapis de départ', `Les mêmes jetons pour tous ; blindes de départ 10 / 20`, `${hr.stack} jetons`] as Row,
         ['Montée des blindes', '20 / 40, 30 / 60, 40 / 80… : la partie finit plus vite', fmtEvery(hr.every)] as Row,
+        ['Niveau des robots', 'Ils jouent avec ce que leur place voit', LEVEL_NAMES[room.cards.settings.bots ?? 'moyen']] as Row] : []),
+      ...(game === 'coinche' ? [['Objectif', 'La première équipe à ce score gagne la partie', `${room.cards.settings.coincheTarget ?? 1000} points`] as Row,
         ['Niveau des robots', 'Ils jouent avec ce que leur place voit', LEVEL_NAMES[room.cards.settings.bots ?? 'moyen']] as Row] : [])]
     : act === 'lowtide' ? [['Adresse', 'La page du jeu, vérifiée par l\'hôte', <span className="ro-url">{Object.values(room.web)[0] ?? '—'}</span>]] : [];
   return <>
@@ -341,21 +344,26 @@ function CardsSettings() {
   const hr = room.cards.settings.holdemRules ?? { stack: 1000, every: 10 }, holdemOn = room.cards.game === 'holdem' && !!room.cards.holdem && !room.cards.holdem.over;
   const ack = (r: { ok: boolean; error?: string }) => { if (!r.ok) set({ note: r.error ?? '' }); };
   const bots = <><label className="field"><span>Niveau des robots</span><select value={room.cards.settings.bots ?? 'moyen'} disabled={!host} onChange={async e => ack(await request('cards:bots', { level: e.target.value as 'moyen' }))}>
-      {game === 'holdem' ? <><option value="facile">Facile — suit trop, se trompe, bluffe peu</option><option value="moyen">Moyen — ses chances contre la cote du pot</option><option value="fort">Fort — devine les mains d'après les mises, bluffe mieux</option></>
+      {game === 'coinche' ? <><option value="facile">Facile — des fautes, des enchères au hasard</option><option value="moyen">Moyen — compte les cartes, charge son partenaire</option><option value="fort">Fort — simule la fin de la donne</option></>
+        : game === 'holdem' ? <><option value="facile">Facile — suit trop, se trompe, bluffe peu</option><option value="moyen">Moyen — ses chances contre la cote du pot</option><option value="fort">Fort — devine les mains d'après les mises, bluffe mieux</option></>
         : <><option value="facile">Facile — des fautes, des enchères prudentes</option><option value="moyen">Moyen — les règles du jeu, un peu de hasard</option><option value="fort">Fort — il calcule la fin de la donne</option></>}</select></label>
     <p className="note">Les robots jouent comme un joueur : avec ce que leur place voit, jamais les cartes des autres. Le niveau vaut pour tous les jeux de cartes.</p></>;
   return <>
     <label className="field"><span>Jeu</span><select value={game} disabled={!host} onChange={async e => ack(await request('activity:choose', { choice: { activity: 'cards', cardGame: e.target.value as 'tdc' } }))}>
-      <option value="tdc">Trou du cul</option><option value="tarot">Tarot</option><option value="holdem">Texas Hold'em</option>
-      <option disabled>Coinche (bientôt)</option></select></label>
+      <option value="tdc">Trou du cul</option><option value="tarot">Tarot</option><option value="holdem">Texas Hold'em</option><option value="coinche">Coinche</option></select></label>
     <p className="note">{GAME_HELP[game]}</p>
     <label className="field"><span>Joueurs</span><select value={players} disabled={!host} onChange={async e => ack(await request('cards:players', { game, players: Number(e.target.value) }))}>
-      {CARD_PLAYERS[game].map(n => <option key={n} value={n}>{n} joueurs{game === 'tarot' && n === 5 ? ' (le preneur appelle un Roi)' : game === 'holdem' && n === 2 ? ' (en tête-à-tête)' : ''}</option>)}</select></label>
+      {CARD_PLAYERS[game].map(n => <option key={n} value={n}>{n} joueurs{game === 'tarot' && n === 5 ? ' (le preneur appelle un Roi)' : game === 'holdem' && n === 2 ? ' (en tête-à-tête)' : game === 'coinche' ? ' (deux contre deux)' : ''}</option>)}</select></label>
     <p className="note">À partir de la {game === 'holdem' ? 'partie' : 'donne'} suivante. Prends une place à la table avant la donne ; des robots complètent les places libres. Les règles se lisent avec le bouton « i » de la table.</p>
     {game === 'tarot' && <><label className="check"><input type="checkbox" checked={room.cards.showTricks} disabled={!host} onChange={e => void request('tarot:tricks', { show: e.target.checked })} /><span>Revoir les plis gagnés (au survol)</span></label>
       <p className="note">Décoché, la partie est plus dure : personne ne peut revoir les plis déjà joués.</p>
       {bots}
       <TrumpArt edit={host} /></>}
+    {game === 'coinche' && <>
+      <label className="field"><span>Objectif</span><select value={room.cards.settings.coincheTarget ?? 1000} disabled={!host} onChange={async e => ack(await request('coinche:target', { target: Number(e.target.value) }))}>
+        {COINCHE_TARGETS.map(n => <option key={n} value={n}>{n} points{n === 1000 ? ' (une partie courte)' : ''}</option>)}</select></label>
+      <p className="note">La première équipe à ce score gagne, après la donne qui l'y amène. À partir de la partie suivante.</p>
+      {bots}</>}
     {game === 'holdem' && <>
       <label className="field"><span>Tapis de départ</span><select value={hr.stack} disabled={!host} onChange={async e => ack(await request('holdem:rules', { stack: Number(e.target.value) }))}>
         {HOLDEM_STACKS.map(n => <option key={n} value={n}>{n} jetons ({n / 20} grosses blindes)</option>)}</select></label>

@@ -13,3 +13,5 @@ export * as Tarot from './tarot.js';
 export * as TarotAI from './tarot-ai.js';
 export * as Holdem from './holdem.js';
 export * as HoldemAI from './holdem-ai.js';
+export * as Coinche from './coinche.js';
+export * as CoincheAI from './coinche-ai.js';

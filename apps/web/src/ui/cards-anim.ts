@@ -13,9 +13,10 @@ export const painted = () => new Promise<void>(r => requestAnimationFrame(() => 
 function plays(v: CardsView): Play[] {
   if (v.game === 'tdc' && v.tdc) return [...v.tdc.lastTrick, ...v.tdc.trick];
   if (v.game === 'tarot' && v.tarot) return [...v.tarot.lastTrick, ...v.tarot.trick].map(p => ({ by: p.by, cards: [p.card] }));
+  if (v.game === 'coinche' && v.coinche) return [...v.coinche.lastTrick, ...v.coinche.trick].map(p => ({ by: p.by, cards: [p.card] }));
   return [];
 }
-const sameDeal = (a: CardsView, b: CardsView) => a.game === b.game && (a.game === 'tdc'
+const sameDeal = (a: CardsView, b: CardsView) => a.game === b.game && (a.game === 'coinche' ? !!a.coinche && !!b.coinche && a.coinche.deal === b.coinche.deal && a.coinche.startedAt === b.coinche.startedAt : a.game === 'tdc'
   ? !!a.tdc && !!b.tdc && a.tdc.round === b.tdc.round && a.tdc.startedAt === b.tdc.startedAt
   : !!a.tarot && !!b.tarot && a.tarot.deal === b.tarot.deal && a.tarot.startedAt === b.tarot.startedAt);
 
@@ -33,6 +34,10 @@ export function diff(a: CardsView, b: CardsView): Step {
   if (!sameDeal(a, b)) return none;
   const seen = new Set(plays(a).flatMap(p => p.cards.map(c => c.id)));
   const played = plays(b).filter(p => p.cards.some(c => !seen.has(c.id)));
+  if (b.game === 'coinche' && a.coinche && b.coinche) {   // the Coinche: its trick too, shown then sent to its winner
+    const x = a.coinche, y = b.coinche, closed = !y.trick.length && y.lastTrick.length > 0 && y.lastTrick[0]!.card.id !== x.lastTrick[0]?.card.id;
+    return { ...none, played, gather: closed ? y.lastWinner : null };
+  }
   if (b.game !== 'tarot' || !a.tarot || !b.tarot) return { ...none, played };
   const ta = a.tarot, tb = b.tarot;
   const closed = !tb.trick.length && tb.lastTrick.length > 0 && tb.lastTrick[0]!.card.id !== ta.lastTrick[0]?.card.id;

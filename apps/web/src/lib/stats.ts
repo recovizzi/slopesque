@@ -6,7 +6,7 @@ import { esc } from './html';
 import type { Tdc } from '@slopesque/engines';
 type Role = Tdc.Role;
 
-export type StatGame = 'disk' | 'tdc' | 'tarot' | 'holdem';
+export type StatGame = 'disk' | 'tdc' | 'tarot' | 'holdem' | 'coinche';
 /** One player's result in one round / deal (the room keeps them; the name and colour as they were). */
 export interface StatEvent {
   at: number; game: StatGame; id: string; name: string; color: string; won: boolean;
@@ -26,6 +26,7 @@ export const GAMES: Record<StatGame | 'all', { name: string; unit: string; win: 
   tdc: { name: 'Trou du cul', unit: 'manches', win: 'présidences' },
   tarot: { name: 'Tarot', unit: 'donnes', win: 'donnes gagnées (dans le camp gagnant)' },
   holdem: { name: 'Texas Hold\'em', unit: 'parties', win: 'parties gagnées (1re place)' },
+  coinche: { name: 'Coinche', unit: 'donnes', win: 'donnes gagnées (contrat rempli, ou chuté en défense)' },
 };
 
 export interface Row {
@@ -46,6 +47,7 @@ export const SORTS: Record<StatGame | 'all', { key: keyof Row; label: string; ra
   disk: [{ key: 'won', label: 'Tours gagnés' }, { key: 'rate', label: '% de tours gagnés', rate: true }, { key: 'perfects', label: 'Perfects' }, { key: 'avg', label: 'Points moyens par tour', rate: true }, { key: 'played', label: 'Tours joués' }],
   tdc: [{ key: 'won', label: 'Présidences' }, { key: 'rate', label: '% de présidences', rate: true }, { key: 'trous', label: 'Le moins souvent Trou du cul', rate: true, asc: true }, { key: 'played', label: 'Manches jouées' }],
   tarot: [{ key: 'won', label: 'Donnes gagnées' }, { key: 'rate', label: '% de donnes gagnées', rate: true }, { key: 'takes', label: 'Prises' }, { key: 'takeRate', label: '% de prises réussies', rate: true }, { key: 'best', label: 'Meilleure marque' }, { key: 'played', label: 'Donnes jouées' }],
+  coinche: [{ key: 'won', label: 'Donnes gagnées' }, { key: 'rate', label: '% de donnes gagnées', rate: true }, { key: 'takes', label: 'Contrats pris' }, { key: 'takeRate', label: '% de contrats remplis', rate: true }, { key: 'best', label: 'Meilleure donne' }, { key: 'played', label: 'Donnes jouées' }],
   holdem: [{ key: 'won', label: 'Parties gagnées' }, { key: 'rate', label: '% de parties gagnées', rate: true }, { key: 'avgPlace', label: 'Place moyenne', rate: true, asc: true }, { key: 'podiums', label: 'Dans la première moitié' }, { key: 'played', label: 'Parties jouées' }],
 };
 export const MIN_PLAYED = 5;
@@ -74,7 +76,7 @@ export function rows(events: StatEvent[], f: Filter, now = Date.now()): Row[] {
     if (e.role === 'tdc') r.trous++;
     if (e.taker) { r.takes++; if (e.won) r.takesWon++; }
     if (e.place) { r.placeSum += e.place; r.placeN++; if (e.place <= Math.ceil((e.of ?? 2) / 2)) r.podiums++; }
-    if (e.pts !== undefined) { r.ptsSum += e.pts; r.ptsN++; if (e.game === 'tarot') r.best = Math.max(r.best, e.pts); }
+    if (e.pts !== undefined) { r.ptsSum += e.pts; r.ptsN++; if (e.game === 'tarot' || e.game === 'coinche') r.best = Math.max(r.best, e.pts); }
   }
   return [...map.values()].map(({ gameSet, ptsSum, ptsN, placeSum, placeN, ...r }) => ({
     ...r, avgPlace: placeN ? placeSum / placeN : 0, rate: r.counted ? r.won / r.counted : 0, avg: ptsN ? ptsSum / ptsN : 0, takeRate: r.takes ? r.takesWon / r.takes : 0,
@@ -103,6 +105,7 @@ function cells(r: Row, f: Filter, key: keyof Row): { main: string; sub: string[]
   if (f.game === 'disk') sub.push(`${r.perfects} perfect${r.perfects > 1 ? 's' : ''}`, `moy. ${num(Math.round(r.avg * 10) / 10)}`);
   if (f.game === 'tdc') sub.push(`Trou du cul ${pct(r.trous)}`);
   if (f.game === 'holdem') sub.push(`place moyenne ${num(Math.round(r.avgPlace * 10) / 10)}`);
+  if (f.game === 'coinche') sub.push(`${r.takes} contrat${r.takes > 1 ? 's' : ''}${r.takes ? ` (${pct(r.takeRate)} remplis)` : ''}`, `meilleure +${Math.max(0, r.best)}`);
   if (f.game === 'tarot') sub.push(`${r.takes} prise${r.takes > 1 ? 's' : ''}${r.takes ? ` (${pct(r.takeRate)})` : ''}`, `meilleure ${r.best > 0 ? '+' : ''}${r.best}`);
   return { main, sub };
 }

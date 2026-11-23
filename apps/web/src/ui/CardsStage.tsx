@@ -6,7 +6,8 @@ import type { CardsView, MemberView } from '@slopesque/shared';
 import * as K from '../lib/cards';
 import * as TV from '../lib/tarot-view';
 import * as HV from '../lib/holdem-view';
-import { Holdem as HE, Tarot as TA } from '@slopesque/engines';
+import * as CV from '../lib/coinche-view';
+import { Coinche as CO, Holdem as HE, Tarot as TA } from '@slopesque/engines';
 import { request } from '../net';
 import { useStore } from '../store';
 import { LiveHtml } from './LiveHtml';
@@ -31,13 +32,16 @@ export function CardsStage() {
   const want = room.activity.cardGame ?? 'tdc';   // the game the host chose (the table may still hold the other)
   const t = c.game === 'tdc' && want === 'tdc' ? c.tdc : null, tarot = c.game === 'tarot' && want === 'tarot' ? c.tarot : null;
   const holdem = c.game === 'holdem' && want === 'holdem' ? c.holdem as unknown as HE.Holdem | null : null;
+  const coinche = c.game === 'coinche' && want === 'coinche' ? c.coinche as unknown as CO.Coinche | null : null;
+  const [coBid, setCoBid] = useState<{ value: number | null; suit: 'S' | 'H' | 'D' | 'C' | null }>({ value: null, suit: null });
   const [pending, setPending] = useState<number[]>([]), [pay, setPay] = useState(false), [fresh, setFresh] = useState<Set<string>>(new Set()), hideSel = useRef(new Set<string>());
   const [wonView, setWonView] = useState<string | null>(null);
   const members = new Map(room.members.map(m => [m.id, m]));
   const [sel, setSel] = useState<Set<string>>(new Set()), [rules, setRules] = useState(false), [full, setFull] = useState(false), [note, setNote] = useState('');
   useEscape(() => setRules(false), rules);
   const mySeat = c.seats.find(s => s.user === me)?.id ?? '';
-  useEffect(() => { setSel(new Set()); }, [t?.round, t?.turn, tarot?.deal, tarot?.phase]);
+  useEffect(() => { setSel(new Set()); }, [t?.round, t?.turn, tarot?.deal, tarot?.phase, coinche?.deal, coinche?.phase]);
+  useEffect(() => { setCoBid({ value: null, suit: null }); }, [coinche?.deal, coinche?.turn]);
   useEffect(() => { setPending([]); }, [holdem?.hand, holdem?.turn, holdem?.street]);
 
   const who = (id: string) => {
@@ -46,7 +50,9 @@ export function CardsStage() {
   };
   const free = c.seats.filter(s => !s.user), mine = free.find(s => s.credit === me);
   const late = c.late ? { seat: c.late.seat, secs: c.late.secs, vote: room.chat.messages.some(m => m.kind === 'vote' && !(m.data?.vote as { result?: string } | undefined)?.result) } : null;
-  const html = holdem ? HV.holdemTableHtml({ g: holdem, me: mySeat, playing: !!mySeat, host: room.hostId === me, who, fresh, pending, pay,
+  const html = coinche ? CV.coincheTableHtml({ g: coinche, me: mySeat, playing: !!mySeat, host: room.hostId === me, selected: sel, fan: fan(coinche.hands[mySeat]?.length ?? 0, box.current),
+      who, showLast, bid: coBid, late: late && late.seat !== mySeat ? late : null })
+    : holdem ? HV.holdemTableHtml({ g: holdem, me: mySeat, playing: !!mySeat, host: room.hostId === me, who, fresh, pending, pay,
       late: late && late.seat !== mySeat ? late : null,
       seats: (() => { const open = c.seats.filter(st => !holdem.out.includes(st.id) || holdem.over), freeOpen = open.filter(st => !st.user), mineOpen = freeOpen.find(st => st.credit === me);
         return { free: freeOpen.length, total: open.length, mine: !!mineOpen, takes: freeOpen[0] ? who(freeOpen[0].id).name : '', full }; })() })
@@ -61,7 +67,7 @@ export function CardsStage() {
       const chips = seats.map(st => K.seatPill(who(st.id))).join('');
       const freeSeats = seats.filter(st => !st.user).length;
       const mine = !!mySeat;
-      return `<div class="cards-game"><header class="cg-head"><b class="cg-title">${want === 'tarot' ? `Tarot à ${c.settings.tarot}` : want === 'holdem' ? `Texas Hold'em à ${n}` : `Trou du cul à ${c.settings.tdc}`}</b>
+      return `<div class="cards-game"><header class="cg-head"><b class="cg-title">${want === 'tarot' ? `Tarot à ${c.settings.tarot}` : want === 'holdem' ? `Texas Hold'em à ${n}` : want === 'coinche' ? 'Coinche, 2 contre 2' : `Trou du cul à ${c.settings.tdc}`}</b>
         <span class="cg-info">Avant la donne : prends une place ; des robots jouent les places libres.</span></header>
         <div class="cg-table"><ul class="cg-seats" style="--cols:${K.seatCols(seats.length)}">${chips}</ul><div class="cg-pile">${room.hostId === me ? `<button class="btn big" type="button" data-action="cards-deal">Distribuer</button>` : ''}</div>
           <p class="cg-pile-text">${seats.length - freeSeats} joueur${seats.length - freeSeats > 1 ? 's' : ''} sur ${n} place${n > 1 ? 's' : ''}${room.hostId === me ? '' : ' · l\'hôte distribue'}</p></div>
@@ -101,6 +107,14 @@ export function CardsStage() {
         const name = (id: string) => { const s = next.seats.find(x => x.id === id), u = s?.user ?? s?.credit; return u === me ? 'Toi' : (u && useStore.getState().room?.members.find(m => m.id === u)?.name) || s?.bot || '?'; };
         if (step.take) { setAnnounce(TV.takeAnnounce(name(step.take.seat), step.take.bid as Exclude<TA.Bid, 'pass'>)); await A.wait(2000); setAnnounce(''); }
         for (const h of step.handfuls) { setAnnounce(TV.handfulAnnounce(name(h.seat), h.level, h.cards as TA.TCard[], next.art ?? {})); await A.wait(2400); setAnnounce(''); }
+        const ca = prev.coinche, cb = next.coinche;
+        if (ca && cb && ca.deal === cb.deal && ca.startedAt === cb.startedAt) {   // the Coinche: the coinche, the contract, the belote, the deal's end
+          if (!ca.coincheBy && cb.coincheBy) { setAnnounce(CV.coincheAnnounce(name(cb.coincheBy), false)); await A.wait(1800); setAnnounce(''); }
+          if (ca.contract?.mult !== 4 && cb.contract?.mult === 4) { const s = cb.speeches.at(-1)!.by; setAnnounce(CV.coincheAnnounce(name(s), true)); await A.wait(1800); setAnnounce(''); }
+          if (ca.phase === 'bid' && cb.phase === 'play' && cb.contract) { setAnnounce(CV.contractAnnounce(name(cb.contract.by), cb.contract)); await A.wait(2200); setAnnounce(''); }
+          if (cb.belote.said > ca.belote.said && cb.belote.by) { setAnnounce(CV.beloteAnnounce(name(cb.belote.by), cb.belote.said)); await A.wait(1400); setAnnounce(''); }
+          if (!ca.result && cb.result) { await A.wait(500); setAnnounce(CV.dealAnnounce(cb.result.made, cb.result.contract)); await A.wait(1800); setAnnounce(''); }
+        }
         if (step.chelem) { setAnnounce(TV.chelemAnnounce(name(step.chelem))); await A.wait(2000); setAnnounce(''); }
         if (step.call) {
           const mine = step.call.taker !== seat && !!next.tarot?.hands[seat]?.some(x => x.id === step.call!.card.id);
@@ -148,10 +162,10 @@ export function CardsStage() {
     cards.forEach((el, i) => el.style.setProperty('--a', `${((i - (n - 1) / 2) * step).toFixed(4)}rad`));
   });
   useEffect(() => {   // the clock of the game
-    const start = (holdem ?? tarot ?? t)?.startedAt;
+    const start = (coinche ?? holdem ?? tarot ?? t)?.startedAt;
     const id = setInterval(() => { const el = box.current?.querySelector('[data-card-clock]'); if (el && start) el.textContent = fmtClock(Date.now() - start); }, 1000);
     return () => clearInterval(id);
-  }, [t, tarot, holdem]);
+  }, [t, tarot, holdem, coinche]);
 
   const ack = (r: { ok: boolean; error?: string }) => setNote(r.ok ? '' : r.error ?? '');
   const onAction = async (a: string, el: HTMLElement) => {
@@ -166,6 +180,17 @@ export function CardsStage() {
       if (move) ack(await request('holdem:act', move));
       return;
     }
+    if (a === 'card-pick' && coinche) {   // a card: chosen, then clicked again to play it
+      const card = (coinche.hands[mySeat] ?? []).find(x => x.id === el.dataset.card);
+      if (!card || coinche.phase !== 'play' || coinche.turn !== mySeat || !CO.legal(coinche, mySeat).some(x => x.id === card.id)) return;
+      if (sel.has(card.id)) { ack(await request('cards:play', { cards: [card.id] })); return; }
+      setSel(new Set([card.id]));
+      return;
+    }
+    if (a === 'co-value') { setCoBid(b => ({ ...b, value: Number(el.dataset.v) })); return; }
+    if (a === 'co-suit') { setCoBid(b => ({ ...b, suit: el.dataset.v as 'S' })); return; }
+    if (a === 'co-bid' && coBid.value && coBid.suit) { ack(await request('coinche:say', { kind: 'bid', value: coBid.value, suit: coBid.suit })); return; }
+    if (a === 'co-pass' || a === 'co-coinche' || a === 'co-surcoinche') { ack(await request('coinche:say', { kind: a === 'co-pass' ? 'pass' : a === 'co-coinche' ? 'coinche' : 'surcoinche' })); return; }
     if (a === 'card-pick' && tarot) {
       const hand = tarot.hands[mySeat] ?? [], card = hand.find(x => x.id === el.dataset.card) as TA.TCard | undefined;
       if (!card) return;
@@ -205,6 +230,6 @@ export function CardsStage() {
     <LiveHtml className="cards-holder" html={html} onAction={(a, el) => void onAction(a, el)} />
     {note && <p className="alert cards-note" role="alert">{note}</p>}
     {announce && <div className="announce-layer"><LiveHtml className="announce" html={announce} /></div>}
-    {rules && <LiveHtml html={want === 'holdem' ? HV.holdemRulesHtml() : c.game === 'tarot' ? TV.tarotRulesHtml(c.art ?? {}) : K.rulesHtml()} onAction={(a, el) => void onAction(a, el)} />}
+    {rules && <LiveHtml html={want === 'coinche' ? CV.coincheRulesHtml() : want === 'holdem' ? HV.holdemRulesHtml() : c.game === 'tarot' ? TV.tarotRulesHtml(c.art ?? {}) : K.rulesHtml()} onAction={(a, el) => void onAction(a, el)} />}
   </div>;
 }

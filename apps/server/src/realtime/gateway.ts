@@ -1,6 +1,7 @@
 // The WebSocket entry (openspec: realtime-sync): the code checked at the handshake, then the intents of
 // packages/shared/protocol.ts, each validated (zod) and answered by an acknowledgement { ok, value | error }.
 import { readFileSync } from 'node:fs';
+import type { Coinche } from '@slopesque/engines';
 import { Inject, Logger } from '@nestjs/common';
 import { ConnectedSocket, MessageBody, type OnGatewayConnection, type OnGatewayDisconnect, type OnGatewayInit, SubscribeMessage, WebSocketGateway } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
@@ -246,6 +247,10 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
   holdemAct(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('holdem:act', b, async v => { await this.hub.holdemDo(s, v); return null; }); }
   @SubscribeMessage('holdem:rules')
   holdemRules(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('holdem:rules', b, async v => { await this.hub.holdemSetRules(s, v); return null; }); }
+  @SubscribeMessage('coinche:say')
+  coincheSay(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('coinche:say', b, async v => { await this.hub.coincheDo(s, { say: (v.kind === 'bid' ? { kind: 'bid', value: v.value ?? 0, suit: v.suit ?? 'S' } : { kind: v.kind }) as Coinche.Say }); return null; }); }
+  @SubscribeMessage('coinche:target')
+  coincheTarget(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('coinche:target', b, async v => { await this.hub.coincheSetTarget(s, v.target); return null; }); }
   @SubscribeMessage('holdem:end')
   holdemEnd(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('holdem:end', b, async () => { await this.hub.holdemEnd(s); return null; }); }
   @SubscribeMessage('tarot:handful')

@@ -191,6 +191,16 @@ secrets, du développement testable en local sans aucune clé.
     sur tous les jeux de cartes, robot et couronne (👑) sur les angles ; au palmarès, une partie sans autre joueur ne
     compte que dans les parties jouées. *Rejeté* : points selon les jetons gagnés à
     chaque main (un tapis de départ différent changerait l'échelle du classement) ; Limit (moins joué).
+22. **Coinche** (2026-11-23, demandée « comme les autres jeux ») : pas de règle officielle unique (la FFB ne publie
+    que la belote contrée) ; variante retenue (pagat, regles-du-jeu.net) : annonces 80 à 160 et capot, 4 couleurs
+    (sans « sans atout » ni « tout atout »), coinche ×2 à son tour qui arrête les enchères, surcoinche ×4, capot non
+    coinchable ; pisser obligatoire, partenaire maître libre ; belote pour l'équipe qui l'a, comptée pour le contrat ;
+    82 au moins ; rempli = points + annonce, chuté = 160 + annonce à la défense ; pas d'autres annonces (tierce…) ;
+    partie à 1 000, 1 500 ou 2 000. Classement : les points de son équipe à chaque donne (comme les marques du Tarot).
+    Robots : règles (mémoire, couper, charger, faire tomber les atouts) et, en Fort, simulation des donnes possibles.
+    Mesure (`pnpm coinche:duel`, donnes rejouées en échangeant les équipes) : une chute coûtant 160 + l'annonce, les
+    enchères prudentes gagnent (contrat tenu environ 85 fois sur 100) ; Moyen bat Facile (+13 points par donne), Fort
+    bat Moyen (+8 à +19) et Facile (+31).
 
 ## Risks / Trade-offs
 

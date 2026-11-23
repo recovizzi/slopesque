@@ -152,26 +152,39 @@ export type HoldemAct = 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'allin' | 
 export interface HoldemRules { stack: number; every: number }
 export const HOLDEM_STACKS = [500, 1000, 2000, 5000] as const;
 export const HOLDEM_EVERY = [5, 10, 20, 0] as const;
+/** The Coinche's deal as a seat sees it (engines' coincheView: the others' hands as backs). */
+export interface CoincheView {
+  seats: string[]; dealer: string; hands: Record<string, PlayingCard[]>; phase: 'bid' | 'play' | 'done';
+  speeches: ({ by: string; kind: 'pass' | 'coinche' | 'surcoinche' } | { by: string; kind: 'bid'; value: number; suit: 'S' | 'H' | 'D' | 'C' })[];
+  contract: { by: string; value: number; suit: 'S' | 'H' | 'D' | 'C'; mult: 1 | 2 | 4 } | null; passes: number; coincheBy: string | null; answer: string[]; turn: string | null;
+  trick: { by: string; card: PlayingCard }[]; lastTrick: { by: string; card: PlayingCard }[]; lastWinner: string | null; tricks: Record<string, { by: string; card: PlayingCard }[][]>;
+  winners: string[]; belote: { by: string | null; said: number }; scores: [number, number]; target: number; deal: number; startedAt: number;
+  result: { attack: 0 | 1; contract: { by: string; value: number; suit: 'S' | 'H' | 'D' | 'C'; mult: 1 | 2 | 4 }; points: [number, number]; belote: 0 | 1 | null; made: boolean; score: [number, number]; capot: 0 | 1 | null } | null;
+  history: { deal: number; contract: { by: string; value: number; suit: 'S' | 'H' | 'D' | 'C'; mult: 1 | 2 | 4 } | null; score: [number, number] }[];
+  note: string; over: boolean; winner: 0 | 1 | null;
+}
+export const COINCHE_TARGETS = [1000, 1500, 2000] as const;
 /** How many seats each card game can have (robots complete the free ones). */
-export const CARD_PLAYERS = { tdc: [3, 4, 5, 6, 7, 8], tarot: [4, 5], holdem: [2, 3, 4, 5, 6, 7, 8] } as const;
+export const CARD_PLAYERS = { tdc: [3, 4, 5, 6, 7, 8], tarot: [4, 5], holdem: [2, 3, 4, 5, 6, 7, 8], coinche: [4] } as const;
 export type CardGameKey = keyof typeof CARD_PLAYERS;
 export interface CardsView {
   game: CardGameKey;
   players: number;                       // the seats of the table on the table now
-  settings: { tdc: number; tarot: number; holdem: number; bots?: 'facile' | 'moyen' | 'fort'; holdemRules?: HoldemRules };   // the host's choice for each game, from the next deal; bots: the robots' level
+  settings: { tdc: number; tarot: number; holdem: number; coinche: number; bots?: 'facile' | 'moyen' | 'fort'; holdemRules?: HoldemRules; coincheTarget?: number };   // the host's choice for each game, from the next deal; bots: the robots' level
   showTricks: boolean;                   // Tarot: the won tricks can be looked at
   seats: CardSeatView[];
   tdc: TdcRoundView | null;
   tarot: TarotDealView | null;
   holdem: HoldemView | null;
+  coinche: CoincheView | null;
   paid: Record<string, string | null>;   // the last round: who got each seat's points (null: a robot)
   turnSince: number;
   late: { seat: string; user: string; secs: number } | null;   // a player's turn has lasted 30 s: /kick possible
   art: Record<string, string>;           // Tarot: the room's pictures of the trumps (« 0 » the Excuse … « 21 »), their address
 }
-export const READY_CARD_GAMES = ['tdc', 'tarot', 'holdem'];
+export const READY_CARD_GAMES = ['tdc', 'tarot', 'holdem', 'coinche'];
 /** The card game an activity choice plays (the Trou du cul by default). */
-export const cardGameOf = (a: { cardGame?: string }): CardGameKey => (a.cardGame === 'tarot' || a.cardGame === 'holdem' ? a.cardGame : 'tdc');
+export const cardGameOf = (a: { cardGame?: string }): CardGameKey => (a.cardGame === 'tarot' || a.cardGame === 'holdem' || a.cardGame === 'coinche' ? a.cardGame : 'tdc');
 /** /effet: a visual effect on everyone's screen (not kept). On a player's photo: hit, tomato, hammer. */
 export const EFFECTS = ['firework', 'confetti', 'hit', 'tomato', 'hammer', 'screamer'] as const;
 export type EffectKind = typeof EFFECTS[number];
@@ -183,9 +196,9 @@ export const EFFECT_PARALLEL: Partial<Record<EffectKind, number>> = { firework: 
 export interface EffectView { id: string; kind: EffectKind; by: string; target: string | null; hue: number | null; pic: { kind: 'image' | 'emoji'; src: string } | null }
 /** The ranking an activity shows (and resets): each game its own; null: an activity without points. */
 export const scoreKey = (a: { activity: string; cardGame?: string }) => (a.activity === 'disk' ? 'disk' : a.activity === 'cards' ? cardGameOf(a) : null);
-export const SCORE_NAMES: Record<string, string> = { disk: 'du Demi-disque', tdc: 'du Trou du cul', tarot: 'du Tarot', holdem: 'du Texas Hold\'em' };
+export const SCORE_NAMES: Record<string, string> = { disk: 'du Demi-disque', tdc: 'du Trou du cul', tarot: 'du Tarot', holdem: 'du Texas Hold\'em', coinche: 'de la Coinche' };
 /** One player's result in one round (the Palmarès, kept with the room). */
-export interface PalmaresEvent { at: number; game: 'disk' | 'tdc' | 'tarot' | 'holdem'; id: string; name: string; hue: number; won: boolean; pts?: number; perfect?: boolean; role?: string; taker?: boolean; partner?: boolean; place?: number; of?: number; humans?: number }
+export interface PalmaresEvent { at: number; game: 'disk' | 'tdc' | 'tarot' | 'holdem' | 'coinche'; id: string; name: string; hue: number; won: boolean; pts?: number; perfect?: boolean; role?: string; taker?: boolean; partner?: boolean; place?: number; of?: number; humans?: number }
 
 export type PollAnswer = number | string | [number, number];
 export interface PollPicView { kind: 'image' | 'sticker' | 'gif'; src: string; w: number; h: number }
@@ -296,13 +309,15 @@ export const intents = {
   'holdem:act': z.object({ act: z.enum(['fold', 'check', 'call', 'raise', 'allin']), to: z.number().int().min(1).max(100_000_000).optional() }),
   'holdem:rules': z.object({ stack: z.number().int().refine(n => (HOLDEM_STACKS as readonly number[]).includes(n)).optional(), every: z.number().int().refine(n => (HOLDEM_EVERY as readonly number[]).includes(n)).optional() }),
   'holdem:end': z.object({}),
+  'coinche:say': z.object({ kind: z.enum(['pass', 'bid', 'coinche', 'surcoinche']), value: z.number().int().min(80).max(250).optional(), suit: z.enum(['S', 'H', 'D', 'C']).optional() }),
+  'coinche:target': z.object({ target: z.number().int().refine(n => (COINCHE_TARGETS as readonly number[]).includes(n)) }),
   'tarot:handful': z.object({ level: z.union([z.literal(1), z.literal(2), z.literal(3)]) }),
   'tarot:chelem': z.object({}),
   'tarot:art': z.object({ card: z.number().int().min(0).max(21), mediaId: z.string().uuid().nullable() }),
   'tarot:art-reset': z.object({}),
   'effect:play': z.object({ kind: z.enum(EFFECTS), target: z.string().uuid().nullable().optional(),
     pic: z.object({ kind: z.enum(['image', 'sticker', 'gif', 'emoji']), value: z.string().min(1).max(700_000) }).optional() }),
-  'cards:players': z.object({ game: z.enum(['tdc', 'tarot', 'holdem']), players: z.number().int().min(2).max(8) }),
+  'cards:players': z.object({ game: z.enum(['tdc', 'tarot', 'holdem', 'coinche']), players: z.number().int().min(2).max(8) }),
   'table:join': z.object({}),
   'table:leave': z.object({}),
   'gif:favorites': z.object({ favorites: z.array(gifRef).max(200) }),
@@ -368,6 +383,8 @@ export interface IntentResults {
   'holdem:act': null;
   'holdem:rules': null;
   'holdem:end': null;
+  'coinche:say': null;
+  'coinche:target': null;
   'tarot:handful': null;
   'tarot:chelem': null;
   'tarot:art': null;

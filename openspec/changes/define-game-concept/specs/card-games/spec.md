@@ -1,9 +1,9 @@
 ## ADDED Requirements
 
 ### Requirement: Nombre de joueurs d'un jeu de cartes
-L'hôte MUST choisir d'abord le jeu (Trou du cul, Tarot, Texas Hold'em), puis, dans l'onglet Partie, le nombre de
-joueurs parmi les valeurs que ce jeu permet : de 3 à 8 au Trou du cul, 4 ou 5 au Tarot (à 5, le preneur appelle un
-Roi), de 2 à 8 au Texas Hold'em. Le choix MUST
+L'hôte MUST choisir d'abord le jeu (Trou du cul, Tarot, Texas Hold'em, Coinche), puis, dans l'onglet Partie, le
+nombre de joueurs parmi les valeurs que ce jeu permet : de 3 à 8 au Trou du cul, 4 ou 5 au Tarot (à 5, le preneur
+appelle un Roi), de 2 à 8 au Texas Hold'em, 4 à la Coinche (deux équipes de deux). Le choix MUST
 valoir à partir de la donne suivante ; les joueurs qui ont cliqué « Participer » prennent les places, des robots
 complètent les autres.
 
@@ -20,7 +20,7 @@ jeux de cartes MUST donner des points au classement du salon, comme le Demi-disq
 
 #### Scenario: Choisir le jeu
 - **WHEN** l'hôte ouvre Paramètres → Partie avec l'activité Cartes
-- **THEN** la liste Jeu propose Trou du cul, Tarot et Texas Hold'em, et montre la Coinche « (bientôt) », désactivée
+- **THEN** la liste Jeu propose Trou du cul, Tarot, Texas Hold'em et Coinche
 
 ### Requirement: Présentation des cartes
 Une carte MUST être un petit rectangle aux angles arrondis, dessiné en SVG : en haut, la valeur dans l'angle gauche et
@@ -195,6 +195,64 @@ le montant, **ses deux cartes + les cartes communes**, les 5 cartes de la combin
 - **THEN** Malo est 1ᵉʳ (+30), Léa 2ᵉ (+20) ; les places 3 et 4 (éliminées avant) ont +10 et 0 ; une place tenue par
   un robot du début à la fin ne rapporte rien
 
+### Requirement: Coinche
+La Coinche (belote coinchée) MUST se jouer à 4, en deux équipes de deux (les partenaires face à face), avec 32 cartes
+(7, 8, 9, 10, Valet, Dame, Roi, As), en une **partie** jusqu'à un objectif (réglage de l'hôte : 1 000, 1 500 ou 2 000
+points). Il n'y a pas de règle officielle unique ; Slopesque retient la variante la plus répandue (pagat, regles-du-jeu.net) :
+- **Donne** : 8 cartes chacun ; le donneur tourne à chaque donne ; le joueur à sa gauche parle et entame le premier.
+- **Enchères** : chacun à son tour passe ou annonce un **contrat** — de 80 à 160 points par pas de 10, avec une
+  couleur d'atout (♠ ♥ ♦ ♣), plus haut que le précédent — ou le **capot** (faire les 8 plis, 250, qui clôt les
+  enchères). Trois passes après une annonce les terminent ; quatre passes d'entrée : on redonne. Un adversaire de la
+  dernière annonce peut, à son tour, **coincher** (×2) : les enchères s'arrêtent, puis chaque partenaire preneur peut
+  **surcoincher** (×4). Le capot ne se coinche pas.
+- **Jeu** : fournir la couleur demandée ; à l'atout demandé, monter si possible ; sans la couleur, couper, sauf si
+  son partenaire est maître du pli (alors défausse libre) ; si un adversaire a coupé, surcouper si possible, sinon
+  jouer un atout plus faible (pisser) ; sans couleur ni atout, défausse libre.
+- **Valeurs** : atout — Valet 20, 9 14, As 11, 10 10, Roi 4, Dame 3, 8 et 7 0 ; hors atout — As 11, 10 10, Roi 4,
+  Dame 3, Valet 2, 9, 8, 7 0 ; le dernier pli vaut 10 (« dix de der ») : 162 en tout ; faire les 8 plis compte 250.
+- **Belote-rebelote** : le Roi et la Dame d'atout dans une même main rapportent 20 points à son équipe, annoncés en
+  les jouant (« Belote », « Rebelote »), gardés même si le contrat chute ; ils comptent pour le remplir.
+- **Décompte** (arrondi à la dizaine, 5 vers le haut) : le contrat est **rempli** si les preneurs font au moins
+  l'annonce et au moins 82 (plus de la moitié). Rempli : les preneurs marquent leurs points + l'annonce, la défense
+  ses points. **Chuté** : les preneurs ne marquent que leur belote, la défense 160 + l'annonce. Coinché : l'annonce
+  compte double, surcoinché quadruple. Capot annoncé : 500 réussi, 500 pour la défense s'il chute.
+- **Fin** : après la donne où une équipe atteint l'objectif, la plus haute gagne (égalité : une donne de plus).
+
+La table MUST montrer : le score des deux équipes (« Nous » / « Eux ») et l'objectif dans l'en-tête, le contrat
+(l'annonce, l'atout, coinché ou non) et qui l'a pris ; sur chaque pastille son équipe et son annonce pendant les
+enchères ; le pli au centre (comme au Tarot : ramassé vers son gagnant) ; ma main en éventail, les cartes que je ne
+peux pas jouer grisées, l'atout repérable ; pour enchérir, la valeur et la couleur à choisir, Passer, Coincher /
+Surcoincher quand c'est possible ; des annonces au-dessus de la table (fin des enchères, coinche, belote, fin de la
+donne avec le détail du décompte). **Points au classement** à chaque donne : les points de son équipe ; le palmarès
+garde chaque donne (gagnée par son équipe, contrats pris et réussis). Les règles (« i ») MUST montrer l'ordre et la
+valeur des cartes dessinées, les enchères, les obligations de jeu avec des exemples, le décompte.
+
+#### Scenario: Contrat rempli
+- **WHEN** Léa prend 100 ♥, son équipe fait 112 points (belote comprise), la défense 70
+- **THEN** l'équipe de Léa marque 110 + 100 = 210, la défense 70
+
+#### Scenario: Contrat coinché et chuté
+- **WHEN** Malo coinche le 120 ♠ de Zoé, et l'équipe de Zoé ne fait que 90
+- **THEN** l'équipe de Malo marque 160 + 2 × 120 = 400, celle de Zoé 0 (plus sa belote si elle l'avait)
+
+#### Scenario: Partenaire maître
+- **WHEN** mon partenaire gagne le pli avec l'As de pique et je n'ai plus de pique
+- **THEN** je peux jouer n'importe quelle carte (je ne suis pas obligé de couper)
+
+### Requirement: Robots de la Coinche
+Les robots de la Coinche MUST jouer avec ce que voit leur place. Ils MUST : enchérir selon la force de leur main
+pour chaque atout possible (valets et neuf d'atout, longueur, As et 10 maîtres, belote) et **soutenir** l'annonce de
+leur partenaire (monter de 10 par As ou atout maître), coincher un contrat qu'ils pensent faire tomber ; au jeu, se
+souvenir des cartes tombées et des couleurs coupées, faire tomber les atouts quand ils ont pris, jouer leurs cartes
+maîtresses, **charger** (donner des points) le pli de leur partenaire quand il est sûr, donner le moins possible
+sinon, garder le dix de der en vue. Niveaux (le réglage commun) : *Facile* (des fautes, des enchères au hasard),
+*Moyen* (ces règles), *Fort* (il simule la fin de la donne sur des distributions possibles des cartes cachées, et
+choisit son contrat en jouant la donne sur des mains tirées au hasard).
+
+#### Scenario: Charger le partenaire
+- **WHEN** mon partenaire robot joue en dernier et notre équipe gagne déjà le pli
+- **THEN** il donne son 10 ou son As d'une couleur plutôt qu'un 7
+
 ### Requirement: Pastilles des places
 Autour de la table (tous les jeux de cartes), les pastilles des joueurs MUST avoir **toutes la même taille**, calculée
 sur la place disponible (une rangée jusqu'à 4, deux au-delà), le pseudo coupé (« … ») s'il est trop long, et le
@@ -366,7 +424,7 @@ reprendre celle d'un absent ; des **paris** sur ses gains (une part de ses point
 pouvoir **parier leurs points sur un joueur** de la table pour en gagner (à spécifier : cotes, plafond, moment des
 mises) ; un **temps par tour** (dépassé : le robot joue) ; le **vote** pour faire quitter la table au joueur qui la
 fait attendre (« Faire quitter la table un joueur qui la fait attendre », côté serveur) ; la possibilité de **rallonger** la
-partie (manches ou objectif, à la fin de la manche en cours) ; le Tarot, le Texas Hold'em et la Coinche (à venir).
+partie (manches ou objectif, à la fin de la manche en cours) ; le Tarot, le Texas Hold'em et la Coinche.
 
 #### Scenario: Joueur absent
 - **WHEN** le tour d'un joueur dure depuis 30 s

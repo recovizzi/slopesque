@@ -18,6 +18,7 @@ export const ACTS: Act[] = [
   { code: 'cartes', label: 'Cartes', kind: 'cards', names: ['cartes', 'carte', 'cards'], formats: [
     { code: 'trou-du-cul', label: 'Trou du cul', names: ['trou du cul', 'tdc', 'president'], choice: { activity: 'cards', cardGame: 'tdc' } },
     { code: 'tarot', label: 'Tarot', names: ['tarot'], choice: { activity: 'cards', cardGame: 'tarot' } },
+    { code: 'coinche', label: 'Coinche', names: ['coinche', 'belote coinchee', 'belote', 'contree', 'couinche'], choice: { activity: 'cards', cardGame: 'coinche' } },
     { code: 'holdem', label: 'Texas Hold\'em', names: ['texas holdem', 'texasholdem', 'texas hold\'em', 'texas hold em', 'hold\'em', 'holdem', 'texas', 'poker'], choice: { activity: 'cards', cardGame: 'holdem' } }] },
   { code: 'low-tide', label: 'Low Tide', kind: 'web', names: ['low tide', 'lowtide', 'jeux web', 'web'], choice: { activity: 'lowtide' } },
 ];
