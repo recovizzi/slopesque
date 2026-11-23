@@ -1109,12 +1109,15 @@ button.hd-rack-pile:disabled { cursor: default; opacity: .4; }
 .co-suit.red { color: #c62828; }
 .announce-box .co-suit, .co-board .co-suit { text-shadow: 0 0 2px #fff; }
 .co-mult { color: #c62828; font-weight: 800; }
-.co-board { position: absolute; left: 10px; bottom: 10px; z-index: 4; display: flex; flex-direction: column; gap: 2px; padding: 5px 9px; border-radius: 10px; background: rgb(0 0 0 / .3); color: #fff; font-size: 12px; }
+.co-board { position: absolute; left: 0; top: 50%; transform: translateY(-50%); z-index: 6; display: flex; align-items: stretch; border-radius: 0 10px 10px 0; background: rgb(0 0 0 / .45); color: #fff; font-size: 12.5px; cursor: default; outline: none; }
+.co-board-tab { writing-mode: vertical-rl; transform: rotate(180deg); padding: 10px 4px; font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; opacity: .9; }
+.co-board-body { display: flex; flex-direction: column; justify-content: center; gap: 2px; max-width: 0; overflow: hidden; white-space: nowrap; transition: max-width .25s ease, padding .25s ease; }
+.co-board:hover .co-board-body, .co-board:focus .co-board-body { max-width: 240px; padding: 6px 12px 6px 4px; }
 .co-board small { opacity: .75; }
 .co-score b { font-variant-numeric: tabular-nums; margin-left: 4px; }
 .co-score.us b { color: #9fe0b8; }
 .co-score.them b { color: #ffc9b0; }
-.co-team { padding: 0 6px; border-radius: 99px; font-size: 10px; font-weight: 800; white-space: nowrap; background: #e8e5dc; color: #4a463f; }
+.co-team { padding: 0 5px; border-radius: 99px; font-size: 9.5px; font-weight: 800; white-space: nowrap; background: #e8e5dc; color: #4a463f; }
 .co-team.us { background: #d6f0df; color: #1f5a37; }
 .co-team.them { background: #fbe0d4; color: #7a2e10; }
 .co-team.t1 { background: #fbe0d4; color: #7a2e10; }
@@ -1143,9 +1146,23 @@ button.hd-rack-pile:disabled { cursor: default; opacity: .4; }
 .co-values-rule { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .co-values-rule li { display: flex; flex-direction: column; align-items: center; gap: 1px; font-size: 12px; }
 .cards-game.coinche .cg-actions:not(.co-actions) { flex-wrap: wrap; justify-content: center; }
-@container stage (max-width: 480px) { .co-board { bottom: 6px; left: 6px; font-size: 11px; } .co-best { font-size: 20px; } }
+@container stage (max-width: 480px) { .co-best { font-size: 20px; } }
 /* the teams: the pills' colour (mine green, the opponents' orange) */
-.cg-seat.co-seat { box-shadow: inset 4px 0 0 var(--team); }
+.cg-seat.co-seat { box-shadow: inset 0 -4px 0 var(--team); }
 .cg-seat.co-us, .cg-seat.co-t0 { --team: #2c8a55; }
 .cg-seat.co-them, .cg-seat.co-t1 { --team: #d9692e; }
-.cg-seat.co-seat.is-turn { box-shadow: inset 4px 0 0 var(--team), 0 0 0 3px rgb(255 211 77 / .35); }
+.cg-seat.co-seat.is-turn { box-shadow: inset 0 -4px 0 var(--team), 0 0 0 3px rgb(255 211 77 / .35); }
+.cg-seat.co-seat.is-viewed { box-shadow: inset 0 -4px 0 var(--team), 0 0 0 3px #ffd34d; }
+/* each player's pile of won tricks (the trick flies there; the last one shown again when hovered) */
+.co-pile { position: relative; display: inline-flex; align-items: center; gap: 2px; padding: 1px 4px; border-radius: 6px; }
+.co-pile .mini { width: 13px; height: 18px; }
+.co-pile b { font-size: 12px; font-variant-numeric: tabular-nums; }
+.co-pile.is-empty { opacity: .45; }
+.co-pile.is-last { background: #ffd34d; cursor: zoom-in; }
+.won-pile[data-won] { box-shadow: 0 0 0 3px #ffd34d; border-radius: 6px; }
+.co-last .tarot-trick { justify-content: center; }
+.co-last .pcard { width: 52px; height: 73px; }
+/* the trump, under the table */
+.co-trump { align-self: center; display: flex; align-items: center; gap: 6px; padding: 3px 14px; border-radius: 99px; background: #fff7d6; color: #3d2f00; box-shadow: 0 0 0 2px #d4a017; font-size: 13px; }
+.co-trump .co-suit { font-size: 22px; line-height: 1; }
+.co-trump span { color: #6b5a20; }

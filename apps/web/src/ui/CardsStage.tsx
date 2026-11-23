@@ -51,7 +51,7 @@ export function CardsStage() {
   const free = c.seats.filter(s => !s.user), mine = free.find(s => s.credit === me);
   const late = c.late ? { seat: c.late.seat, secs: c.late.secs, vote: room.chat.messages.some(m => m.kind === 'vote' && !(m.data?.vote as { result?: string } | undefined)?.result) } : null;
   const html = coinche ? CV.coincheTableHtml({ g: coinche, me: mySeat, playing: !!mySeat, host: room.hostId === me, selected: sel, fan: fan(coinche.hands[mySeat]?.length ?? 0, box.current),
-      who, showLast, bid: coBid, late: late && late.seat !== mySeat ? late : null })
+      who, showLast, bid: coBid, wonView, late: late && late.seat !== mySeat ? late : null })
     : holdem ? HV.holdemTableHtml({ g: holdem, me: mySeat, playing: !!mySeat, host: room.hostId === me, who, fresh, pending, pay,
       late: late && late.seat !== mySeat ? late : null,
       seats: (() => { const open = c.seats.filter(st => !holdem.out.includes(st.id) || holdem.over), freeOpen = open.filter(st => !st.user), mineOpen = freeOpen.find(st => st.credit === me);

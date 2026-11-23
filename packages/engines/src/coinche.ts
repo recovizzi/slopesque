@@ -73,9 +73,18 @@ export const rankLabel = (r: number) => ({ 11: 'V', 12: 'D', 13: 'R', 14: 'A' } 
 export const rankName = (r: number) => ({ 11: 'Valet', 12: 'Dame', 13: 'Roi', 14: 'As' } as Record<number, string>)[r] ?? String(r);
 export const cardName = (c: CCard) => `${rankName(c.r)} de ${SUIT_NAME[c.s]}`;
 export const contractName = (k: Pick<Contract, 'value' | 'suit' | 'mult'>) => `${k.value === CAPOT ? 'Capot' : k.value} ${SUIT_SIGN[k.suit]}${k.mult === 4 ? ' surcoinché' : k.mult === 2 ? ' coinché' : ''}`;
-/** The hand's order: by suit (alternating colours), the trumps first once known, strongest first. */
+/** The suits in a hand's order: the trump first once known, then the colours alternating (♥ ♠ ♦ ♣ for a heart trump). */
+export function suitOrder(trump: Suit | null, present: Suit[] = SUITS): Suit[] {
+  const red = (s: Suit) => s === 'H' || s === 'D';
+  if (!trump) { const all: Suit[] = ['S', 'H', 'C', 'D']; return [...all.filter(s => present.includes(s)), ...all.filter(s => !present.includes(s))]; }
+  const rest = [...SUITS.filter(s => s !== trump && present.includes(s)), ...SUITS.filter(s => s !== trump && !present.includes(s))], out: Suit[] = [trump];
+  while (rest.length) { const i = rest.findIndex(s => red(s) !== red(out.at(-1)!)); out.push(rest.splice(i < 0 ? 0 : i, 1)[0]!); }
+  return out;
+}
+/** The hand's order: by suit (the trump first, the colours alternating), each suit from its strongest card (at the
+ *  trump: Valet, 9, As, 10, Roi, Dame, 8, 7). */
 export function sortHand(cs: CCard[], trump: Suit | null = null) {
-  const order: Suit[] = trump ? [trump, ...(['S', 'H', 'C', 'D'] as Suit[]).filter(s => s !== trump)] : ['S', 'H', 'C', 'D'];
+  const order = suitOrder(trump, [...new Set(cs.map(c => c.s))]);   // the colours alternating among the suits held
   return cs.sort((a, b) => order.indexOf(a.s) - order.indexOf(b.s) || power(b, trump ?? 'X' as Suit) - power(a, trump ?? 'X' as Suit));
 }
 

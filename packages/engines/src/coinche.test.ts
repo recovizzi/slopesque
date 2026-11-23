@@ -49,6 +49,13 @@ describe('Coinche: the bidding', () => {
   });
 });
 
+describe('Coinche: the hand', () => {
+  it('sorted with the trump first, by its order (Valet, 9, As, 10…), then the colours alternating', () => {
+    expect(C.sortHand(cs('S7 H14 H11 C10 D13 H9 S14 H7'), 'H').map(x => x.id)).toEqual(['H11', 'H9', 'H14', 'H7', 'S14', 'S7', 'D13', 'C10']);
+    expect(C.suitOrder('C')).toEqual(['C', 'H', 'S', 'D']);
+  });
+});
+
 describe('Coinche: the tricks', () => {
   it('follow the suit (no need to beat it)', () => {
     const g = table({}, { b: 'S7 S14 H7' }, [['a', 'S10']], 'b');

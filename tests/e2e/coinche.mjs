@@ -64,6 +64,27 @@ check(played || await frame.locator('.co-results').count() > 0, 'I play a legal 
 check(await until(async () => (await frame.locator('.tarot-trick .on-table').count()) >= 1, 15000), 'the trick on the table');
 await shot(page, '41-coinche-trick');
 
+check(await frame.locator('.co-trump').count() === 1 && /Atout/.test(await frame.locator('.co-trump').textContent() ?? ''), 'the trump, readable under the table');
+// the tricks taken: each player's pile counts them; the last winner's pile shows the last trick when hovered
+const taken = async () => frame.evaluate(() => [...document.querySelectorAll('.co-pile b, .won-pile .won-n')].reduce((n, b) => n + Number(b.textContent), 0));
+let lastSeen = false;
+for (let k = 0; k < 60 && !lastSeen; k++) {
+  const c = frame.locator('.cards-game.coinche.my-turn .cg-hand .in-hand:not(.is-off)');
+  if (await c.count()) { await c.first().click().catch(() => {}); await c.first().click().catch(() => {}); }
+  if (await taken() >= 2 && await frame.locator('[data-won]').count()) {
+    await frame.locator('[data-won]').first().hover();
+    lastSeen = await until(async () => (await frame.locator('.co-last .pcard').count()) === 4, 2000);
+    if (lastSeen) await shot(page, '41b-coinche-last-trick');
+    await frame.locator('.cg-hand').hover().catch(() => {});
+  }
+  await page.waitForTimeout(400);
+}
+check(await taken() >= 2, `the piles count the tricks taken (${await taken()})`);
+check(lastSeen, 'the last trick shown again, hovering its winner\'s pile');
+await frame.locator('.co-board').hover();
+check(await until(async () => (await frame.locator('.co-board-body').evaluate(e => e.getBoundingClientRect().width)) > 40, 2000), 'the score: a drawer opened when hovered');
+await shot(page, '41c-coinche-score');
+
 // I leave: the robots finish the deal, its count is shown
 await frame.getByRole('button', { name: 'Quitter la table' }).click();
 check(await until(async () => (await frame.locator('.co-results').count()) > 0, 90000), 'the deal\'s count: contract made or fallen, each team\'s points, the score sheet');

@@ -82,10 +82,13 @@ export function flyIn(box: HTMLElement, from: From) {
   })).then(() => undefined);
 }
 
-/** The trick on the table gathered, then sent to its winner: my pile (bottom right) or his seat. */
+/** The trick on the table gathered, then sent to its winner: my pile (bottom right), his own pile (the Coinche: kept
+ *  visible, it lands there) or his seat (it fades on the way). */
 export function gather(box: HTMLElement, winner: string, me: boolean) {
   const els = [...box.querySelectorAll<HTMLElement>('.cg-pile .on-table')];
-  const target = me ? box.querySelector('.won-pile') : box.querySelector(`[data-seat="${CSS.escape(winner)}"]`);
+  const own = me ? null : box.querySelector(`[data-pile-of="${CSS.escape(winner)}"]`);
+  const target = me ? box.querySelector('.won-pile') : own ?? box.querySelector(`[data-seat="${CSS.escape(winner)}"]`);
+  const keep = me || !!own;
   const pile = box.querySelector('[data-pile]')?.getBoundingClientRect();
   if (!els.length || !target || !pile) return Promise.resolve();
   const p = centre(pile), to = centre(target.getBoundingClientRect());
@@ -100,7 +103,7 @@ export function gather(box: HTMLElement, winner: string, me: boolean) {
     return f.animate([
       { transform: 'none', opacity: 1 },
       { transform: `translate(${p.x - o.x}px, ${p.y - o.y}px) rotate(${(i - els.length / 2) * 4}deg)`, opacity: 1, offset: 0.4 },
-      { transform: `translate(${to.x - o.x}px, ${to.y - o.y}px) scale(${me ? 0.55 : 0.3})`, opacity: me ? 1 : 0 },
+      { transform: `translate(${to.x - o.x}px, ${to.y - o.y}px) scale(${me ? 0.55 : own ? 0.35 : 0.3})`, opacity: keep ? 1 : 0 },
     ], { duration: 850, easing: 'cubic-bezier(.3,.6,.3,1)', fill: 'forwards' }).finished.catch(() => undefined).then(() => f.remove());
   })).then(() => undefined);
 }

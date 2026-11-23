@@ -23,6 +23,7 @@ export interface CoincheCtx {
   who: (id: string) => { name: string; color: string; bot?: boolean; photo?: string | null };
   showLast: boolean;                 // the trick just completed, still on the table (before it goes to its winner)
   bid: { value: number | null; suit: Suit | null };   // my bid being chosen
+  wonView: string | null;            // the pile hovered: the last trick shown if it is its winner's
   late: { seat: string; secs: number; vote: boolean } | null;
 }
 
@@ -44,7 +45,7 @@ function spoke(g: G, s: string) {
 const around = (g: G, me: string) => (g.seats.includes(me) ? [1, 2, 3].map(k => g.seats[(g.seats.indexOf(me) + k) % 4]!) : g.seats);
 
 export function coincheTableHtml(c: CoincheCtx) {
-  const { g, me } = c, trump = g.phase === 'play' || g.phase === 'done' ? g.contract?.suit ?? null : null, mine = g.hands[me] ?? [], myTurn = g.turn === me;
+  const { g, me } = c, trump = g.phase === 'play' || g.phase === 'done' ? g.contract?.suit ?? null : null, mine = CO.sortHand([...(g.hands[me] ?? [])], trump), myTurn = g.turn === me;
   const name = (s: string) => (s === me ? 'Toi' : c.who(s).name), tn = teamNames(c), myTeam = g.seats.includes(me) ? team(g, me) : null;
   const doing = { bid: 'parler', play: 'jouer', done: '' }[g.phase];
   const info = `Donne ${g.deal}${g.contract && g.phase !== 'bid' ? ` · ${esc(name(g.contract.by))} : ${contractHtml(g.contract)}` : ''}${g.turn ? ` · ${myTurn ? `<b>à toi de ${doing}</b>` : `à ${esc(name(g.turn))} de ${doing}`}` : ''}`;
@@ -53,14 +54,15 @@ export function coincheTableHtml(c: CoincheCtx) {
     const side = myTeam === null ? `t${t}` : t === myTeam ? 'us' : 'them', word = partner ? 'Partenaire' : myTeam === null ? `Équipe ${t + 1}` : 'Adversaire';
     const role = (g.phase === 'bid' ? spoke(g, s) : g.contract?.by === s ? '<span class="role-badge role-president">Preneur</span>' : '')
       + (g.belote.by === s && g.belote.said ? `<span class="role-badge co-belote">${g.belote.said > 1 ? 'Rebelote' : 'Belote'}</span>` : '');
-    const sub = role || `<span class="co-team ${side}">${word}</span>`;   // the team: the pill's colour (and its word when nothing else is said)
-    return seatPill(p, { cls: `co-seat co-${side} ${g.turn === s ? 'is-turn' : ''} ${c.late?.seat === s ? 'is-late' : ''}`, attrs: `data-seat="${esc(s)}" title="${esc(p.name)} · ${word}"`, sub,
-      side: `<span class="seat-cards" title="${g.hands[s]!.length} cartes">${backSvg('mini')}<b>${g.hands[s]!.length}</b></span>`, extra: kickBtn(c.late?.seat === s ? c.late : null) });
+    const sub = role || (partner || myTeam === null ? `<span class="co-team ${side}">${word}</span>` : '');   // the team: the pill's underline (the partner also named)
+    return seatPill(p, { cls: `co-seat co-${side} ${g.turn === s ? 'is-turn' : ''} ${c.late?.seat === s ? 'is-late' : ''} ${c.wonView === s ? 'is-viewed' : ''}`, attrs: `data-seat="${esc(s)}" title="${esc(p.name)} · ${word}"`, sub,
+      side: pileOf(g, s), extra: kickBtn(c.late?.seat === s ? c.late : null) });
   }).join('');
 
-  // the score of both teams, the target
-  const board = `<div class="co-board" title="Partie en ${g.target} points"><span class="co-score ${myTeam === 1 ? 'them' : 'us'}">${esc(tn(0))} <b>${g.scores[0]}</b></span>
-    <span class="co-score ${myTeam === 1 ? 'us' : 'them'}">${esc(tn(1))} <b>${g.scores[1]}</b></span><small>/ ${g.target}</small></div>`;
+  // the score of both teams and the target: a drawer on the felt's left edge, opened when hovered
+  const board = `<div class="co-board" tabindex="0" aria-label="Score : ${esc(tn(0))} ${g.scores[0]}, ${esc(tn(1))} ${g.scores[1]}, partie en ${g.target}"><span class="co-board-tab">Score</span>
+    <div class="co-board-body"><span class="co-score ${myTeam === 1 ? 'them' : 'us'}">${esc(tn(0))} <b>${g.scores[0]}</b></span>
+    <span class="co-score ${myTeam === 1 ? 'us' : 'them'}">${esc(tn(1))} <b>${g.scores[1]}</b></span><small>partie en ${g.target}</small></div></div>`;
 
   // the middle: the bidding, the trick, the count
   let pile: string, text = '';
@@ -114,13 +116,26 @@ export function coincheTableHtml(c: CoincheCtx) {
       <span class="cg-hint">${g.phase !== 'play' ? '' : myTurn ? (sel ? `Jouer ${CO.cardName(sel)} ?` : 'Choisis une carte (les autres sont grisées)') : 'Attends ton tour…'}</span>
       <button class="btn" type="button" data-action="cards-play" ${active && sel ? '' : 'disabled'}>Jouer</button></div>`;
   }
-  const myPile = c.playing && myTeam !== null ? (() => {
-    const n = g.seats.filter(s => team(g, s) === myTeam).reduce((x, s) => x + (g.tricks[s]?.length ?? 0), 0);
-    return `<div class="won-pile ${n ? '' : 'is-empty'}" title="${n ? `Les plis de ton équipe : ${n}` : 'Les plis de ton équipe viendront ici'}">${n ? `${Array.from({ length: Math.min(3, n) }, (_, k) => `<span class="won-card" style="--k:${k}">${backSvg()}</span>`).join('')}<b class="won-n">${n}</b>` : ''}</div>`;
+  const myPile = c.playing && myTeam !== null ? (() => {   // my own pile (the tricks I took); the last trick when it is mine
+    const n = g.tricks[me]?.length ?? 0, last = lastBy(g) === me;
+    return `<div class="won-pile ${n ? '' : 'is-empty'}" ${last ? `data-won="${esc(me)}"` : ''} title="${n ? `Tes plis : ${n}${last ? ' · survoler pour revoir le dernier pli' : ''}` : 'Tes plis viendront ici'}">${n ? `${Array.from({ length: Math.min(3, n) }, (_, k) => `<span class="won-card" style="--k:${k}">${backSvg()}</span>`).join('')}<b class="won-n">${n}</b>` : ''}</div>`;
   })() : '';
+  // the trump, readable under the table
+  const trumpBar = g.contract && g.phase !== 'bid' ? `<div class="co-trump" title="L'atout de cette donne">Atout ${sign(g.contract.suit)}<b>${SUIT_NAME[g.contract.suit]}</b>
+    <span>· ${g.contract.value === CAPOT ? 'capot' : g.contract.value} pour ${esc(name(g.contract.by))}${g.contract.mult === 4 ? ' · surcoinché' : g.contract.mult === 2 ? ' · coinché' : ''}</span></div>` : '';
+  const lastView = c.wonView && c.wonView === lastBy(g) ? `<div class="tricks-view co-last"><p class="tv-head">Dernier pli, remporté par ${esc(name(c.wonView))}</p>
+    <div class="tarot-trick">${g.lastTrick.map(p => `<span class="trick-card"><span class="pcard">${coincheCard(p.card, trump)}</span><small>${esc(name(p.by))}</small></span>`).join('')}</div></div>` : '';
   return `<div class="cards-game coinche ${myTurn && g.phase !== 'done' ? 'my-turn' : ''}">${head('Coinche', info)}
-    <div class="cg-table"><ul class="cg-seats" style="--cols:${seatCols(around(g, me).filter(s => s !== me).length)}">${seats}</ul>${board}<div class="cg-pile" data-pile>${pile}</div><p class="cg-pile-text">${text}</p>${myPile}</div>
-    <div class="cg-me">${hand}${c.playing ? '<button class="btn ghost sm cg-leave" type="button" data-action="table-leave" title="Un robot joue ta main à ta place">Quitter la table</button>' : ''}${actions}</div></div>`;
+    <div class="cg-table"><ul class="cg-seats" style="--cols:${seatCols(around(g, me).filter(s => s !== me).length)}">${seats}</ul>${board}<div class="cg-pile" data-pile>${pile}</div><p class="cg-pile-text">${text}</p>${myPile}${lastView}</div>
+    <div class="cg-me">${trumpBar}${hand}${c.playing ? '<button class="btn ghost sm cg-leave" type="button" data-action="table-leave" title="Un robot joue ta main à ta place">Quitter la table</button>' : ''}${actions}</div></div>`;
+}
+
+/** Who took the last trick (while it can be looked at again: this deal, until the count). */
+const lastBy = (g: G) => (g.phase === 'play' && g.lastTrick.length ? g.lastWinner : null);
+/** A player's pile of won tricks, on his pill: the cards fly there; hovered when he took the last trick: shown again. */
+function pileOf(g: G, s: string) {
+  const n = g.tricks[s]?.length ?? 0, last = lastBy(g) === s;
+  return `<span class="co-pile ${n ? '' : 'is-empty'} ${last ? 'is-last' : ''}" data-pile-of="${esc(s)}" ${last ? `data-won="${esc(s)}"` : ''} title="${n ? `${n} pli${n > 1 ? 's' : ''}${last ? ' · survoler pour revoir le dernier pli' : ''}` : 'Aucun pli'}">${backSvg('mini')}<b>${n}</b></span>`;
 }
 
 /** The score sheet: the last deals, the contract and each team's points. */

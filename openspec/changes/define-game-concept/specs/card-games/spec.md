@@ -218,10 +218,14 @@ points). Il n'y a pas de règle officielle unique ; Slopesque retient la variant
   compte double, surcoinché quadruple. Capot annoncé : 500 réussi, 500 pour la défense s'il chute.
 - **Fin** : après la donne où une équipe atteint l'objectif, la plus haute gagne (égalité : une donne de plus).
 
-La table MUST montrer : le score des deux équipes (« Nous » / « Eux ») et l'objectif dans l'en-tête, le contrat
-(l'annonce, l'atout, coinché ou non) et qui l'a pris ; sur chaque pastille son équipe et son annonce pendant les
-enchères ; le pli au centre (comme au Tarot : ramassé vers son gagnant) ; ma main en éventail, les cartes que je ne
-peux pas jouer grisées, l'atout repérable ; pour enchérir, la valeur et la couleur à choisir, Passer, Coincher /
+La table MUST montrer : le score des deux équipes (« Nous » / « Eux ») et l'objectif dans un **tiroir** au bord
+gauche du tapis (« Score » écrit en hauteur, ouvert au survol) ; le contrat dans l'en-tête et **l'atout sous la table**
+(son signe en grand, son nom, l'annonce, qui l'a prise, coinché ou non) ; l'équipe de chaque pastille par une couleur
+**sous la pastille** (la mienne verte, l'adverse orange ; « Partenaire » écrit), son annonce pendant les enchères ;
+**la défausse de chaque joueur** (ses plis, comptés) : le pli ramassé y vole, et survoler la défausse du joueur qui a
+fait le dernier pli MUST le remontrer (seul le dernier pli se revoit) ; ma main en éventail, **triée par couleur,
+l'atout d'abord dans son ordre** (Valet, 9, As, 10…) puis les couleurs alternées, les cartes que je ne peux pas jouer
+grisées, les atouts bordés d'or ; pour enchérir, la valeur et la couleur à choisir, Passer, Coincher /
 Surcoincher quand c'est possible ; des annonces au-dessus de la table (fin des enchères, coinche, belote, fin de la
 donne avec le détail du décompte). **Points au classement** à chaque donne : les points de son équipe ; le palmarès
 garde chaque donne (gagnée par son équipe, contrats pris et réussis). Les règles (« i ») MUST montrer l'ordre et la
