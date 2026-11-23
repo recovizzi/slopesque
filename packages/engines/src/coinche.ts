@@ -4,7 +4,9 @@
 // bidding, then surcoinche ×4 by the bidders); the tricks (follow; on a trump lead, go higher if possible; without the
 // suit, trump unless the partner is master; over an opponent's trump, overtrump if possible, else a lower trump);
 // the count (trump J 20, 9 14, A 11, 10 10, K 4, Q 3; plain A 11, 10 10, K 4, Q 3, J 2; the last trick 10; all the
-// tricks 250; belote 20 to its team), the contract made with the bid and 82 at least. The robots play on what their
+// tricks 250; belote 20 to its team), the contract made with the bid and 82 at least. Two more contracts: « sans
+// atout » (no trump: A 19, 10 10, K 4, Q 3, J 2; follow, else free) and « tout atout » (every suit a trump: J 14, 9 9,
+// A 6, 10 5, K 3, Q 1; follow and go higher, else free); 162 each, no belote. The robots play on what their
 // seat may see (coincheView).
 import { cut, shuffle, type DealMode, type Suit } from './tdc.js';
 export type { DealMode } from './tdc.js';
@@ -12,15 +14,22 @@ export type { DealMode } from './tdc.js';
 /** A card: r 7 … 14 (11 Valet, 12 Dame, 13 Roi, 14 As). */
 export interface CCard { id: string; r: number; s: Suit }
 export interface CPlay { by: string; card: CCard }
-export type Speech = { by: string; kind: 'pass' } | { by: string; kind: 'bid'; value: number; suit: Suit } | { by: string; kind: 'coinche' } | { by: string; kind: 'surcoinche' };
-export type Say = { kind: 'pass' } | { kind: 'bid'; value: number; suit: Suit } | { kind: 'coinche' } | { kind: 'surcoinche' };
-export interface Contract { by: string; value: number; suit: Suit; mult: 1 | 2 | 4 }
+/** A contract's trump: a suit, « SA » (sans atout: no trump) or « TA » (tout atout: every suit a trump). */
+export type Trump = Suit | 'SA' | 'TA';
+export type Speech = { by: string; kind: 'pass' } | { by: string; kind: 'bid'; value: number; suit: Trump } | { by: string; kind: 'coinche' } | { by: string; kind: 'surcoinche' };
+export type Say = { kind: 'pass' } | { kind: 'bid'; value: number; suit: Trump } | { kind: 'coinche' } | { kind: 'surcoinche' };
+export interface Contract { by: string; value: number; suit: Trump; mult: 1 | 2 | 4 }
 export const CAPOT = 250;
 export const VALUES = [80, 90, 100, 110, 120, 130, 140, 150, 160, CAPOT];
 export const TARGETS = [1000, 1500, 2000];
 export const SUITS: Suit[] = ['S', 'H', 'D', 'C'];
 export const SUIT_NAME: Record<Suit, string> = { S: 'pique', H: 'cœur', D: 'carreau', C: 'trèfle' };
 export const SUIT_SIGN: Record<Suit, string> = { S: '♠', H: '♥', D: '♦', C: '♣' };
+export const TRUMPS: Trump[] = ['S', 'H', 'D', 'C', 'SA', 'TA'];
+export const TRUMP_NAME: Record<Trump, string> = { ...SUIT_NAME, SA: 'sans atout', TA: 'tout atout' };
+export const isSuit = (t: Trump | null): t is Suit => !!t && t !== 'SA' && t !== 'TA';
+/** A card is a trump: of the trump suit, or any card at « tout atout » (none at « sans atout »). */
+export const isTrump = (c: CCard, t: Trump) => t === 'TA' || c.s === t;
 
 export interface DealResult {
   attack: 0 | 1;                         // the bidders' team
@@ -66,17 +75,20 @@ export const card = (id: string): CCard => ({ id, s: id[0] as Suit, r: Number(id
 const TRUMP_ORDER = [7, 8, 12, 13, 10, 14, 9, 11];   // weakest → strongest
 const PLAIN_ORDER = [7, 8, 9, 11, 12, 13, 10, 14];
 /** A card's strength in its suit (trump or not). */
-export const power = (c: CCard, trump: Suit) => (c.s === trump ? 100 + TRUMP_ORDER.indexOf(c.r) : PLAIN_ORDER.indexOf(c.r));
+export const power = (c: CCard, trump: Trump) => (isTrump(c, trump) ? 100 + TRUMP_ORDER.indexOf(c.r) : PLAIN_ORDER.indexOf(c.r));
 const TRUMP_PTS: Record<number, number> = { 11: 20, 9: 14, 14: 11, 10: 10, 13: 4, 12: 3 };
 const PLAIN_PTS: Record<number, number> = { 14: 11, 10: 10, 13: 4, 12: 3, 11: 2 };
-export const points = (c: CCard, trump: Suit) => (c.s === trump ? TRUMP_PTS[c.r] ?? 0 : PLAIN_PTS[c.r] ?? 0);
+const SA_PTS: Record<number, number> = { 14: 19, 10: 10, 13: 4, 12: 3, 11: 2 };   // 38 a suit: 152, + 10 = 162
+const TA_PTS: Record<number, number> = { 11: 14, 9: 9, 14: 6, 10: 5, 13: 3, 12: 1 };
+export const points = (c: CCard, trump: Trump) => (trump === 'SA' ? SA_PTS[c.r] ?? 0 : trump === 'TA' ? TA_PTS[c.r] ?? 0 : c.s === trump ? TRUMP_PTS[c.r] ?? 0 : PLAIN_PTS[c.r] ?? 0);
 export const rankLabel = (r: number) => ({ 11: 'V', 12: 'D', 13: 'R', 14: 'A' } as Record<number, string>)[r] ?? String(r);
 export const rankName = (r: number) => ({ 11: 'Valet', 12: 'Dame', 13: 'Roi', 14: 'As' } as Record<number, string>)[r] ?? String(r);
 export const cardName = (c: CCard) => `${rankName(c.r)} de ${SUIT_NAME[c.s]}`;
-export const contractName = (k: Pick<Contract, 'value' | 'suit' | 'mult'>) => `${k.value === CAPOT ? 'Capot' : k.value} ${SUIT_SIGN[k.suit]}${k.mult === 4 ? ' surcoinché' : k.mult === 2 ? ' coinché' : ''}`;
+export const trumpLabel = (t: Trump) => (isSuit(t) ? SUIT_SIGN[t] : TRUMP_NAME[t]);
+export const contractName = (k: Pick<Contract, 'value' | 'suit' | 'mult'>) => `${k.value === CAPOT ? 'Capot' : k.value} ${trumpLabel(k.suit)}${k.mult === 4 ? ' surcoinché' : k.mult === 2 ? ' coinché' : ''}`;
 /** The suits in a hand's order: the trump first once known, then the colours alternating (♥ ♠ ♦ ♣ for a heart trump). */
-export function suitOrder(trump: Suit | null, present: Suit[] = SUITS): Suit[] {
-  const red = (s: Suit) => s === 'H' || s === 'D';
+export function suitOrder(t: Trump | null, present: Suit[] = SUITS): Suit[] {
+  const red = (s: Suit) => s === 'H' || s === 'D', trump = isSuit(t) ? t : null;
   if (!trump) { const all: Suit[] = ['S', 'H', 'C', 'D']; return [...all.filter(s => present.includes(s)), ...all.filter(s => !present.includes(s))]; }
   const rest = [...SUITS.filter(s => s !== trump && present.includes(s)), ...SUITS.filter(s => s !== trump && !present.includes(s))], out: Suit[] = [trump];
   while (rest.length) { const i = rest.findIndex(s => red(s) !== red(out.at(-1)!)); out.push(rest.splice(i < 0 ? 0 : i, 1)[0]!); }
@@ -84,9 +96,9 @@ export function suitOrder(trump: Suit | null, present: Suit[] = SUITS): Suit[] {
 }
 /** The hand's order: by suit (the trump first, the colours alternating), each suit from its strongest card (at the
  *  trump: Valet, 9, As, 10, Roi, Dame, 8, 7). */
-export function sortHand(cs: CCard[], trump: Suit | null = null) {
+export function sortHand(cs: CCard[], trump: Trump | null = null) {
   const order = suitOrder(trump, [...new Set(cs.map(c => c.s))]);   // the colours alternating among the suits held
-  return cs.sort((a, b) => order.indexOf(a.s) - order.indexOf(b.s) || power(b, trump ?? 'X' as Suit) - power(a, trump ?? 'X' as Suit));
+  return cs.sort((a, b) => order.indexOf(a.s) - order.indexOf(b.s) || power(b, trump ?? 'SA') - power(a, trump ?? 'SA'));
 }
 
 // ------------------------------------------------------------------ the game
@@ -166,7 +178,7 @@ export function bid(c: Coinche, s: string, say: Say) {
     return true;
   }
   if (say.kind === 'bid') {
-    if (!o.values.includes(say.value) || !SUITS.includes(say.suit)) return false;
+    if (!o.values.includes(say.value) || !TRUMPS.includes(say.suit)) return false;
     c.speeches.push({ by: s, kind: 'bid', value: say.value, suit: say.suit });
     c.contract = { by: s, value: say.value, suit: say.suit, mult: 1 };
     c.passes = 0;
@@ -190,13 +202,15 @@ function startPlay(c: Coinche) {
   const trump = c.contract!.suit;
   c.phase = 'play'; c.turn = next(c, c.dealer); c.answer = [];
   for (const s of c.seats) c.hands[s] = sortHand(c.hands[s]!, trump);
-  c.belote = { by: c.seats.find(s => c.hands[s]!.some(x => x.s === trump && x.r === 13) && c.hands[s]!.some(x => x.s === trump && x.r === 12)) ?? null, said: 0 };
+  c.belote = { by: isSuit(trump) ? c.seats.find(s => c.hands[s]!.some(x => x.s === trump && x.r === 13) && c.hands[s]!.some(x => x.s === trump && x.r === 12)) ?? null : null, said: 0 };   // no belote at SA, TA
   return true;
 }
 
-/** Who wins the trick so far: the highest trump, else the highest card of the suit led. */
-export function winner(trick: CPlay[], trump: Suit) {
+/** Who wins the trick so far: the highest trump, else the highest card of the suit led (at SA and TA: the highest of
+ *  the suit led — no other suit can cut). */
+export function winner(trick: CPlay[], trump: Trump) {
   const lead = trick[0]!.card.s;
+  if (!isSuit(trump)) return trick.filter(p => p.card.s === lead).reduce((w, p) => (power(p.card, trump) > power(w.card, trump) ? p : w)).by;
   return trick.reduce((w, p) => {
     const a = w.card, b = p.card;
     const beats = b.s === a.s ? power(b, trump) > power(a, trump) : b.s === trump && a.s !== trump;
@@ -209,6 +223,13 @@ export function winner(trick: CPlay[], trump: Suit) {
 export function legal(c: Coinche, s: string): CCard[] {
   const hand = c.hands[s]!, trump = c.contract!.suit;
   if (!c.trick.length) return hand;
+  if (!isSuit(trump)) {   // SA: follow, else free; TA: follow and go higher than the best of the suit, else free
+    const lead = c.trick[0]!.card.s, follow = hand.filter(x => x.s === lead);
+    if (!follow.length) return hand;
+    if (trump === 'SA') return follow;
+    const top = Math.max(...c.trick.filter(p => p.card.s === lead).map(p => power(p.card, trump))), over = follow.filter(x => power(x, trump) > top);
+    return over.length ? over : follow;
+  }
   const lead = c.trick[0]!.card.s, trumps = hand.filter(x => x.s === trump);
   const top = Math.max(-1, ...c.trick.filter(p => p.card.s === trump).map(p => power(p.card, trump)));
   const over = trumps.filter(x => power(x, trump) > top);

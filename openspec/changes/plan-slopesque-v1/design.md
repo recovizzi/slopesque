@@ -199,6 +199,9 @@ secrets, du développement testable en local sans aucune clé.
     82 au moins ; rempli = points + annonce, chuté = 160 + annonce à la défense ; pas d'autres annonces (tierce…) ;
     partie à 1 000, 1 500 ou 2 000. Classement : les points de son équipe à chaque donne (comme les marques du Tarot).
     Robots : règles (mémoire, couper, charger, faire tomber les atouts) et, en Fort, simulation des donnes possibles.
+    Retours du 2026-11-23 : sans atout et tout atout ajoutés (valeurs courantes, 162 chacun, pas de belote ; les
+    robots les estiment sur leur propre échelle, mesurée), le décompte au premier plan et « Continuer » voté par les
+    joueurs assis (une minute au plus).
     Mesure (`pnpm coinche:duel`, donnes rejouées en échangeant les équipes) : une chute coûtant 160 + l'annonce, les
     enchères prudentes gagnent (contrat tenu environ 85 fois sur 100) ; Moyen bat Facile (+13 points par donne), Fort
     bat Moyen (+8 à +19) et Facile (+31).

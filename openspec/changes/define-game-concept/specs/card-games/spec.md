@@ -201,7 +201,7 @@ La Coinche (belote coinchée) MUST se jouer à 4, en deux équipes de deux (les 
 points). Il n'y a pas de règle officielle unique ; Slopesque retient la variante la plus répandue (pagat, regles-du-jeu.net) :
 - **Donne** : 8 cartes chacun ; le donneur tourne à chaque donne ; le joueur à sa gauche parle et entame le premier.
 - **Enchères** : chacun à son tour passe ou annonce un **contrat** — de 80 à 160 points par pas de 10, avec une
-  couleur d'atout (♠ ♥ ♦ ♣), plus haut que le précédent — ou le **capot** (faire les 8 plis, 250, qui clôt les
+  couleur d'atout (♠ ♥ ♦ ♣), **sans atout** ou **tout atout**, plus haut que le précédent — ou le **capot** (faire les 8 plis, 250, qui clôt les
   enchères). Trois passes après une annonce les terminent ; quatre passes d'entrée : on redonne. Un adversaire de la
   dernière annonce peut, à son tour, **coincher** (×2) : les enchères s'arrêtent, puis chaque partenaire preneur peut
   **surcoincher** (×4). Le capot ne se coinche pas.
@@ -210,6 +210,10 @@ points). Il n'y a pas de règle officielle unique ; Slopesque retient la variant
   jouer un atout plus faible (pisser) ; sans couleur ni atout, défausse libre.
 - **Valeurs** : atout — Valet 20, 9 14, As 11, 10 10, Roi 4, Dame 3, 8 et 7 0 ; hors atout — As 11, 10 10, Roi 4,
   Dame 3, Valet 2, 9, 8, 7 0 ; le dernier pli vaut 10 (« dix de der ») : 162 en tout ; faire les 8 plis compte 250.
+- **Sans atout** : aucune couleur ne coupe ; fournir, sinon défausse libre ; As 19, 10 10, Roi 4, Dame 3, Valet 2
+  (ordre As, 10, Roi, Dame, Valet, 9, 8, 7). **Tout atout** : chaque couleur est atout ; fournir en montant si possible,
+  sinon défausse libre ; Valet 14, 9 9, As 6, 10 5, Roi 3, Dame 1 (ordre Valet, 9, As, 10, Roi, Dame, 8, 7). 162 en
+  tout dans les deux cas, pas de belote ; le décompte est le même.
 - **Belote-rebelote** : le Roi et la Dame d'atout dans une même main rapportent 20 points à son équipe, annoncés en
   les jouant (« Belote », « Rebelote »), gardés même si le contrat chute ; ils comptent pour le remplir.
 - **Décompte** (arrondi à la dizaine, 5 vers le haut) : le contrat est **rempli** si les preneurs font au moins
@@ -217,6 +221,10 @@ points). Il n'y a pas de règle officielle unique ; Slopesque retient la variant
   ses points. **Chuté** : les preneurs ne marquent que leur belote, la défense 160 + l'annonce. Coinché : l'annonce
   compte double, surcoinché quadruple. Capot annoncé : 500 réussi, 500 pour la défense s'il chute.
 - **Fin** : après la donne où une équipe atteint l'objectif, la plus haute gagne (égalité : une donne de plus).
+- **Entre deux donnes** : le décompte MUST s'afficher **au premier plan**, au-dessus de la table et des pastilles,
+  lisible même en petit format ; chaque joueur assis MUST cliquer « Continuer » quand il l'a lu ; la donne suivante
+  part quand tous l'ont fait (qui est prêt est montré), ou au bout d'une minute (un absent ne bloque pas la table) ;
+  seuls des robots : après un instant.
 
 La table MUST montrer : le score des deux équipes (« Nous » / « Eux ») et l'objectif dans un **tiroir** au bord
 gauche du tapis (« Score » écrit en hauteur, ouvert au survol) ; le contrat dans l'en-tête et **l'atout sous la table**

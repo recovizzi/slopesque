@@ -1175,3 +1175,17 @@ button.hd-rack-pile:disabled { cursor: default; opacity: .4; }
 .chat-poll-body .poll-answer, .chat-poll-body .poll-results { margin: 0; padding: 0; }
 .chat-poll-done { margin: 0; color: var(--muted); font-size: 12.5px; }
 .msg.chat-poll .vote-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+/* Coinche: sans atout, tout atout; the deal's count in the foreground, « Continuer » */
+.co-suit.co-sa, .co-suit.co-ta { display: inline-block; padding: 0 4px; border-radius: 4px; font-size: .8em; letter-spacing: .02em; color: #fff; background: #4a463f; text-shadow: none; }
+.co-suit.co-ta { background: #b8860b; }
+.co-suit-btn.co-word { font-size: 12px; padding: 4px 8px; }
+.cards-game.coinche { position: relative; }
+.co-overlay { position: absolute; inset: 0; z-index: 40; display: grid; place-items: center; padding: 10px; background: rgb(8 14 11 / .62); animation: tv-in .25s ease; }
+.co-overlay-card.cg-results { position: static; max-height: 100%; overflow: auto; width: min(100%, 440px); gap: 8px; padding: 14px 16px; border-radius: 14px; box-shadow: 0 14px 44px rgb(0 0 0 / .5); }
+.co-next { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; }
+.co-next .btn.is-done { opacity: .7; cursor: default; }
+.co-ready { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
+.co-ready li { padding: 1px 8px; border-radius: 99px; font-size: 12px; background: var(--border); color: var(--muted); }
+.co-ready li.is-ready { background: #d6f0df; color: #1f5a37; font-weight: 700; }
+.co-next .note { margin: 0; text-align: center; }
+@container stage (max-width: 480px) { .co-overlay-card.cg-results { padding: 10px; } .co-sheet { font-size: 10.5px; } }

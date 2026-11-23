@@ -33,7 +33,8 @@ export function CardsStage() {
   const t = c.game === 'tdc' && want === 'tdc' ? c.tdc : null, tarot = c.game === 'tarot' && want === 'tarot' ? c.tarot : null;
   const holdem = c.game === 'holdem' && want === 'holdem' ? c.holdem as unknown as HE.Holdem | null : null;
   const coinche = c.game === 'coinche' && want === 'coinche' ? c.coinche as unknown as CO.Coinche | null : null;
-  const [coBid, setCoBid] = useState<{ value: number | null; suit: 'S' | 'H' | 'D' | 'C' | null }>({ value: null, suit: null });
+  const [coBid, setCoBid] = useState<{ value: number | null; suit: CO.Trump | null }>({ value: null, suit: null });
+  const [countFor, setCountFor] = useState<number | null>(room.cards.coinche?.result ? room.cards.coinche.deal : null);   // the deal whose count is shown (after its last trick)
   const [pending, setPending] = useState<number[]>([]), [pay, setPay] = useState(false), [fresh, setFresh] = useState<Set<string>>(new Set()), hideSel = useRef(new Set<string>());
   const [wonView, setWonView] = useState<string | null>(null);
   const members = new Map(room.members.map(m => [m.id, m]));
@@ -51,7 +52,8 @@ export function CardsStage() {
   const free = c.seats.filter(s => !s.user), mine = free.find(s => s.credit === me);
   const late = c.late ? { seat: c.late.seat, secs: c.late.secs, vote: room.chat.messages.some(m => m.kind === 'vote' && !(m.data?.vote as { result?: string } | undefined)?.result) } : null;
   const html = coinche ? CV.coincheTableHtml({ g: coinche, me: mySeat, playing: !!mySeat, host: room.hostId === me, selected: sel, fan: fan(coinche.hands[mySeat]?.length ?? 0, box.current),
-      who, showLast, bid: coBid, wonView, late: late && late.seat !== mySeat ? late : null })
+      who, showLast, bid: coBid, wonView, late: late && late.seat !== mySeat ? late : null, count: countFor === coinche.deal,
+      next: c.next ? { at: c.next.at, ready: new Set(c.seats.filter(s => s.user && c.next!.ready.includes(s.user)).map(s => s.id)), waiting: c.seats.filter(s => s.user).map(s => s.id) } : null })
     : holdem ? HV.holdemTableHtml({ g: holdem, me: mySeat, playing: !!mySeat, host: room.hostId === me, who, fresh, pending, pay,
       late: late && late.seat !== mySeat ? late : null,
       seats: (() => { const open = c.seats.filter(st => !holdem.out.includes(st.id) || holdem.over), freeOpen = open.filter(st => !st.user), mineOpen = freeOpen.find(st => st.credit === me);
@@ -94,7 +96,11 @@ export function CardsStage() {
     try {
       while (queue.current.length) {
         const el = box.current;
-        if (!el || queue.current.length > 6 || document.hidden || A.reduced()) { hideSel.current.clear(); setPay(false); show(queue.current.at(-1)!); queue.current = []; break; }   // too far behind: the last view
+        if (!el || queue.current.length > 6 || document.hidden || A.reduced()) {   // too far behind: the last view
+          const v = queue.current.at(-1)!;
+          hideSel.current.clear(); setPay(false); if (v.coinche?.result) setCountFor(v.coinche.deal);
+          show(v); queue.current = []; break;
+        }
         const next = queue.current.shift()!, prev = shown.current, step = A.diff(prev, next);
         if (next.game === 'holdem' && next.holdem) { await holdemStep(el, prev, next); continue; }
         const seat = prev.seats.find(s => s.user === me)?.id ?? '';
@@ -115,6 +121,7 @@ export function CardsStage() {
           if (cb.belote.said > ca.belote.said && cb.belote.by) { setAnnounce(CV.beloteAnnounce(name(cb.belote.by), cb.belote.said)); await A.wait(1400); setAnnounce(''); }
           if (!ca.result && cb.result) { await A.wait(500); setAnnounce(CV.dealAnnounce(cb.result.made, cb.result.contract)); await A.wait(1800); setAnnounce(''); }
         }
+        if (cb?.result) setCountFor(cb.deal);   // its last trick gathered: the count in the foreground
         if (step.chelem) { setAnnounce(TV.chelemAnnounce(name(step.chelem))); await A.wait(2000); setAnnounce(''); }
         if (step.call) {
           const mine = step.call.taker !== seat && !!next.tarot?.hands[seat]?.some(x => x.id === step.call!.card.id);
@@ -163,7 +170,12 @@ export function CardsStage() {
   });
   useEffect(() => {   // the clock of the game
     const start = (coinche ?? holdem ?? tarot ?? t)?.startedAt;
-    const id = setInterval(() => { const el = box.current?.querySelector('[data-card-clock]'); if (el && start) el.textContent = fmtClock(Date.now() - start); }, 1000);
+    const tick = () => {
+      const el = box.current?.querySelector('[data-card-clock]'); if (el && start) el.textContent = fmtClock(Date.now() - start);
+      box.current?.querySelectorAll<HTMLElement>('[data-countdown]').forEach(x => { x.textContent = String(Math.max(0, Math.ceil((Number(x.dataset.countdown) - Date.now() - useStore.getState().clockSkew) / 1000))); });
+    };
+    tick();
+    const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [t, tarot, holdem, coinche]);
 
@@ -190,6 +202,7 @@ export function CardsStage() {
     if (a === 'co-value') { setCoBid(b => ({ ...b, value: Number(el.dataset.v) })); return; }
     if (a === 'co-suit') { setCoBid(b => ({ ...b, suit: el.dataset.v as 'S' })); return; }
     if (a === 'co-bid' && coBid.value && coBid.suit) { ack(await request('coinche:say', { kind: 'bid', value: coBid.value, suit: coBid.suit })); return; }
+    if (a === 'co-next') { ack(await request('coinche:next')); return; }
     if (a === 'co-pass' || a === 'co-coinche' || a === 'co-surcoinche') { ack(await request('coinche:say', { kind: a === 'co-pass' ? 'pass' : a === 'co-coinche' ? 'coinche' : 'surcoinche' })); return; }
     if (a === 'card-pick' && tarot) {
       const hand = tarot.hands[mySeat] ?? [], card = hand.find(x => x.id === el.dataset.card) as TA.TCard | undefined;

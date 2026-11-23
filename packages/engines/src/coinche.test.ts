@@ -96,6 +96,32 @@ describe('Coinche: the tricks', () => {
   });
 });
 
+describe('Coinche: sans atout and tout atout', () => {
+  it('sans atout: follow, else free (no cut); the Ace 19, the highest of the suit led wins', () => {
+    const g = table({ suit: 'SA' }, { b: 'H7 C14 D10' }, [['a', 'S9']], 'b');
+    expect(ids(C.legal(g, 'b'))).toEqual(['C14', 'D10', 'H7']);
+    expect(C.winner([{ by: 'a', card: C.card('S9') }, { by: 'b', card: C.card('C14') }, { by: 'c', card: C.card('S10') }], 'SA')).toBe('c');
+    expect(C.points(C.card('S14'), 'SA')).toBe(19);
+  });
+  it('tout atout: follow and go higher if possible (the Jack and the 9 strongest), else free; J 14, 9 9', () => {
+    expect(ids(C.legal(table({ suit: 'TA' }, { b: 'S7 S9 H11' }, [['a', 'S14']], 'b'), 'b'))).toEqual(['S9']);
+    expect(ids(C.legal(table({ suit: 'TA' }, { b: 'S7 S8 H11' }, [['a', 'S14']], 'b'), 'b'))).toEqual(['S7', 'S8']);
+    expect(ids(C.legal(table({ suit: 'TA' }, { b: 'H11 D7' }, [['a', 'S14']], 'b'), 'b'))).toEqual(['D7', 'H11']);
+    expect([C.points(C.card('S11'), 'TA'), C.points(C.card('S9'), 'TA')]).toEqual([14, 9]);
+  });
+  it('each makes 162 (152 + the last trick), no belote', () => {
+    for (const suit of ['SA', 'TA'] as C.Trump[]) {
+      expect(C.deck().reduce((n, x) => n + C.points(x, suit), 0)).toBe(152);
+      const g = C.newGame(['a', 'b', 'c', 'd']);
+      C.bid(g, 'a', { kind: 'bid', value: 90, suit });
+      for (const s of ['b', 'c', 'd']) C.bid(g, s, { kind: 'pass' });
+      expect(g.belote.by).toBeNull();
+      for (let k = 0; k < 40 && g.phase === 'play'; k++) C.play(g, g.turn!, C.legal(g, g.turn!)[0]!);
+      expect(g.result!.points[0] + g.result!.points[1]).toBe(g.result!.capot !== null ? 250 : 162);
+    }
+  });
+});
+
 describe('Coinche: the count', () => {
   it('a whole deal counted (made, failed, coinched), the scores adding up', () => {
     let seen = 0;

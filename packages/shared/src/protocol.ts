@@ -153,14 +153,16 @@ export interface HoldemRules { stack: number; every: number }
 export const HOLDEM_STACKS = [500, 1000, 2000, 5000] as const;
 export const HOLDEM_EVERY = [5, 10, 20, 0] as const;
 /** The Coinche's deal as a seat sees it (engines' coincheView: the others' hands as backs). */
+/** A Coinche contract's trump: a suit, « SA » (sans atout) or « TA » (tout atout). */
+export type CoincheTrump = 'S' | 'H' | 'D' | 'C' | 'SA' | 'TA';
 export interface CoincheView {
   seats: string[]; dealer: string; hands: Record<string, PlayingCard[]>; phase: 'bid' | 'play' | 'done';
-  speeches: ({ by: string; kind: 'pass' | 'coinche' | 'surcoinche' } | { by: string; kind: 'bid'; value: number; suit: 'S' | 'H' | 'D' | 'C' })[];
-  contract: { by: string; value: number; suit: 'S' | 'H' | 'D' | 'C'; mult: 1 | 2 | 4 } | null; passes: number; coincheBy: string | null; answer: string[]; turn: string | null;
+  speeches: ({ by: string; kind: 'pass' | 'coinche' | 'surcoinche' } | { by: string; kind: 'bid'; value: number; suit: CoincheTrump })[];
+  contract: { by: string; value: number; suit: CoincheTrump; mult: 1 | 2 | 4 } | null; passes: number; coincheBy: string | null; answer: string[]; turn: string | null;
   trick: { by: string; card: PlayingCard }[]; lastTrick: { by: string; card: PlayingCard }[]; lastWinner: string | null; tricks: Record<string, { by: string; card: PlayingCard }[][]>;
   winners: string[]; belote: { by: string | null; said: number }; scores: [number, number]; target: number; deal: number; startedAt: number;
-  result: { attack: 0 | 1; contract: { by: string; value: number; suit: 'S' | 'H' | 'D' | 'C'; mult: 1 | 2 | 4 }; points: [number, number]; belote: 0 | 1 | null; made: boolean; score: [number, number]; capot: 0 | 1 | null } | null;
-  history: { deal: number; contract: { by: string; value: number; suit: 'S' | 'H' | 'D' | 'C'; mult: 1 | 2 | 4 } | null; score: [number, number] }[];
+  result: { attack: 0 | 1; contract: { by: string; value: number; suit: CoincheTrump; mult: 1 | 2 | 4 }; points: [number, number]; belote: 0 | 1 | null; made: boolean; score: [number, number]; capot: 0 | 1 | null } | null;
+  history: { deal: number; contract: { by: string; value: number; suit: CoincheTrump; mult: 1 | 2 | 4 } | null; score: [number, number] }[];
   note: string; over: boolean; winner: 0 | 1 | null;
 }
 export const COINCHE_TARGETS = [1000, 1500, 2000] as const;
@@ -177,6 +179,7 @@ export interface CardsView {
   tarot: TarotDealView | null;
   holdem: HoldemView | null;
   coinche: CoincheView | null;
+  next: { at: number; ready: string[] } | null;   // Coinche: the deal's count shown; the next deal when every seated player is ready (or at `at`)
   paid: Record<string, string | null>;   // the last round: who got each seat's points (null: a robot)
   turnSince: number;
   late: { seat: string; user: string; secs: number } | null;   // a player's turn has lasted 30 s: /kick possible
@@ -317,7 +320,8 @@ export const intents = {
   'holdem:act': z.object({ act: z.enum(['fold', 'check', 'call', 'raise', 'allin']), to: z.number().int().min(1).max(100_000_000).optional() }),
   'holdem:rules': z.object({ stack: z.number().int().refine(n => (HOLDEM_STACKS as readonly number[]).includes(n)).optional(), every: z.number().int().refine(n => (HOLDEM_EVERY as readonly number[]).includes(n)).optional() }),
   'holdem:end': z.object({}),
-  'coinche:say': z.object({ kind: z.enum(['pass', 'bid', 'coinche', 'surcoinche']), value: z.number().int().min(80).max(250).optional(), suit: z.enum(['S', 'H', 'D', 'C']).optional() }),
+  'coinche:say': z.object({ kind: z.enum(['pass', 'bid', 'coinche', 'surcoinche']), value: z.number().int().min(80).max(250).optional(), suit: z.enum(['S', 'H', 'D', 'C', 'SA', 'TA']).optional() }),
+  'coinche:next': z.object({}),
   'cards:deal-mode': z.object({ mode: z.enum(['random', 'classic']) }),
   'coinche:target': z.object({ target: z.number().int().refine(n => (COINCHE_TARGETS as readonly number[]).includes(n)) }),
   'tarot:handful': z.object({ level: z.union([z.literal(1), z.literal(2), z.literal(3)]) }),
@@ -395,6 +399,7 @@ export interface IntentResults {
   'holdem:rules': null;
   'holdem:end': null;
   'coinche:say': null;
+  'coinche:next': null;
   'coinche:target': null;
   'cards:deal-mode': null;
   'tarot:handful': null;

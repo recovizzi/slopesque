@@ -42,6 +42,7 @@ for (let k = 0; k < 40; k++) {
       bidSeen = true;
       const v80 = frame.locator('[data-action="co-value"][data-v="80"]:not([disabled])');
       if (await v80.count()) {
+        check(await frame.locator('[data-action="co-suit"][data-v="SA"]').count() === 1 && await frame.locator('[data-action="co-suit"][data-v="TA"]').count() === 1, 'the bidding offers « Sans atout » and « Tout atout » beside the suits');
         await v80.click(); await frame.locator('[data-action="co-suit"][data-v="H"]').click();
         check(/Annoncer 80/.test(await frame.locator('[data-action="co-bid"]').textContent() ?? ''), 'the bid button says it: « Annoncer 80 ♥ »');
         await shot(page, '40-coinche-bid');
@@ -91,13 +92,22 @@ await frame.locator('.co-board').hover();
 check(await until(async () => (await frame.locator('.co-board-body').evaluate(e => e.getBoundingClientRect().width)) > 40, 2000), 'the score: a drawer opened when hovered');
 await shot(page, '41c-coinche-score');
 
-// I leave: the robots finish the deal, its count is shown
-await frame.getByRole('button', { name: 'Quitter la table' }).click();
-check(await until(async () => (await frame.locator('.co-results').count()) > 0, 90000), 'the deal\'s count: contract made or fallen, each team\'s points, the score sheet');
+// I play to the end of the deal: its count in the foreground, « Continuer » for the next one
+for (let k = 0; k < 120 && !(await frame.locator('.co-overlay').count()); k++) {
+  const c = frame.locator('.cards-game.coinche.my-turn .cg-hand .in-hand:not(.is-off)');
+  if (await c.count()) { await c.first().click().catch(() => {}); await c.first().click().catch(() => {}); }
+  await page.waitForTimeout(400);
+}
+check(await frame.locator('.co-overlay .co-results').count() === 1, 'the deal\'s count in the foreground: contract made or fallen, each team\'s points, the score sheet');
+check(await frame.locator('.co-overlay [data-action="co-next"]').count() === 1 && await until(async () => /^\d+$/.test(await frame.locator('[data-countdown]').textContent() ?? ''), 2500), 'its « Continuer » and the time left');
 await shot(page, '42-coinche-count');
+const dealBefore = await frame.locator('.cg-head .cg-info').textContent();
+await frame.locator('[data-action="co-next"]').click();
+check(await until(async () => (await frame.locator('.co-overlay').count()) === 0 && (await frame.locator('.cg-head .cg-info').textContent()) !== dealBefore, 10000), 'everyone ready (the only player): the next deal');
+await frame.getByRole('button', { name: 'Quitter la table' }).click();
 
 await frame.locator('[data-action="cards-rules"]').click();
-check(await frame.locator('.co-values-rule li').count() === 16, 'the rules: the cards\' order and points, trump and plain');
+check(await frame.locator('.co-values-rule li').count() === 32, 'the rules: the cards\' order and points — trump, plain, sans atout, tout atout');
 await shot(page, '43-coinche-rules');
 await frame.locator('.rules [data-action="rules-close"]').click();
 

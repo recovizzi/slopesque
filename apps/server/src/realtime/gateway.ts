@@ -255,6 +255,8 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
   coincheSay(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('coinche:say', b, async v => { await this.hub.coincheDo(s, { say: (v.kind === 'bid' ? { kind: 'bid', value: v.value ?? 0, suit: v.suit ?? 'S' } : { kind: v.kind }) as Coinche.Say }); return null; }); }
   @SubscribeMessage('cards:deal-mode')
   cardsDealMode(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('cards:deal-mode', b, async v => { await this.hub.cardsDealMode(s, v.mode); return null; }); }
+  @SubscribeMessage('coinche:next')
+  coincheNext(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('coinche:next', b, async () => { await this.hub.coincheReady(s); return null; }); }
   @SubscribeMessage('coinche:target')
   coincheTarget(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('coinche:target', b, async v => { await this.hub.coincheSetTarget(s, v.target); return null; }); }
   @SubscribeMessage('holdem:end')
