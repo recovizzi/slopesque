@@ -76,7 +76,7 @@ pnpm prod:admin purge:run           # ce qui a expiré, tout de suite
 pnpm prod:admin media:delete <id>   # une image précise
 ```
 
-**Vérifier que tout va bien** : `pnpm prod:admin services:check`, ou `curl http://<adresse>:23180/api/health`.
+**Vérifier que tout va bien** : `pnpm prod:admin services:check`, ou `curl https://<ton domaine>/api/health`.
 
 ## Le journal d'admin
 

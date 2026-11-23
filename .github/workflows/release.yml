@@ -76,6 +76,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+        env:
+          VITE_SERVER_URL: ${{ vars.PUBLIC_URL }}   # the server the extension proposes at its first launch (a repository variable, not in the code)
       - run: pnpm --filter @slopesque/extension run lint
       - run: mkdir -p release && cp apps/extension/dist/slopesque-extension.zip release/slopesque-chrome-$VERSION.zip
 

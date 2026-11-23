@@ -17,7 +17,7 @@ services:
       S3_ENDPOINT: http://rustfs:9000
       S3_ACCESS_KEY: slopesque
       S3_SECRET_KEY: ${RUSTFS_SECRET_KEY}
-    ports: ['${PUBLIC_PORT:-23180}:23100']
+    ports: ['${PUBLIC_BIND:-0.0.0.0}:${PUBLIC_PORT:-23180}:23100']   # behind a reverse proxy (Caddy, https): PUBLIC_BIND=127.0.0.1
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }

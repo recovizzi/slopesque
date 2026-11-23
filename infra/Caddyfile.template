@@ -1,0 +1,10 @@
+# Slopesque behind Caddy (https with the domain's certificate, renewed by Caddy): copied by `pnpm deploy:prod --init`
+# into the machine's reverse proxy (DEPLOY_CADDY_DIR), {{DOMAIN}} and {{UPSTREAM}} filled in from your .env. The
+# WebSocket (Socket.IO) goes through as is; the server reads the player's address in X-Forwarded-For (TRUST_PROXY=true).
+{{DOMAIN}} {
+	encode zstd gzip
+	request_body {
+		max_size 40MB
+	}
+	reverse_proxy {{UPSTREAM}}
+}
