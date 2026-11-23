@@ -37,7 +37,8 @@ describe.skipIf(!up)('Texas Hold\'em', () => {
     expect((await ask(host, 'cards:deal')).ok).toBe(true);
     const c = await mine, seat = c.seats.find(s => s.user === me)!.id, g = c.holdem!;
     expect(c.seats).toHaveLength(3);
-    expect(g.stacks[seat]! + (g.paid[seat] ?? 0)).toBe(500);
+    expect(g.stacks[seat]! + (g.paid[seat] ?? 0)).toBe(g.startStacks[seat]);   // hand 1, or a later one if the others folded before my turn
+    expect(Object.values(g.stacks).reduce((x, y) => x + y, 0) + Object.values(g.paid).reduce((x, y) => x + y, 0)).toBe(1500);
     expect(g.holes[seat]!.every(x => x.r > 0)).toBe(true);
     expect(Object.entries(g.holes).filter(([s]) => s !== seat).every(([, h]) => h.every(x => x.r === 0))).toBe(true);
     expect((await ask(host, 'holdem:act', { act: 'fold' })).ok).toBe(false);   // not at the table
