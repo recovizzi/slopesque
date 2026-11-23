@@ -56,19 +56,26 @@ vX.Y.Z ──▶ plan ──┬─▶ extension   zip Chrome, .crx Linux, .xpi s
 
 ## Déployer à la main : `pnpm deploy:prod`
 
-Depuis ton poste, en SSH avec le compte de déploiement (ta clé dans son `authorized_keys`, comme la CI). La machine
-n'est nommée que dans ton `.env` (non versionné) : `DEPLOY_SSH_HOST` (un alias de `~/.ssh/config`), `DEPLOY_USER`,
-`DEPLOY_DIR`, `PROD_PUBLIC_URL`, `DEPLOY_CADDY_*`.
+Depuis ton poste, **dans un terminal**. La machine n'est nommée que dans ton `.env` (non versionné) :
+`DEPLOY_SSH_HOST` (un alias de `~/.ssh/config`), `DEPLOY_USER`, `DEPLOY_DIR`, `PROD_PUBLIC_URL`, `DEPLOY_CADDY_DIR`.
+Le compte de déploiement est joint directement si ta clé y est autorisée (comme la CI), sinon par
+`sudo -iu <compte>` depuis ton compte (ton mot de passe sudo, une fois). Les fichiers passent par un dossier
+temporaire privé sur la machine (les secrets jamais en ligne de commande), supprimé à la fin.
 
 ```sh
+pnpm deploy:prod --dry-run --init  # ce qui tournerait sur la machine, affiché : rien n'est envoyé
+pnpm deploy:prod --check         # lecture seule : Caddy (son conteneur, son réseau, chaque site et le conteneur
+                                 # qu'il joint), le PUBLIC_URL de la machine, les conteneurs
 pnpm deploy:prod --init          # la première fois : le infra/.env de la machine (secrets tirés au hasard, https,
-                                 # TRUST_PROXY, port local seulement) et le site du reverse proxy (infra/Caddyfile.template)
-pnpm deploy:prod                 # l'image du serveur construite ici, envoyée par SSH, démarrée, santé vérifiée
+                                 # TRUST_PROXY, port local seulement, réseau du proxy), l'image, puis le site Caddy
+pnpm deploy:prod                 # l'image du serveur construite ici, envoyée, démarrée, santé vérifiée
 pnpm deploy:prod --image 0.2.0   # une version publiée : son image tirée de GHCR (ce que fait le workflow Release)
 ```
 
-Le serveur écoute sur `127.0.0.1:23180` ; le reverse proxy (Caddy) sert le domaine en https et lui passe tout,
-WebSocket compris. L'extension propose ce domaine au premier lancement : la variable `PUBLIC_URL` du dépôt, lue au
+Le reverse proxy (Caddy, en conteneur) sert le domaine en https et joint le serveur **par son nom de conteneur**,
+`slopesque-server:23100`, sur son réseau Docker (`PROXY_NETWORK` dans le `infra/.env` de la machine,
+`infra/docker-compose.proxy.yml`) ; le site est `slopesque.caddyfile` dans le dossier des sites de Caddy. Le port
+`127.0.0.1:23180` reste ouvert sur la machine seulement (contrôle de santé, admin). L'extension propose ce domaine au premier lancement : la variable `PUBLIC_URL` du dépôt, lue au
 build de la release.
 
 ## Relancer, vérifier, revenir en arrière

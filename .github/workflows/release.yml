@@ -5,8 +5,8 @@
 #               Mozilla, unlisted (MOZILLA_API_KEY / MOZILLA_API_SECRET) — environment « release »
 #   server      its image on GHCR: ghcr.io/<owner>/slopesque-server:<v> and :latest
 #   deploy      environment « production »: waits for your approval (Actions → this run → Review deployments), then
-#               over SSH to the machine: the compose file, that very image, a health check, the old images pruned
-#               (the last 3 kept); its secrets: DEPLOY_SSH_KEY, DEPLOY_SSH_HOST, DEPLOY_SSH_PORT, DEPLOY_SSH_USER,
+#               over SSH to the machine: infra/deploy.sh (as `pnpm deploy:prod`): that very image, on the reverse
+#               proxy's network when infra/.env names it, a health check, the old images pruned (the last 3 kept); its secrets: DEPLOY_SSH_KEY, DEPLOY_SSH_HOST, DEPLOY_SSH_PORT, DEPLOY_SSH_USER,
 #               DEPLOY_SSH_KNOWN_HOSTS, DEPLOY_DIR (MANQUES.md). Missing secrets skip the job, with the reason.
 #   publish     the release page, with what was made
 # Run again by hand for a tag already pushed: Actions → Release → Run workflow (AMO accepts a version only once).
@@ -168,16 +168,11 @@ jobs:
           dir=${DEPLOY_DIR:-slopesque}
           image=ghcr.io/${GITHUB_REPOSITORY,,}-server:$VERSION
           opts=(-i ~/.ssh/deploy -o BatchMode=yes -o StrictHostKeyChecking=yes)
-          scp "${opts[@]}" -P "${SSH_PORT:-22}" infra/docker-compose.prod.yml "$SSH_USER@$SSH_HOST:$dir/infra/docker-compose.prod.yml"
-          ssh "${opts[@]}" -p "${SSH_PORT:-22}" "$SSH_USER@$SSH_HOST" "set -e
-            cd $dir/infra
-            test -f .env || { echo 'Il manque infra/.env sur la machine (MANQUES.md)'; exit 1; }
-            export SERVER_IMAGE=$image
-            docker compose -f docker-compose.prod.yml --env-file .env pull server
-            docker compose -f docker-compose.prod.yml --env-file .env up -d --wait
-            port=\$(grep -E '^PUBLIC_PORT=' .env | cut -d= -f2)
-            curl -fsS http://127.0.0.1:\$port/api/health > /dev/null
-            docker images --format '{{.Repository}}:{{.Tag}}' | grep -E '/slopesque-server:[0-9]' | sort -t: -k2 -V -r | tail -n +4 | xargs -r docker rmi || true"
+          ssh "${opts[@]}" -p "${SSH_PORT:-22}" "$SSH_USER@$SSH_HOST" "mkdir -p $dir/infra"
+          scp "${opts[@]}" -P "${SSH_PORT:-22}" infra/docker-compose.prod.yml infra/docker-compose.proxy.yml infra/deploy.sh infra/caddy.sh "$SSH_USER@$SSH_HOST:$dir/infra/"
+          # the same script as `pnpm deploy:prod`: this version's image pulled, the stack started (on the proxy's network
+          # when infra/.env names it), the health checked, the 3 last images kept
+          ssh "${opts[@]}" -p "${SSH_PORT:-22}" "$SSH_USER@$SSH_HOST" "sh $dir/infra/deploy.sh $image pull"
           rm -f ~/.ssh/deploy
           echo "- 🚀 déployé : $image (santé vérifiée)" >> "$GITHUB_STEP_SUMMARY"
 
@@ -212,7 +207,7 @@ jobs:
               echo
               echo "**Firefox (142+) :** ouvre \`slopesque-firefox-$VERSION.xpi\` dans Firefox, puis **Ajouter** (s'il est dans la release)."
               echo
-              echo "Puis : onglet **Extension** du panneau → **Serveur** → l'adresse du serveur de ton groupe."
+              echo "Au premier lancement, l'extension propose le serveur public de Slopesque. Ton groupe a le sien ? Onglet **Extension** du panneau → **Serveur**."
             else
               echo "Le serveur seulement : l'extension ne change pas."
             fi

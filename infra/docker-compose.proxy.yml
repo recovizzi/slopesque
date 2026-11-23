@@ -1,0 +1,11 @@
+# Added on the machine when the reverse proxy (Caddy) runs in a container: the server joins its Docker network under a
+# fixed container name, the name the proxy's site file uses (slopesque-server:23100). PROXY_NETWORK: in infra/.env,
+# found by infra/caddy.sh. Without it, docker-compose.prod.yml alone (the port on PUBLIC_BIND).
+services:
+  server:
+    container_name: slopesque-server
+    networks: [default, proxy]
+networks:
+  proxy:
+    name: ${PROXY_NETWORK:?PROXY_NETWORK manque dans infra/.env}
+    external: true

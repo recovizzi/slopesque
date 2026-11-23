@@ -30,7 +30,7 @@ pnpm prod:admin <cmd>    # une commande d'admin sur la machine du projet (alias 
 pnpm release [patch|minor|major] [--only extension|server] [--min-extension] [--dry-run]   # une version : tag → CI Release (voir RELEASE.md)
 pnpm admin <cmd>         # console d'admin (dev)
 pnpm db:generate         # nouvelle migration après un changement de src/db/schema.ts
-pnpm deploy:prod         # déploiement (SSH en compte de déploiement ; --init la 1re fois ; voir RELEASE.md)
+pnpm deploy:prod         # déploiement (--check, --init la 1re fois, --dry-run ; dans un terminal ; voir RELEASE.md)
 ```
 
 ## Règles
