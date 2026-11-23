@@ -247,6 +247,10 @@ export class Gateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDis
   holdemAct(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('holdem:act', b, async v => { await this.hub.holdemDo(s, v); return null; }); }
   @SubscribeMessage('holdem:rules')
   holdemRules(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('holdem:rules', b, async v => { await this.hub.holdemSetRules(s, v); return null; }); }
+  @SubscribeMessage('poll:chat-answer')
+  pollChatAnswer(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('poll:chat-answer', b, async v => { await this.hub.chatPollAnswer(s, v.id, v.answer); return null; }); }
+  @SubscribeMessage('poll:chat-end')
+  pollChatEnd(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('poll:chat-end', b, async v => { await this.hub.chatPollEnd(s, v.id); return null; }); }
   @SubscribeMessage('coinche:say')
   coincheSay(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.run('coinche:say', b, async v => { await this.hub.coincheDo(s, { say: (v.kind === 'bid' ? { kind: 'bid', value: v.value ?? 0, suit: v.suit ?? 'S' } : { kind: v.kind }) as Coinche.Say }); return null; }); }
   @SubscribeMessage('coinche:target')

@@ -58,8 +58,10 @@ describe.skipIf(!up)('Texas Hold\'em', () => {
   }, 30_000);
 
   it('robots alone (I left): the game ends by itself, nobody scores', async () => {
+    const last = cards(host, () => true);
     await ask(a, 'table:leave');
-    const over = cards(host, v => !!v.holdem && v.holdem.hand >= 1 && v.holdem.over);
+    const old = (await last).holdem?.startedAt;   // the game that just ended: its last views may still come
+    const over = cards(host, v => !!v.holdem && v.holdem.startedAt !== old && v.holdem.over);   // a new one, not the last views of the old one
     expect((await ask(host, 'cards:deal')).ok).toBe(true);
     const end = await over;
     expect(Object.values(end.paid).every(x => x === null)).toBe(true);

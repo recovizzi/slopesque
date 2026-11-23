@@ -71,7 +71,8 @@ export const roomMembers = pgTable('room_members', {
   lastSeenAt: at('last_seen_at'),
 }, t => [primaryKey({ columns: [t.roomId, t.accountId] })]);
 
-/** The chat (30 days). kind: text, system, media, vote, credit; `data` holds a vote's or a credit change's details. */
+/** The chat (30 days). kind: text, system, media, vote, credit, poll; `data` holds a vote's, a credit change's or a poll
+ *  continued in the chat (its answers: the server shows them only once it is closed). */
 export const messages = pgTable('messages', {
   id: bigserial('id', { mode: 'number' }).primaryKey(),
   roomId: uuid('room_id').notNull().references(() => rooms.id, { onDelete: 'cascade' }),

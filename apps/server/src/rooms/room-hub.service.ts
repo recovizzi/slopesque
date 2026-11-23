@@ -15,7 +15,7 @@ import { accounts, customEmoji, media, messages, palmares, roomMembers, rooms, s
 import { sql } from 'drizzle-orm';
 import { MediaService, type MediaRow } from '../media/media.service.js';
 import { PreviewService } from '../external/preview.service.js';
-import { ChatService } from '../chat/chat.service.js';
+import { ChatService, type StoredChatPoll } from '../chat/chat.service.js';
 import { UserError } from '../errors.js';
 import { ADMIN_CHANNEL, RoomsService, type AdminNotice, type Room } from './rooms.service.js';
 import type { Account } from '../accounts/accounts.service.js';
@@ -24,7 +24,7 @@ interface MemberRt { sockets: Set<string>; awaySince: number | null; grace: Node
 interface PollRt { phase: PollView['phase']; round: number; seconds: number; secret: boolean; poll: PollView['poll']; answers: Record<string, PollAnswer>; host: string | null; deadline: number | null; timer: NodeJS.Timeout | null }
 interface WheelRt { phase: WheelView['phase']; items: WheelView['items']; spin: WheelView['spin']; needle: number; round: number; timer: NodeJS.Timeout | null }
 interface CardsRt { game: CardGameKey; players: number; settings: { tdc: number; tarot: number; holdem: number; coinche: number; bots?: TarotAI.Level; holdemRules?: HoldemRules; coincheTarget?: number }; showTricks: boolean; tarot: Tarot.Tarot | null; holdem: Holdem.Holdem | null; coinche: Coinche.Coinche | null; handDone: number; shownAt: { hand: number; street: string }; settled: boolean; seats: Table.CardSeat[]; tdc: Tdc.Tdc | null; paid: Record<string, string | null>; turnSince: number; robot: NodeJS.Timeout | null; late: NodeJS.Timeout | null; art: Record<string, string> }
-interface RoomRt { cards: CardsRt; room: Room; seq: number; members: Map<string, MemberRt>; vote: { id: number; v: Vote; timer: NodeJS.Timeout } | null; disk: D.DiskState; diskTimer: NodeJS.Timeout | null; poll: PollRt; wheel: WheelRt; fx: Record<string, number[]>; notice: { id: string; title: string; text: string; at: number } | null }
+interface RoomRt { chatPolls: Map<number, { cp: StoredChatPoll; timer: NodeJS.Timeout | null }>; cards: CardsRt; room: Room; seq: number; members: Map<string, MemberRt>; vote: { id: number; v: Vote; timer: NodeJS.Timeout } | null; disk: D.DiskState; diskTimer: NodeJS.Timeout | null; poll: PollRt; wheel: WheelRt; fx: Record<string, number[]>; notice: { id: string; title: string; text: string; at: number } | null }
 const GAME_ROUND: Record<CardGameKey, string> = { tdc: 'la manche du Trou du cul', tarot: 'la donne de Tarot', holdem: 'la partie de Texas Hold\'em', coinche: 'la partie de Coinche' };
 const GAME_NAME: Record<CardGameKey, string> = { tdc: 'Trou du cul', tarot: 'Tarot', holdem: 'Texas Hold\'em', coinche: 'Coinche' };
 export interface SocketData { account: Account; ip: string; roomId: string | null }
@@ -50,10 +50,14 @@ export class RoomHub implements OnModuleInit {
     const disk = { ...D.newDisk({ ...D.DEFAULT_RULES, ...saved.rules }), round: saved.round ?? 1, phase: (saved.round ?? 1) > 1 ? 'writing' as const : 'lobby' as const };
     const ps = (room.rules.poll ?? {}) as { seconds?: number; secret?: boolean; round?: number };
     const ws = (room.rules.wheel ?? {}) as { items?: WheelView['items']; needle?: number; round?: number };
-    const rt: RoomRt = { cards: { game: 'tdc', players: 4, settings: { tdc: 4, tarot: 4, holdem: 6, coinche: 4, ...((room.rules.cards as object | undefined) ?? {}) }, showTricks: true, tarot: null, holdem: null, coinche: null, handDone: 0, shownAt: { hand: 0, street: '' }, settled: false, seats: [], tdc: null, paid: {}, turnSince: 0, robot: null, late: null, art: {} }, room, seq: 0, members: new Map(), vote: null, disk, diskTimer: null,
+    const rt: RoomRt = { chatPolls: new Map(), cards: { game: 'tdc', players: 4, settings: { tdc: 4, tarot: 4, holdem: 6, coinche: 4, ...((room.rules.cards as object | undefined) ?? {}) }, showTricks: true, tarot: null, holdem: null, coinche: null, handDone: 0, shownAt: { hand: 0, street: '' }, settled: false, seats: [], tdc: null, paid: {}, turnSince: 0, robot: null, late: null, art: {} }, room, seq: 0, members: new Map(), vote: null, disk, diskTimer: null,
       poll: { phase: 'writing', round: ps.round ?? 1, seconds: ps.seconds ?? 300, secret: ps.secret ?? false, poll: null, answers: {}, host: null, deadline: null, timer: null },
       wheel: { phase: 'writing', items: ws.items ?? [{ label: '', weight: '' }, { label: '', weight: '' }], spin: null, needle: ws.needle ?? 0, round: ws.round ?? 1, timer: null }, fx: {}, notice: null };
     for (const a of await this.db.select().from(trumpArt).where(eq(trumpArt.roomId, room.id))) rt.cards.art[a.card] = a.mediaId;   // the trumps' pictures
+    // the polls continued in the chat, still open: their clock again (closed at once if their time ran out meanwhile)
+    for (const m of await this.db.select().from(messages).where(and(eq(messages.roomId, room.id), eq(messages.kind, 'poll'), sql`coalesce((${messages.data}->'chatPoll'->>'closed')::boolean, true) = false`))) {
+      this.armChatPoll(rt, m.id, (m.data as { chatPoll: StoredChatPoll }).chatPoll);
+    }
     // a game running when the server stopped: cancelled, back to its first step, said in the chat and in a window
     const live = (room.rules.live ?? {}) as { cards?: string; poll?: string };
     const lost = [saved.guessing ? 'le tour du Demi-disque' : '', live.poll ? 'le sondage' : '', live.cards ? GAME_ROUND[live.cards as CardGameKey] ?? 'la partie de cartes' : ''].filter(Boolean);
@@ -84,12 +88,7 @@ export class RoomHub implements OnModuleInit {
       await this.saveDisk(rt); await this.emitDisk(rt);
       lost.push('le tour du Demi-disque');
     }
-    if (rt.poll.phase === 'open' && to.activity !== 'poll') {
-      if (rt.poll.timer) clearTimeout(rt.poll.timer);
-      rt.poll = { ...rt.poll, phase: 'writing', poll: null, answers: {}, host: null, deadline: null, timer: null };
-      await this.setLive(rt, 'poll', null); await this.emitPoll(rt);
-      lost.push('le sondage');
-    }
+    if (rt.poll.phase === 'open' && to.activity !== 'poll') await this.pollToChat(rt);   // not lost: it goes on in the chat
     if (rt.wheel.phase === 'spinning' && to.activity !== 'wheel') {
       if (rt.wheel.timer) clearTimeout(rt.wheel.timer);
       rt.wheel = { ...rt.wheel, phase: 'writing', spin: null, timer: null };
@@ -619,15 +618,19 @@ export class RoomHub implements OnModuleInit {
     await this.emitPoll(rt);
   }
 
+  /** An answer fits the poll: a choice of its list, a text, a point of its gradient. */
+  private validAnswer(poll: NonNullable<PollRt['poll']>, answer: PollAnswer) {
+    return poll.kind === 'choices' ? typeof answer === 'number' && answer < poll.choices.length
+      : poll.kind === 'free' ? typeof answer === 'string'
+      : Array.isArray(answer) && answer.every(x => Number.isFinite(x) && Math.abs(x) <= 1.01) && (poll.choices.length > 2 || (answer[1] === 0 && answer[0] >= 0));
+  }
+
   async pollAnswer(socket: Socket, answer: PollAnswer) {
     const rt = this.roomOf(socket), me = (socket.data as SocketData).account.id, p = rt.poll;
     if (p.phase !== 'open' || !p.poll) throw new UserError('Le sondage est fermé.');
     if (me !== rt.room.hostId && !(await this.playingIds(rt)).has(me)) throw new UserError('Clique d\'abord « Participer ».');
     if (me in p.answers) throw new UserError('Tu as déjà répondu.');
-    const ok = p.poll.kind === 'choices' ? typeof answer === 'number' && answer < p.poll.choices.length
-      : p.poll.kind === 'free' ? typeof answer === 'string'
-      : Array.isArray(answer) && answer.every(x => Number.isFinite(x) && Math.abs(x) <= 1.01) && (p.poll.choices.length > 2 || (answer[1] === 0 && answer[0] >= 0));
-    if (!ok) throw new UserError('Réponse invalide.');
+    if (!this.validAnswer(p.poll, answer)) throw new UserError('Réponse invalide.');
     p.answers[me] = answer;
     await this.emitPoll(rt);
     const playing = await this.playingIds(rt);
@@ -654,6 +657,67 @@ export class RoomHub implements OnModuleInit {
     rt.poll = { ...rt.poll, phase: 'writing', round: rt.poll.round + 1, poll: null, answers: {}, host: null, deadline: null };
     await this.saveRules(rt, 'poll', { seconds: rt.poll.seconds, secret: rt.poll.secret, round: rt.poll.round });
     await this.emitPoll(rt);
+  }
+
+  // ---------------------------------------------------------------- a poll continued in the chat
+  /** The activity changes while a poll is open: it becomes a message of the chat (its time and its answers kept),
+   *  answered there; the Sondage starts again from a blank page. */
+  private async pollToChat(rt: RoomRt) {
+    const p = rt.poll;
+    if (p.timer) clearTimeout(p.timer);
+    const cp: StoredChatPoll = { poll: p.poll!, round: p.round, host: p.host, secret: p.secret, seconds: p.seconds, deadline: p.deadline ?? Date.now(), answers: { ...p.answers }, closed: false, outcome: null };
+    const [row] = await this.db.insert(messages).values({ roomId: rt.room.id, authorId: p.host, kind: 'poll', text: p.poll!.question, data: { chatPoll: cp } }).returning();
+    this.armChatPoll(rt, row!.id, cp);
+    this.emit(rt, { type: 'message', message: this.chat.view(row!) });
+    rt.poll = { ...p, phase: 'writing', round: p.round + 1, poll: null, answers: {}, host: null, deadline: null, timer: null };
+    await this.saveRules(rt, 'poll', { seconds: rt.poll.seconds, secret: rt.poll.secret, round: rt.poll.round });
+    await this.setLive(rt, 'poll', null);
+    await this.emitPoll(rt);
+    await this.say(rt, null, `Le sondage « ${cp.poll.question} » continue dans le chat : réponds-y directement.`, null, true);
+  }
+
+  private armChatPoll(rt: RoomRt, id: number, cp: StoredChatPoll) {
+    const timer = setTimeout(() => void this.chatPollClose(rt, id), Math.max(0, cp.deadline - Date.now()));
+    rt.chatPolls.set(id, { cp, timer });
+  }
+
+  /** Its message rewritten (its answers kept; everyone sees who answered, not what, until it closes). */
+  private async saveChatPoll(rt: RoomRt, id: number, cp: StoredChatPoll) {
+    const [row] = await this.db.update(messages).set({ data: { chatPoll: cp } }).where(eq(messages.id, id)).returning();
+    if (row) this.emit(rt, { type: 'message-updated', message: this.chat.view(row) });
+  }
+
+  /** An answer in the chat: any player of the room, once; closed when every connected player (but its host) answered. */
+  async chatPollAnswer(socket: Socket, id: number, answer: PollAnswer) {
+    const rt = this.roomOf(socket), me = (socket.data as SocketData).account.id, e = rt.chatPolls.get(id);
+    if (!e || e.cp.closed) throw new UserError('Ce sondage est fermé.');
+    if (me in e.cp.answers) throw new UserError('Tu as déjà répondu.');
+    if (!this.validAnswer(e.cp.poll, answer)) throw new UserError('Réponse invalide.');
+    e.cp.answers[me] = answer;
+    await this.saveChatPoll(rt, id, e.cp);
+    const others = this.connected(rt).filter(x => x !== e.cp.host);
+    if (others.length && others.every(x => x in e.cp.answers)) await this.chatPollClose(rt, id);
+  }
+
+  /** Its host (or the room's) ends it now. */
+  async chatPollEnd(socket: Socket, id: number) {
+    const rt = this.roomOf(socket), me = (socket.data as SocketData).account.id, e = rt.chatPolls.get(id);
+    if (!e || e.cp.closed) throw new UserError('Ce sondage est déjà fermé.');
+    if (me !== e.cp.host && me !== rt.room.hostId) throw new UserError('Seul l\'hôte du sondage peut le terminer.');
+    await this.chatPollClose(rt, id);
+  }
+
+  /** Closed: its outcome counted, shown in its message. */
+  private async chatPollClose(rt: RoomRt, id: number) {
+    const e = rt.chatPolls.get(id);
+    if (!e || e.cp.closed) return;
+    if (e.timer) clearTimeout(e.timer);
+    rt.chatPolls.delete(id);
+    e.cp.closed = true;
+    e.cp.outcome = Poll.outcome({ ...e.cp.poll, answers: e.cp.answers } as Poll.Poll, e.cp.host ?? '');
+    await this.saveChatPoll(rt, id, e.cp);
+    const n = Object.keys(e.cp.answers).length;
+    await this.say(rt, null, `Sondage « ${e.cp.poll.question} » terminé : ${n} réponse${n > 1 ? 's' : ''}, les résultats sont dans le chat.`, null, true);
   }
 
   // ---------------------------------------------------------------- Roulette

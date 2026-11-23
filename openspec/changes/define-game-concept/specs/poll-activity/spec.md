@@ -109,3 +109,19 @@ dans les réponses et en vignette dans les barres de résultats (les lignes sans
 #### Scenario: Un GIF sur un choix
 - **WHEN** l'hôte clique le « + » du choix « Brésil » puis « GIF » et choisit un GIF
 - **THEN** le GIF devient l'image du choix « Brésil » (et passe dans ses GIF récents)
+
+### Requirement: Sondage continué dans le chat
+Quand l'activité change alors qu'un sondage est encore ouvert, il MUST ne pas être perdu : il MUST devenir un
+**message du chat**, avec sa question, ses choix (et leurs images), son temps restant et le nombre de réponses. Tout
+joueur du salon MUST pouvoir y répondre directement dans le chat (choix défini, réponse libre, gradient), une seule
+fois, sans voir les réponses des autres tant qu'il est ouvert. Il MUST se fermer à la fin de son temps, quand tous les
+joueurs connectés (hors son hôte) ont répondu, ou quand son hôte (ou l'hôte du salon) le termine ; ses **résultats**
+MUST alors s'afficher dans le même message, comme dans l'activité (secrets ou nominatifs, selon son réglage). Il MUST
+survivre à un redémarrage du serveur (il est gardé avec le message) ; le Sondage de l'activité, elle, repart d'une
+feuille blanche.
+
+#### Scenario: Changer d'activité pendant un sondage
+- **WHEN** l'hôte passe au Tarot alors que « On mange où ? » est ouvert depuis 2 min sur 5
+- **THEN** le chat montre le sondage, encore ouvert 3 min ; Léa y choisit « Pizza » et valide ; à la fin, les résultats
+  s'affichent dans ce message
+

@@ -50,7 +50,7 @@ export interface Quote { id: number; from: string | null; text: string; kind: st
 export interface MessageView {
   id: number;
   from: string | null;             // null: the room (system)
-  kind: 'text' | 'system' | 'media' | 'vote' | 'credit';
+  kind: 'text' | 'system' | 'media' | 'vote' | 'credit' | 'poll';   // poll: a poll continued in the chat (data.chatPoll)
   text: string;
   at: number;
   reply: Quote | null;
@@ -204,6 +204,12 @@ export type PollAnswer = number | string | [number, number];
 export interface PollPicView { kind: 'image' | 'sticker' | 'gif'; src: string; w: number; h: number }
 /** The Sondage as a player sees it: during the poll, only who answered and my own answer; then everything (names
  *  hidden when secret). */
+/** A poll continued in the chat (the activity changed while it was open): answered there, its results shown there.
+ *  While open, who answered (not what); closed, the answers (anonymous when secret) and the outcome. */
+export interface ChatPollView {
+  poll: NonNullable<PollView['poll']>; round: number; host: string | null; secret: boolean; seconds: number; deadline: number;
+  answered: string[]; closed: boolean; answers: Record<string, PollAnswer> | null; outcome: PollView['outcome'];
+}
 export interface PollView {
   phase: 'writing' | 'open' | 'results';
   round: number;
@@ -292,6 +298,8 @@ export const intents = {
       gif: gifRef.optional() }).nullable()).max(8) }),
   'poll:answer': z.object({ answer: z.union([z.number().int().min(0).max(7), z.string().trim().min(1).max(60), z.tuple([z.number(), z.number()])]) }),
   'poll:end': z.object({}),
+  'poll:chat-answer': z.object({ id: z.number().int().positive(), answer: z.union([z.number().int().min(0).max(7), z.string().trim().min(1).max(60), z.tuple([z.number(), z.number()])]) }),
+  'poll:chat-end': z.object({ id: z.number().int().positive() }),
   'poll:next': z.object({}),
   'wheel:set': z.object({ items: z.array(z.object({ label: z.string().max(40), weight: z.string().max(8) })).max(12) }),
   'wheel:spin': z.object({}),
@@ -366,6 +374,8 @@ export interface IntentResults {
   'poll:publish': null;
   'poll:answer': null;
   'poll:end': null;
+  'poll:chat-answer': null;
+  'poll:chat-end': null;
   'poll:next': null;
   'wheel:set': null;
   'wheel:spin': null;

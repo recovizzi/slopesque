@@ -2,7 +2,7 @@
 // it, hovering shows it), reactions (the bar under a hovered message, my 4 last ones, « + » for the picker, a
 // double click for my quick reaction), links, emoji :codes:, the start of what is kept (30 days).
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { GifRef, MediaView, MemberView, MessageView, Quote, StickerView } from '@slopesque/shared';
+import type { ChatPollView, GifRef, MediaView, MemberView, MessageView, Quote, StickerView } from '@slopesque/shared';
 import { esc } from '../lib/html';
 import { COMMANDS, DEFAULT_REACTIONS, emojiHtml, expandCodes, loadCodes, NAME, placeFloating, suggest, suggestName, SuggestList, useRecent, withCustom, type CustomEmoji, type EmojiPop, type Suggestion } from '../lib/emoji';
 import { GifPop, useGif } from '../lib/gif';
@@ -17,6 +17,7 @@ import { Avatar, colorOf, Html, Icon, Who } from './common';
 import { ActivityPicker } from './ActivityPicker';
 import { CreditBadge, CreditCard, CreditModal } from './Credit';
 import { VoteCard } from './Vote';
+import { PollCard } from './PollCard';
 import type { Vote } from '@slopesque/engines';
 import type { ActivityChoice } from '@slopesque/shared';
 
@@ -388,6 +389,7 @@ export function Chat({ pop }: { pop: EmojiPop | null }) {
       {room.chat.hasMore ? <li className="msg sys chat-start">{loadingMore ? 'Chargement…' : <button className="btn ghost sm" type="button" onClick={more}>Messages plus anciens</button>}</li>
         : room.chat.start && <li className="msg sys chat-start">{room.chat.start === 'begin' ? 'Début de la conversation' : 'Les messages de plus de 30 jours ont été supprimés'}</li>}
       {room.chat.messages.filter(m => !m.scope || m.scope === room.scope).map(m => m.kind === 'vote' && m.data?.vote ? <VoteCard key={m.id} id={m.id} v={m.data.vote as Vote} members={members} me={account.id} />
+        : m.kind === 'poll' && m.data?.chatPoll ? <PollCard key={m.id} id={m.id} cp={m.data.chatPoll as ChatPollView} members={members} me={account.id} />
         : m.kind === 'credit' && m.data ? <li key={m.id} className="msg credit" data-msg={m.id}><CreditCard data={m.data as { by: string; to: string; delta: number }} members={members} me={account.id} /></li>
         : m.from === null || m.kind === 'system'
         ? <li key={m.id} className="msg sys" data-msg={m.id}><Html html={withCustom(esc(m.text), custom)} /></li>

@@ -153,7 +153,8 @@ secrets, du développement testable en local sans aucune clé.
 18. **Revue des specs du 2026-11-20** (décidé avec l'utilisateur) :
     - Images d'un sondage gardées le temps du sondage + 1 h (jamais effacées avant sa fin) ; favoris GIF : 200.
     - « Reprendre un compte » sans Redis : 3 min d'attente après chaque code inconnu (au lieu de 3 essais puis 5 min).
-    - Changer d'activité pendant un tour l'**annule** (dit dans le chat) ; un redémarrage du serveur pendant une partie
+    - Changer d'activité pendant un tour l'**annule** (dit dans le chat) — sauf un sondage ouvert, qui continue dans
+      le chat (2026-11-23 : on y répond, ses résultats s'y affichent) ; un redémarrage du serveur pendant une partie
       l'annule aussi, la remet à son début et le dit dans une fenêtre « Partie perdue ».
     - Roulette : le résultat est celui du serveur ; l'animation part à l'heure du serveur (décalage d'horloge corrigé).
     - Deux joueurs peuvent avoir la même couleur (leur choix) ; un joueur ne quitte jamais un salon (il est absent) :

@@ -2,7 +2,7 @@
 // a reply carries its quote (or says the quoted message is gone); reactions toggle.
 import { Inject, Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { and, desc, eq, gt, inArray, lt, lte, sql } from 'drizzle-orm';
-import { HOUR, LIMITS, RETENTION, type ChatPage, type GifRef, type LinkPreview, type MediaView, type MessageView, type Quote } from '@slopesque/shared';
+import { HOUR, LIMITS, RETENTION, type ChatPage, type ChatPollView, type PollAnswer, type GifRef, type LinkPreview, type MediaView, type MessageView, type Quote } from '@slopesque/shared';
 import { DB, type Db } from '../db/db.module.js';
 import { media, messages, reactions, rooms } from '../db/schema.js';
 import { MediaService, type MediaRow } from '../media/media.service.js';
@@ -74,7 +74,8 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
   }
 
   view(m: Row, reactions: Record<string, string[]> = {}, reply: Quote | null = null, pic?: MediaRow): MessageView {
-    const { preview, ...data } = (m.data ?? {}) as { preview?: LinkPreview };
+    const { preview, ...data } = (m.data ?? {}) as { preview?: LinkPreview; chatPoll?: unknown };
+    if (m.kind === 'poll' && data.chatPoll) data.chatPoll = chatPollView(data.chatPoll as StoredChatPoll);
     // a link's preview older than a week: its text stays, its picture (deleted after a week) no longer shown
     const old = Date.now() - m.createdAt.getTime() > RETENTION.linkPreviews;
     return { id: m.id, from: m.authorId, kind: m.kind as MessageView['kind'], text: m.text, at: m.createdAt.getTime(), reply, reactions,
@@ -140,4 +141,15 @@ function quote(id: number, m: Row | undefined): Quote {
   // a chat image older than a week is gone: the quote says it (« Image expirée »)
   const expired = m.mediaKind === 'image' && Date.now() - m.createdAt.getTime() > RETENTION.chatImages;
   return { id, from: m.authorId, text: m.text.slice(0, 200), kind: m.mediaKind ?? m.kind, gone: false, ...(expired ? { expired: true } : {}) };
+}
+
+/** A poll continued in the chat, as kept in its message (all the answers). */
+export interface StoredChatPoll extends Omit<ChatPollView, 'answered' | 'answers'> { answers: Record<string, PollAnswer> }
+/** What everyone sees of it: while open, who answered (not what); closed, the answers (anonymous when secret). */
+export function chatPollView(p: StoredChatPoll): ChatPollView {
+  const answered = Object.keys(p.answers);
+  if (!p.closed) return { ...p, answered, answers: null, outcome: null };
+  if (!p.secret) return { ...p, answered, answers: p.answers };
+  const alias = new Map(answered.map((id, i) => [id, `r${i}`]));
+  return { ...p, answered: [], answers: Object.fromEntries(Object.entries(p.answers).map(([id, a]) => [alias.get(id)!, a])), outcome: p.outcome ? { ...p.outcome, ranked: p.outcome.ranked.map(r => ({ ...r, ids: [] })) } : null };
 }

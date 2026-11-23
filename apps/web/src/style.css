@@ -1166,3 +1166,12 @@ button.hd-rack-pile:disabled { cursor: default; opacity: .4; }
 .co-trump { align-self: center; display: flex; align-items: center; gap: 6px; padding: 3px 14px; border-radius: 99px; background: #fff7d6; color: #3d2f00; box-shadow: 0 0 0 2px #d4a017; font-size: 13px; }
 .co-trump .co-suit { font-size: 22px; line-height: 1; }
 .co-trump span { color: #6b5a20; }
+
+/* a poll continued in the chat (ui/PollCard.tsx): the Sondage's views, smaller */
+.chat-poll .vote-q small { color: var(--muted); font-weight: 400; }
+.chat-poll-body { min-width: min(100%, 320px); }
+.chat-poll-body .poll-box { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.chat-poll-body svg[data-gradient] { max-width: 100%; height: auto; max-height: 220px; }
+.chat-poll-body .poll-answer, .chat-poll-body .poll-results { margin: 0; padding: 0; }
+.chat-poll-done { margin: 0; color: var(--muted); font-size: 12.5px; }
+.msg.chat-poll .vote-actions { display: flex; gap: 6px; flex-wrap: wrap; }

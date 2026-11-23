@@ -372,6 +372,23 @@ await b.frame.getByRole('button', { name: 'Compris' }).click();
 check(await a.frame.locator('.notice-modal').count() === 0 && (await a.frame.locator('.poll-option').count()) === 0, 'server back: the poll back to its first step, the window read once');
 await say(b.frame, '/activity chat');
 check(await until(async () => (await a.frame.locator('.chat-stage .msg', { hasText: 'merci' }).count()) === 1, 8000), 'server back: the chat kept');
+
+// a poll still open when the activity changes: it goes on in the chat, answered there, its results shown there
+await say(b.frame, '/activity sondage');
+await b.frame.getByRole('button', { name: 'Nouveau sondage' }).click({ timeout: 3000 }).catch(() => {});
+await b.frame.locator('[data-poll="question"]').fill('Film ce soir ?');
+await b.frame.locator('[data-poll="choice"][data-i="0"]').fill('Comédie');
+await b.frame.locator('[data-poll="choice"][data-i="1"]').fill('Horreur');
+await b.frame.getByRole('button', { name: 'Publier le sondage' }).click();
+await a.frame.locator('.poll-option').first().waitFor();
+await say(b.frame, '/activity chat');
+check(await until(async () => (await a.frame.locator('.chat-poll.is-open', { hasText: 'Film ce soir ?' }).count()) === 1, 8000), 'activity changed during a poll: it goes on in the chat');
+await a.frame.locator('.chat-poll .poll-option').first().click();
+await shot(a.page, '18a-poll-in-chat');
+await a.frame.locator('.chat-poll').getByRole('button', { name: 'Valider ma réponse' }).click();
+check(await until(async () => (await a.frame.locator('.chat-poll.is-over').count()) === 1 && (await a.frame.locator('.chat-poll .vote-count').textContent()).includes('Terminé'), 8000),
+  'the poll in the chat: answered there, closed when everyone answered, its results in the message');
+await shot(a.page, '18b-poll-in-chat-results');
 await a.frame.locator('[name="text"]').fill('toujours là ?');
 await a.frame.locator('[name="text"]').press('Enter');
 check(await until(async () => (await b.frame.locator('.msg', { hasText: 'toujours là' }).count()) === 1, 8000), 'after the restart, messages go through again');

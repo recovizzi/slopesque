@@ -5,7 +5,7 @@ import net from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { io, type Socket } from 'socket.io-client';
 import { newCode } from '@slopesque/engines';
-import { PROTOCOL_VERSION, type Ack, type PollView, type RoomState, type WheelView } from '@slopesque/shared';
+import { PROTOCOL_VERSION, type Ack, type ChatPollView, type MessageView, type PollView, type RoomState, type WheelView } from '@slopesque/shared';
 
 const PORT = 23194, URL = `http://localhost:${PORT}`;
 const up = await new Promise<boolean>(res => { const s = net.connect(23432, 'localhost').on('connect', () => { s.destroy(); res(true); }).on('error', () => res(false)); });
@@ -42,6 +42,29 @@ describe.skipIf(!up)('Sondage and Roulette', () => {
     expect(r.outcome?.winner).toBe('0');
     expect(Object.keys(r.answers!).some(k => ids.includes(k))).toBe(false);
     expect(r.outcome?.ranked[0]?.ids).toEqual([]);
+  });
+
+  it('the activity changes while a poll is open: it goes on in the chat, answered there, its results shown there', async () => {
+    await ask(host, 'poll:settings', { secret: false });
+    if ((await ask(host, 'poll:next')).ok === false) { /* already blank */ }
+    expect((await ask(host, 'activity:choose', { choice: { activity: 'poll' } })).ok).toBe(true);
+    expect((await ask(host, 'poll:publish', { kind: 'choices', question: 'On mange où ?', choices: ['Pizza', 'Sushi'], pics: [null, null] })).ok).toBe(true);
+    await ask(a, 'poll:answer', { answer: 1 });   // an answer before the change: kept
+    const moved = new Promise<MessageView>(res => { const h = (e: any) => { if (e.type === 'message' && e.message.kind === 'poll') { b.off('event', h); res(e.message); } }; b.on('event', h); });
+    const blank = next<PollView>(b, 'poll', p => p.phase === 'writing');
+    expect((await ask(host, 'activity:choose', { choice: { activity: 'chat' } })).ok).toBe(true);
+    const m = await moved, cp = m.data!.chatPoll as ChatPollView;
+    expect([cp.poll.question, cp.closed, cp.answered, cp.answers]).toEqual(['On mange où ?', false, [ids[1]], null]);   // who answered, not what
+    expect((await blank).poll).toBeNull();   // the Sondage starts again blank
+    expect((await ask(a, 'poll:chat-answer', { id: m.id, answer: 0 })).ok).toBe(false);   // once
+    expect((await ask(b, 'poll:chat-answer', { id: m.id, answer: 9 })).ok).toBe(false);   // not a choice
+    expect((await ask(a, 'poll:chat-end', { id: m.id })).ok).toBe(false);   // its host only
+    const done = new Promise<ChatPollView>(res => { const h = (e: any) => { const c = e.message?.data?.chatPoll; if (e.type === 'message-updated' && e.message.id === m.id && c?.closed) { host.off('event', h); res(c); } }; host.on('event', h); });
+    expect((await ask(b, 'poll:chat-answer', { id: m.id, answer: 0 })).ok).toBe(true);   // every connected player but its host: closed
+    const r = await done;
+    expect(r.outcome?.ranked.map(x => x.value)).toEqual([1, 1]);
+    expect(r.answers).toEqual({ [ids[1]!]: 1, [ids[2]!]: 0 });
+    expect((await ask(b, 'poll:chat-answer', { id: m.id, answer: 1 })).ok).toBe(false);   // closed
   });
 
   it('the wheel: drawn by the server, the same spin for everyone', async () => {

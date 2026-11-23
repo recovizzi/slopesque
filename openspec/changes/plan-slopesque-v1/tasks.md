@@ -138,6 +138,7 @@ chaque jalon, les tâches sont groupées par partie du monorepo (`[racine]`, `[i
 - [x] 10q.6 [engines] Robots du Tarot : nouvelle IA (mémoire des cartes, camp et partenaire deviné, charger / ne pas charger, sauver le Petit, 21, Excuse, poignée, chelem), niveaux Facile / Moyen / Fort (simulation Monte-Carlo), réglés par l'hôte ; `pnpm tarot:duel` mesure les niveaux
 - [x] 10q.8 [engines+server+web] Texas Hold'em : moteur No Limit (TDA), tournoi, robots Facile / Moyen / Fort (Chen, Monte-Carlo, cote du pot), table, règles illustrées, réglages, classement et palmarès ; `pnpm holdem:duel`
 - [x] 10q.9 [engines+server+web] Coinche : moteur (enchères, coinche, surcoinche, capot, belote, décompte), robots Facile / Moyen / Fort, table, règles illustrées, réglages, classement et palmarès ; `pnpm coinche:duel`
+- [x] 10q.10 [server+web] Un sondage ouvert au changement d'activité continue dans le chat (message `poll`, réponses gardées, minuteur réarmé au chargement), on y répond, ses résultats s'y affichent ; tirage des cartes vérifié (200 000 donnes contre les probabilités exactes)
 - [x] 10q.7 [repo] La machine nommée seulement dans le `.env` de l'utilisateur (aucun alias ni compte dans le dépôt)
 
 ## 11. Jalon 11 : releases et déploiement
