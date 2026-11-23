@@ -97,9 +97,15 @@ export function CardsStage() {
       while (queue.current.length) {
         const el = box.current;
         if (!el || queue.current.length > 6 || document.hidden || A.reduced()) {   // too far behind: the last view
-          const v = queue.current.at(-1)!;
+          const v = queue.current.at(-1)!, was = shown.current.holdem, h = v.holdem;
           hideSel.current.clear(); setPay(false); if (v.coinche?.result) setCountFor(v.coinche.deal);
-          show(v); queue.current = []; break;
+          show(v); queue.current = [];
+          if (h?.street === 'showdown' && h.result && !(was && was.startedAt === h.startedAt && was.hand === h.hand && was.street === 'showdown')) {   // behind: the winning hand all the same
+            const seat = v.seats.find(x => x.user === me)?.id ?? '', name = (id: string) => { const st = v.seats.find(x => x.id === id), u = st?.user ?? st?.credit; return u === me ? 'Toi' : (u && useStore.getState().room?.members.find(m => m.id === u)?.name) || st?.bot || '?'; };
+            const html = HV.handAnnounce(h as unknown as HE.Holdem, h.result.awards[0]!, name, seat, h.result.awards.length);
+            setAnnounce(html); setTimeout(() => setAnnounce(x => (x === html ? '' : x)), HA.T.read);
+          }
+          break;
         }
         const next = queue.current.shift()!, prev = shown.current, step = A.diff(prev, next);
         if (next.game === 'holdem' && next.holdem) { await holdemStep(el, prev, next); continue; }
