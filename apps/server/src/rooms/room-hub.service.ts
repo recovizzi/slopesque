@@ -23,7 +23,7 @@ import type { Account } from '../accounts/accounts.service.js';
 interface MemberRt { sockets: Set<string>; awaySince: number | null; grace: NodeJS.Timeout | null }
 interface PollRt { phase: PollView['phase']; round: number; seconds: number; secret: boolean; poll: PollView['poll']; answers: Record<string, PollAnswer>; host: string | null; deadline: number | null; timer: NodeJS.Timeout | null }
 interface WheelRt { phase: WheelView['phase']; items: WheelView['items']; spin: WheelView['spin']; needle: number; round: number; timer: NodeJS.Timeout | null }
-interface CardsRt { game: CardGameKey; players: number; settings: { tdc: number; tarot: number; holdem: number; coinche: number; bots?: TarotAI.Level; holdemRules?: HoldemRules; coincheTarget?: number }; showTricks: boolean; tarot: Tarot.Tarot | null; holdem: Holdem.Holdem | null; coinche: Coinche.Coinche | null; handDone: number; shownAt: { hand: number; street: string }; settled: boolean; seats: Table.CardSeat[]; tdc: Tdc.Tdc | null; paid: Record<string, string | null>; turnSince: number; robot: NodeJS.Timeout | null; late: NodeJS.Timeout | null; art: Record<string, string> }
+interface CardsRt { game: CardGameKey; players: number; settings: { tdc: number; tarot: number; holdem: number; coinche: number; bots?: TarotAI.Level; holdemRules?: HoldemRules; coincheTarget?: number; dealMode?: 'random' | 'classic' }; showTricks: boolean; tarot: Tarot.Tarot | null; holdem: Holdem.Holdem | null; coinche: Coinche.Coinche | null; handDone: number; shownAt: { hand: number; street: string }; settled: boolean; seats: Table.CardSeat[]; tdc: Tdc.Tdc | null; paid: Record<string, string | null>; turnSince: number; robot: NodeJS.Timeout | null; late: NodeJS.Timeout | null; art: Record<string, string> }
 interface RoomRt { chatPolls: Map<number, { cp: StoredChatPoll; timer: NodeJS.Timeout | null }>; cards: CardsRt; room: Room; seq: number; members: Map<string, MemberRt>; vote: { id: number; v: Vote; timer: NodeJS.Timeout } | null; disk: D.DiskState; diskTimer: NodeJS.Timeout | null; poll: PollRt; wheel: WheelRt; fx: Record<string, number[]>; notice: { id: string; title: string; text: string; at: number } | null }
 const GAME_ROUND: Record<CardGameKey, string> = { tdc: 'la manche du Trou du cul', tarot: 'la donne de Tarot', holdem: 'la partie de Texas Hold\'em', coinche: 'la partie de Coinche' };
 const GAME_NAME: Record<CardGameKey, string> = { tdc: 'Trou du cul', tarot: 'Tarot', holdem: 'Texas Hold\'em', coinche: 'Coinche' };
@@ -961,7 +961,7 @@ export class RoomHub implements OnModuleInit {
     c.game = 'tarot'; c.players = n; c.tdc = null;
     c.seats = c.seats.map(s => ({ ...s, credit: s.user }));
     c.paid = {}; c.settled = false;
-    c.tarot = Tarot.deal(c.seats.map(s => s.id), c.tarot);
+    c.tarot = Tarot.deal(c.seats.map(s => s.id), c.tarot, c.settings.dealMode ?? 'random');
     await this.setLive(rt, 'cards', 'tarot');
     c.turnSince = Date.now();
     const names = [];
@@ -1237,7 +1237,7 @@ export class RoomHub implements OnModuleInit {
     const c = rt.cards, g = c.coinche;
     if (!g || g.over) return;
     c.robot = null;
-    Coinche.dealHand(g);
+    Coinche.dealHand(g, true, c.settings.dealMode ?? 'random');
     c.seats = c.seats.map(s => ({ ...s, credit: s.user }));
     c.settled = false; c.paid = {};
     c.turnSince = Date.now();
@@ -1311,6 +1311,17 @@ export class RoomHub implements OnModuleInit {
     await this.coincheApply(rt, seat, 'say' in d ? d : { play: g.hands[seat]!.find(x => x.id === d.play.id)! }).catch(async () => {
       if (g.phase === 'bid') await this.coincheApply(rt, seat, { say: { kind: 'pass' } }); else await this.coincheApply(rt, seat, { play: Coinche.legal(g, seat)[0]! });
     });
+  }
+
+  /** The host's way of dealing at the Tarot and the Coinche (from the next deal): random, or as at a table. */
+  async cardsDealMode(socket: Socket, mode: 'random' | 'classic') {
+    const rt = this.roomOf(socket);
+    this.hostOnly(rt, socket);
+    rt.cards.settings = { ...rt.cards.settings, dealMode: mode };
+    await this.saveRules(rt, 'cards', rt.cards.settings);
+    await this.say(rt, null, mode === 'classic' ? 'Distribution à l\'ancienne : les plis ramassés, coupés, distribués par paquets (plus de mains déséquilibrées), à partir de la donne suivante.'
+      : 'Distribution aléatoire : le paquet mélangé à chaque donne, à partir de la donne suivante.');
+    await this.emitCards(rt);
   }
 
   /** The host's target (from the next game). */

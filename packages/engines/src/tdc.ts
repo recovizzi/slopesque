@@ -42,6 +42,15 @@ export function deck(): Card[] {
   return RANKS.flatMap(r => SUITS.map(s => ({ id: `${r}${s}`, r, s })));
 }
 
+/** The pack cut, as at a table: a random part (3 cards at least on each side) put under the rest. */
+export function cut<T>(pile: T[]) {
+  const k = 3 + (crypto.getRandomValues(new Uint32Array(1))[0]! % Math.max(1, pile.length - 5));
+  return [...pile.slice(k), ...pile.slice(0, k)];
+}
+/** How the cards are dealt: « random » (the pack fully shuffled each deal) or « classic » (as at a table: the tricks
+ *  gathered in order, cut, dealt by packets — the colours stay grouped, more unbalanced hands). */
+export type DealMode = 'random' | 'classic';
+
 export function shuffle<T>(a: T[]) {
   const r = crypto.getRandomValues(new Uint32Array(a.length));
   for (let i = a.length - 1; i > 0; i--) { const j = r[i]! % (i + 1); [a[i], a[j]] = [a[j]!, a[i]!]; }

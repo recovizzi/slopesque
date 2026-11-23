@@ -20,6 +20,12 @@ await frame.locator('.backdrop').click({ force: true }).catch(() => {});
 
 await frame.locator('[name="text"]').fill('/activity cartes coinche');
 await frame.locator('[name="text"]').press('Enter');
+await frame.locator('.bar .avatar').click();
+await frame.locator('.drawer-right .tab', { hasText: 'Partie' }).click();
+await frame.locator('.drawer-right').getByLabel('Distribution').selectOption('classic');
+check(await until(async () => (await frame.locator('.drawer-right .note', { hasText: 'Comme à table' }).count()) === 1, 4000), 'Partie: the deal « à l\'ancienne » chosen (tricks gathered, cut, dealt by packets)');
+await shot(page, '39-coinche-settings');
+await frame.locator('.drawer-right [aria-label="Fermer"]').click();
 await frame.getByRole('button', { name: 'Prendre une place' }).click();
 await frame.getByRole('button', { name: 'Distribuer' }).click();
 await frame.locator('.cg-hand .in-hand').first().waitFor();

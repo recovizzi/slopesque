@@ -11,6 +11,25 @@ function playOut(t: T.Tarot) {
   }
 }
 
+describe('Tarot: the classic deal', () => {
+  it('the tricks and the écart gathered, cut, dealt 3 by 3 with the chien: every card once', () => {
+    for (const seats of [['a', 'b', 'c', 'd'], ['a', 'b', 'c', 'd', 'e']]) {
+      let t = T.deal(seats, null);
+      for (let n = 0; n < 3; n++) {
+        for (let k = 0; k < 400 && t.phase !== 'done'; k++) {
+          if (t.phase === 'bid') T.bid(t, t.turn!, T.bidsFor(t).includes('garde') && t.turn === t.seats[0] ? 'garde' : 'pass');
+          else if (t.phase === 'call') T.call(t, t.taker!, T.callable(t)[0]!.id);
+          else if (t.phase === 'dog') T.discard(t, T.botDiscard(t));
+          else T.play(t, t.turn!, T.legal(t, t.turn!)[0]!);
+        }
+        t = T.deal(seats, t, 'classic');
+        const ids = [...seats.flatMap(s => t.hands[s]!.map(c => c.id)), ...t.chien.map(c => c.id)];
+        expect([new Set(ids).size, t.chien.length]).toEqual([78, seats.length === 5 ? 3 : 6]);
+      }
+    }
+  });
+});
+
 describe('Tarot', () => {
   it('at 4: 18 cards each and a chien of 6; a seat sees only its hand', () => {
     const t = T.deal(['a', 'b', 'c', 'd'], null);

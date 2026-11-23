@@ -160,7 +160,8 @@ const valuesRow = (ranks: number[], s: Suit, trump: boolean) => `<ol class="co-v
 export function coincheRulesHtml() {
   return rulesFrame('Coinche — les règles', `
     <section><h3>But</h3><p>À 4, en <b>deux équipes de deux</b> : ton partenaire est en face. Chaque donne, une équipe s'engage à faire un nombre de points (le <b>contrat</b>) avec la couleur d'atout de son choix ; l'autre défend. La première équipe à l'objectif (1 000, 1 500 ou 2 000, réglage de l'hôte) gagne la partie. Des robots complètent les places libres.</p>
-      <p class="note">Au classement du salon, chaque donne rapporte à chacun les points de son équipe.</p></section>
+      <p class="note">Au classement du salon, chaque donne rapporte à chacun les points de son équipe.</p>
+      <p class="note">Distribution (réglage de l'hôte) : <b>aléatoire</b>, le paquet mélangé à chaque donne ; ou <b>à l'ancienne</b>, comme à table : les plis ramassés, coupés, distribués 3, 2 puis 3 cartes — plus de mains déséquilibrées.</p></section>
     <section><h3>Les cartes (32) et leurs points</h3><p>À l'<b>atout</b>, de la plus forte à la plus faible :</p>${valuesRow([11, 9, 14, 10, 13, 12, 8, 7], 'H', true)}
       <p>Dans les <b>autres couleurs</b> :</p>${valuesRow([14, 10, 13, 12, 11, 9, 8, 7], 'S', false)}
       <p class="note">Le Valet et le 9 d'atout sont les plus forts. 152 points dans les cartes, plus 10 pour le <b>dernier pli</b> (« dix de der ») : 162. Faire les 8 plis (le capot) compte 250.</p></section>

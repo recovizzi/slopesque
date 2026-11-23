@@ -27,6 +27,8 @@ describe.skipIf(!up)('Coinche', () => {
     expect((await ask(a, 'coinche:target', { target: 1500 })).ok).toBe(false);   // the host only
     expect((await ask(host, 'coinche:target', { target: 1500 })).ok).toBe(true);
     expect((await ask(host, 'coinche:target', { target: 1234 })).ok).toBe(false);
+    expect((await ask(a, 'cards:deal-mode', { mode: 'classic' })).ok).toBe(false);   // the host only
+    expect((await ask(host, 'cards:deal-mode', { mode: 'classic' })).ok).toBe(true);
     expect((await ask(a, 'table:join')).ok).toBe(true);
   }, 20_000);
   afterAll(() => { host?.close(); a?.close(); server?.kill(); });

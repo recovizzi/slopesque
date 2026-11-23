@@ -257,6 +257,23 @@ choisit son contrat en jouant la donne sur des mains tirées au hasard).
 - **WHEN** mon partenaire robot joue en dernier et notre équipe gagne déjà le pli
 - **THEN** il donne son 10 ou son As d'une couleur plutôt qu'un 7
 
+### Requirement: Distribution aléatoire ou à l'ancienne
+Au Tarot et à la Coinche, l'hôte MUST pouvoir choisir dans Partie la **distribution** (à partir de la donne
+suivante) :
+- **Aléatoire** (par défaut) : le paquet entièrement mélangé à chaque donne ; les mains suivent le hasard pur, souvent
+  équilibrées (à la Coinche, une main 3-2-2-1 sort 4 fois sur 10).
+- **À l'ancienne** : comme à table, le paquet n'est pas mélangé : on ramasse les plis de la donne dans l'ordre (ceux
+  des preneurs, puis ceux de la défense ; au Tarot, l'écart à la fin ; si tous ont passé, les mains telles quelles),
+  on **coupe** au hasard, puis on distribue par paquets — à la Coinche 3, 2, puis 3 cartes ; au Tarot 3 par 3, une
+  carte au chien après le premier paquet de chaque tour (jamais la première ni la dernière). Les couleurs restent
+  groupées : plus de mains déséquilibrées (longues couleurs, coupes franches). La première donne d'une partie est
+  mélangée.
+
+#### Scenario: Plus de déséquilibre
+- **WHEN** l'hôte choisit « À l'ancienne » à la Coinche
+- **THEN** à la donne suivante, le paquet est fait des plis ramassés, coupé, distribué 3-2-3 ; les mains d'une
+  couleur longue (5 cartes ou plus) et les chicanes sortent plus souvent qu'en aléatoire
+
 ### Requirement: Pastilles des places
 Autour de la table (tous les jeux de cartes), les pastilles des joueurs MUST avoir **toutes la même taille**, calculée
 sur la place disponible (une rangée jusqu'à 4, deux au-delà), le pseudo coupé (« … ») s'il est trop long, et le

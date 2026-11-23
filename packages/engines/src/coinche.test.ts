@@ -56,6 +56,21 @@ describe('Coinche: the hand', () => {
   });
 });
 
+describe('Coinche: the classic deal', () => {
+  it('the tricks gathered, cut, dealt 3-2-3: every card once, 8 each; after four passes, the hands thrown in', () => {
+    const g = C.newGame(['a', 'b', 'c', 'd']);
+    C.bid(g, 'a', { kind: 'bid', value: 80, suit: 'S' });
+    for (const s of ['b', 'c', 'd']) C.bid(g, s, { kind: 'pass' });
+    for (let k = 0; k < 40 && g.phase === 'play'; k++) C.play(g, g.turn!, C.legal(g, g.turn!)[0]!);
+    C.dealHand(g, true, 'classic');
+    const all = g.seats.flatMap(s => g.hands[s]!.map(x => x.id));
+    expect([g.seats.map(s => g.hands[s]!.length), new Set(all).size]).toEqual([[8, 8, 8, 8], 32]);
+    for (const s of ['a', 'b', 'c', 'd']) C.bid(g, s, { kind: 'pass' });
+    C.dealHand(g, true, 'classic');
+    expect(new Set(g.seats.flatMap(s => g.hands[s]!.map(x => x.id))).size).toBe(32);
+  });
+});
+
 describe('Coinche: the tricks', () => {
   it('follow the suit (no need to beat it)', () => {
     const g = table({}, { b: 'S7 S14 H7' }, [['a', 'S10']], 'b');

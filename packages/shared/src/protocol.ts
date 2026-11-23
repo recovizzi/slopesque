@@ -170,7 +170,7 @@ export type CardGameKey = keyof typeof CARD_PLAYERS;
 export interface CardsView {
   game: CardGameKey;
   players: number;                       // the seats of the table on the table now
-  settings: { tdc: number; tarot: number; holdem: number; coinche: number; bots?: 'facile' | 'moyen' | 'fort'; holdemRules?: HoldemRules; coincheTarget?: number };   // the host's choice for each game, from the next deal; bots: the robots' level
+  settings: { tdc: number; tarot: number; holdem: number; coinche: number; bots?: 'facile' | 'moyen' | 'fort'; holdemRules?: HoldemRules; coincheTarget?: number; dealMode?: 'random' | 'classic' };   // dealMode: Tarot and Coinche   // the host's choice for each game, from the next deal; bots: the robots' level
   showTricks: boolean;                   // Tarot: the won tricks can be looked at
   seats: CardSeatView[];
   tdc: TdcRoundView | null;
@@ -318,6 +318,7 @@ export const intents = {
   'holdem:rules': z.object({ stack: z.number().int().refine(n => (HOLDEM_STACKS as readonly number[]).includes(n)).optional(), every: z.number().int().refine(n => (HOLDEM_EVERY as readonly number[]).includes(n)).optional() }),
   'holdem:end': z.object({}),
   'coinche:say': z.object({ kind: z.enum(['pass', 'bid', 'coinche', 'surcoinche']), value: z.number().int().min(80).max(250).optional(), suit: z.enum(['S', 'H', 'D', 'C']).optional() }),
+  'cards:deal-mode': z.object({ mode: z.enum(['random', 'classic']) }),
   'coinche:target': z.object({ target: z.number().int().refine(n => (COINCHE_TARGETS as readonly number[]).includes(n)) }),
   'tarot:handful': z.object({ level: z.union([z.literal(1), z.literal(2), z.literal(3)]) }),
   'tarot:chelem': z.object({}),
@@ -395,6 +396,7 @@ export interface IntentResults {
   'holdem:end': null;
   'coinche:say': null;
   'coinche:target': null;
+  'cards:deal-mode': null;
   'tarot:handful': null;
   'tarot:chelem': null;
   'tarot:art': null;

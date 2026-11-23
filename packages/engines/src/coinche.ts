@@ -6,7 +6,8 @@
 // the count (trump J 20, 9 14, A 11, 10 10, K 4, Q 3; plain A 11, 10 10, K 4, Q 3, J 2; the last trick 10; all the
 // tricks 250; belote 20 to its team), the contract made with the bid and 82 at least. The robots play on what their
 // seat may see (coincheView).
-import { shuffle, type Suit } from './tdc.js';
+import { cut, shuffle, type DealMode, type Suit } from './tdc.js';
+export type { DealMode } from './tdc.js';
 
 /** A card: r 7 … 14 (11 Valet, 12 Dame, 13 Roi, 14 As). */
 export interface CCard { id: string; r: number; s: Suit }
@@ -101,12 +102,38 @@ export function newGame(seats: string[], target = 1000, now = Date.now()): Coinc
 }
 
 /** The next deal: the dealer moves on (not before the first), 8 cards each, the bidding opens on his left. */
-export function dealHand(c: Coinche, rotate = true) {
+export function dealHand(c: Coinche, rotate = true, mode: DealMode = 'random') {
+  const pile = mode === 'classic' ? gathered(c) : null;
   if (rotate) c.dealer = next(c, c.dealer);
-  const cards = shuffle(deck()), hands: Record<string, CCard[]> = {};
-  for (let k = 0; k < 4; k++) { const s = next(c, c.dealer, k + 1); hands[s] = sortHand(cards.slice(k * 8, k * 8 + 8)); }
+  const hands: Record<string, CCard[]> = Object.fromEntries(c.seats.map(s => [s, [] as CCard[]]));
+  if (pile) {   // as at a table: the pack cut, then 3, 2 and 3 cards to each, from the dealer's left
+    const pack = cut(pile);
+    for (const n of [3, 2, 3]) for (let k = 1; k <= 4; k++) hands[next(c, c.dealer, k)]!.push(...pack.splice(0, n));
+    for (const s of c.seats) sortHand(hands[s]!);
+  } else {
+    const cards = shuffle(deck());
+    for (let k = 0; k < 4; k++) { const s = next(c, c.dealer, k + 1); hands[s] = sortHand(cards.slice(k * 8, k * 8 + 8)); }
+  }
   Object.assign(c, { hands, phase: 'bid', speeches: [], contract: null, passes: 0, coincheBy: null, answer: [], turn: next(c, c.dealer), trick: [], lastTrick: [], lastWinner: null,
     tricks: Object.fromEntries(c.seats.map(s => [s, []])), winners: [], belote: { by: null, said: 0 }, result: null, note: '', deal: c.deal + 1 });
+}
+
+/** The last deal's cards as they lie on the table at its end (« classic » deal): each team's tricks in the order they
+ *  were taken, the bidders' first; after four passes, the hands thrown in as held. Null before the first deal. */
+function gathered(c: Coinche): CCard[] | null {
+  const tricks = allTricks(c);
+  if (tricks.length === 8) {
+    const first = c.contract ? team(c, c.contract.by) : 0;
+    const pile = [first, 1 - first].flatMap(t => tricks.filter(tr => team(c, winner(tr, c.contract!.suit)) === t).flatMap(tr => tr.map(p => p.card)));
+    return pile.length === 32 ? pile : null;
+  }
+  const hands = c.seats.flatMap(s => c.hands?.[s] ?? []);
+  return hands.length === 32 && hands.every(x => x.r > 0) ? hands : null;
+}
+/** The tricks in the order they were taken. */
+export function allTricks(c: Pick<Coinche, 'winners' | 'tricks'>): CPlay[][] {
+  const seen: Record<string, number> = {};
+  return (c.winners ?? []).map(w => { const k = seen[w] ?? 0; seen[w] = k + 1; return c.tricks[w]![k]!; });
 }
 
 /** What a seat may say now: pass, a bid higher than the contract (its values), coinche, surcoinche. */

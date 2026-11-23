@@ -8,7 +8,7 @@
 // tricks set the points to make (56 / 51 / 41 / 36 out of 91); score = (25 + |difference|) × the contract; the taker
 // gets it 3 times, each defender once (or the opposite). Petit au bout, poignées and chelem: the V1 (card-games spec).
 // The robots are simple; they play on what their seat may see (tarotView): at 5 they don't « know » the partner.
-import { shuffle as mix, type Suit } from './tdc.js';
+import { cut, shuffle as mix, type DealMode, type Suit } from './tdc.js';
 
 export type Kind = 'suit' | 'trump' | 'excuse';
 /** A card: a suit card (r 1 … 14: 11 Valet, 12 Cavalier, 13 Dame, 14 Roi), a trump (r 1 … 21) or the Excuse (r 0). */
@@ -89,14 +89,39 @@ const shuffle = mix;
 
 /** A new deal for these 4 or 5 seats; with the same players as before, the seats turn (the first player bids and
  *  leads; next deal, the next one). */
-export function deal(seats: string[], prev: Tarot | null): Tarot {
+export function deal(seats: string[], prev: Tarot | null, mode: DealMode = 'random'): Tarot {
   const same = prev && prev.seats.length === seats.length && prev.seats.every(id => seats.includes(id));
   const order = same ? [...prev!.seats.slice(1), prev!.seats[0]] : seats;
-  const n = order.length === 5 ? 15 : 18, cards = shuffle(deck()), hands: Record<string, TCard[]> = {};
-  order.forEach((id, k) => { hands[id] = sortHand(cards.slice(k * n, k * n + n)); });
-  return { seats: order, hands, chien: cards.slice(order.length * n), phase: 'bid', bids: {}, turn: order[0], taker: null, bid: null, called: null, partner: null, revealed: false, ecart: [], trick: [], lastTrick: [],
+  const n = order.length === 5 ? 15 : 18, hands: Record<string, TCard[]> = Object.fromEntries(order.map(id => [id, [] as TCard[]]));
+  const pile = mode === 'classic' && prev ? gathered(prev) : null;
+  let chien: TCard[] = [];
+  if (pile) {   // as at a table: the pack cut, 3 by 3 from the first player; a card to the chien after the first packet of each round
+    const pack = cut(pile), size = 78 - order.length * n;
+    for (let round = 0; round < n / 3; round++) order.forEach((id, k) => {
+      hands[id]!.push(...pack.splice(0, 3));
+      if (k === 0 && chien.length < size) chien.push(pack.shift()!);
+    });
+    for (const id of order) sortHand(hands[id]!);
+  } else {
+    const cards = shuffle(deck());
+    order.forEach((id, k) => { hands[id] = sortHand(cards.slice(k * n, k * n + n)); });
+    chien = cards.slice(order.length * n);
+  }
+  return { seats: order, hands, chien, phase: 'bid', bids: {}, turn: order[0], taker: null, bid: null, called: null, partner: null, revealed: false, ecart: [], trick: [], lastTrick: [],
     won: Object.fromEntries(order.map(id => [id, []])), tricks: Object.fromEntries(order.map(id => [id, []])), lastWinner: null, deal: (prev?.deal ?? 0) + 1, startedAt: prev?.startedAt ?? Date.now(), result: null, note: '',
     shownChien: [], chelem: null, handfuls: {}, started: [], winners: [] };
+}
+
+/** The last deal's cards as they lie at its end (« classic » deal): the tricks in the order they were taken (the taker's
+ *  side first), then the écart; if all passed, the hands as held and the chien. Null if it can't be told. */
+function gathered(t: Tarot): TCard[] | null {
+  let pile: TCard[];
+  if (t.winners.length) {
+    const seen: Record<string, number> = {}, tricks = t.winners.map(w => { const k = seen[w] ?? 0; seen[w] = k + 1; return { w, tr: t.tricks[w]![k]! }; });
+    const side = (x: string) => x === t.taker || (!!t.partner && x === t.partner);
+    pile = [...tricks.filter(x => side(x.w)), ...tricks.filter(x => !side(x.w))].flatMap(x => x.tr.map(p => p.card)).concat(t.ecart.length ? t.ecart : t.chien);
+  } else pile = [...t.seats.flatMap(s => t.hands[s] ?? []), ...t.chien];
+  return pile.length === 78 && new Set(pile.map(c => c.id)).size === 78 ? pile : null;
 }
 
 const best = (t: Tarot) => Object.values(t.bids).reduce((m, b) => (ORDER.indexOf(b) > ORDER.indexOf(m) ? b : m), 'pass' as Bid);

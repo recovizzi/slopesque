@@ -192,7 +192,8 @@ export function tarotRulesHtml(art: Record<string, string>) {
     <section><h3>Les 78 cartes</h3><p>4 couleurs de 14 cartes (1 à 10, Valet, Cavalier, Dame, Roi), <b>21 atouts</b> — numérotés dans les coins, sur leur image — et l'<b>Excuse</b> (★).</p>
       ${cards([S('H', 1), S('S', 10), S('D', 11), S('C', 12), S('H', 13), S('S', 14)], art)}
       ${cards([T(2), T(7), T(13), T(19)], art)}
-      <p>Les trois <b>bouts</b> : le Petit (1), le 21 et l'Excuse.</p>${cards([T(1), T(21), T(0)], art)}</section>
+      <p>Les trois <b>bouts</b> : le Petit (1), le 21 et l'Excuse.</p>${cards([T(1), T(21), T(0)], art)}
+      <p class="note">Distribution (réglage de l'hôte) : <b>aléatoire</b>, le paquet mélangé à chaque donne ; ou <b>à l'ancienne</b>, comme à table : les plis et l'écart ramassés, coupés, distribués 3 par 3 avec le chien carte par carte — plus de mains déséquilibrées.</p></section>
     <section><h3>Valeur des cartes (91 en tout)</h3><ol class="rule-roles">
       <li><span>Bout ou Roi</span><span></span><b>4,5</b></li><li><span>Dame</span><span></span><b>3,5</b></li><li><span>Cavalier</span><span></span><b>2,5</b></li>
       <li><span>Valet</span><span></span><b>1,5</b></li><li><span>Autre carte</span><span></span><b>0,5</b></li></ol></section>

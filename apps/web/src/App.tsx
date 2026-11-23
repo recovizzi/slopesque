@@ -300,6 +300,7 @@ function GameInfo() {
       ...(game === 'holdem' ? [['Tapis de départ', `Les mêmes jetons pour tous ; blindes de départ 10 / 20`, `${hr.stack} jetons`] as Row,
         ['Montée des blindes', '20 / 40, 30 / 60, 40 / 80… : la partie finit plus vite', fmtEvery(hr.every)] as Row,
         ['Niveau des robots', 'Ils jouent avec ce que leur place voit', LEVEL_NAMES[room.cards.settings.bots ?? 'moyen']] as Row] : []),
+      ...(game === 'coinche' || game === 'tarot' ? [['Distribution', 'À l\'ancienne : plis ramassés, coupe, par paquets (plus de mains déséquilibrées)', (room.cards.settings.dealMode ?? 'random') === 'classic' ? 'À l\'ancienne' : 'Aléatoire'] as Row] : []),
       ...(game === 'coinche' ? [['Objectif', 'La première équipe à ce score gagne la partie', `${room.cards.settings.coincheTarget ?? 1000} points`] as Row,
         ['Niveau des robots', 'Ils jouent avec ce que leur place voit', LEVEL_NAMES[room.cards.settings.bots ?? 'moyen']] as Row] : [])]
     : act === 'lowtide' ? [['Adresse', 'La page du jeu, vérifiée par l\'hôte', <span className="ro-url">{Object.values(room.web)[0] ?? '—'}</span>]] : [];
@@ -343,6 +344,9 @@ function CardsSettings() {
   const game = cardGameOf(room.activity), players = room.cards.settings[game] ?? CARD_PLAYERS[game][0];
   const hr = room.cards.settings.holdemRules ?? { stack: 1000, every: 10 }, holdemOn = room.cards.game === 'holdem' && !!room.cards.holdem && !room.cards.holdem.over;
   const ack = (r: { ok: boolean; error?: string }) => { if (!r.ok) set({ note: r.error ?? '' }); };
+  const dealMode = <><label className="field"><span>Distribution</span><select value={room.cards.settings.dealMode ?? 'random'} disabled={!host} onChange={async e => ack(await request('cards:deal-mode', { mode: e.target.value as 'random' }))}>
+      <option value="random">Aléatoire — le paquet mélangé à chaque donne</option><option value="classic">À l'ancienne — plis ramassés, coupe, distribution par paquets</option></select></label>
+    <p className="note">{(room.cards.settings.dealMode ?? 'random') === 'classic' ? 'Comme à table : les couleurs restent groupées, plus de mains déséquilibrées (longues couleurs, coupes franches). La première donne d\'une partie est mélangée.' : 'Le hasard pur : des mains souvent équilibrées. « À l\'ancienne » en donne de plus déséquilibrées.'} À partir de la donne suivante.</p></>;
   const bots = <><label className="field"><span>Niveau des robots</span><select value={room.cards.settings.bots ?? 'moyen'} disabled={!host} onChange={async e => ack(await request('cards:bots', { level: e.target.value as 'moyen' }))}>
       {game === 'coinche' ? <><option value="facile">Facile — des fautes, des enchères au hasard</option><option value="moyen">Moyen — compte les cartes, charge son partenaire</option><option value="fort">Fort — simule la fin de la donne</option></>
         : game === 'holdem' ? <><option value="facile">Facile — suit trop, se trompe, bluffe peu</option><option value="moyen">Moyen — ses chances contre la cote du pot</option><option value="fort">Fort — devine les mains d'après les mises, bluffe mieux</option></>
@@ -357,13 +361,13 @@ function CardsSettings() {
     <p className="note">À partir de la {game === 'holdem' ? 'partie' : 'donne'} suivante. Prends une place à la table avant la donne ; des robots complètent les places libres. Les règles se lisent avec le bouton « i » de la table.</p>
     {game === 'tarot' && <><label className="check"><input type="checkbox" checked={room.cards.showTricks} disabled={!host} onChange={e => void request('tarot:tricks', { show: e.target.checked })} /><span>Revoir les plis gagnés (au survol)</span></label>
       <p className="note">Décoché, la partie est plus dure : personne ne peut revoir les plis déjà joués.</p>
-      {bots}
+      {dealMode}{bots}
       <TrumpArt edit={host} /></>}
     {game === 'coinche' && <>
       <label className="field"><span>Objectif</span><select value={room.cards.settings.coincheTarget ?? 1000} disabled={!host} onChange={async e => ack(await request('coinche:target', { target: Number(e.target.value) }))}>
         {COINCHE_TARGETS.map(n => <option key={n} value={n}>{n} points{n === 1000 ? ' (une partie courte)' : ''}</option>)}</select></label>
       <p className="note">La première équipe à ce score gagne, après la donne qui l'y amène. À partir de la partie suivante.</p>
-      {bots}</>}
+      {dealMode}{bots}</>}
     {game === 'holdem' && <>
       <label className="field"><span>Tapis de départ</span><select value={hr.stack} disabled={!host} onChange={async e => ack(await request('holdem:rules', { stack: Number(e.target.value) }))}>
         {HOLDEM_STACKS.map(n => <option key={n} value={n}>{n} jetons ({n / 20} grosses blindes)</option>)}</select></label>
