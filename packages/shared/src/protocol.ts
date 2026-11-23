@@ -185,7 +185,7 @@ export interface EffectView { id: string; kind: EffectKind; by: string; target: 
 export const scoreKey = (a: { activity: string; cardGame?: string }) => (a.activity === 'disk' ? 'disk' : a.activity === 'cards' ? cardGameOf(a) : null);
 export const SCORE_NAMES: Record<string, string> = { disk: 'du Demi-disque', tdc: 'du Trou du cul', tarot: 'du Tarot', holdem: 'du Texas Hold\'em' };
 /** One player's result in one round (the Palmarès, kept with the room). */
-export interface PalmaresEvent { at: number; game: 'disk' | 'tdc' | 'tarot' | 'holdem'; id: string; name: string; hue: number; won: boolean; pts?: number; perfect?: boolean; role?: string; taker?: boolean; partner?: boolean; place?: number; of?: number }
+export interface PalmaresEvent { at: number; game: 'disk' | 'tdc' | 'tarot' | 'holdem'; id: string; name: string; hue: number; won: boolean; pts?: number; perfect?: boolean; role?: string; taker?: boolean; partner?: boolean; place?: number; of?: number; humans?: number }
 
 export type PollAnswer = number | string | [number, number];
 export interface PollPicView { kind: 'image' | 'sticker' | 'gif'; src: string; w: number; h: number }

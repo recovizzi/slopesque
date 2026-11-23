@@ -5,8 +5,8 @@
 // the amounts; the showdown (hands turned over, the winning 5 cards brought forward, the pots and who took them), the
 // game's places; the rules with the hands and the chips drawn. The flights (cards from the deck, chips to the pot and
 // to the winner) are ui/holdem-anim.ts.
-import { backSvg, faceSvg, head, rulesFrame, seatLabel } from './cards';
-import { avatarHtml, esc } from './html';
+import { backSvg, faceSvg, head, kickBtn, rulesFrame, seatCols, seatLabel, seatPill } from './cards';
+import { esc } from './html';
 import { icon } from './icons';
 import { Holdem as H } from '@slopesque/engines';
 
@@ -100,8 +100,9 @@ function leaders(c: HoldemCtx) {
   const live = c.g.seats.filter(s => !c.g.out.includes(s)), banks = live.map(s => bank(c, s) + (c.g.bets[s] ?? 0)), top = Math.max(...banks);
   return banks.every(b => b === top) ? new Set<string>() : new Set(live.filter((_, i) => banks[i] === top));
 }
-const CROWN = '<svg class="hd-crown" viewBox="0 0 24 16" role="img" aria-label="La plus grosse banque"><path d="M2 14.5 3.6 4l5.2 4.8L12 1.6l3.2 7.2L20.4 4 22 14.5Z" fill="#ffd34d" stroke="#8a6500" stroke-width="1.3" stroke-linejoin="round"/><circle cx="12" cy="1.8" r="1.4" fill="#ffd34d" stroke="#8a6500" stroke-width=".8"/></svg>';
-const bigChip = (amount: number) => chipSvg([...H.CHIP_VALUES].reverse().find(v => v <= Math.max(5, amount)) ?? 5);
+const CROWN = '<span class="seat-crown" role="img" aria-label="La plus grosse banque" title="La plus grosse banque">👑</span>';
+/** A pile of chips (a bank), seen from the side: black, red, white. */
+const PILE_ICON = `<svg class="pile-ico" viewBox="0 0 16 16" aria-hidden="true">${[['#232323', 11.4], ['#c62828', 7.9], ['#f4f1e8', 4.4]].map(([c, y]) => `<rect x="1.5" y="${y}" width="13" height="3.3" rx="1.6" fill="${c}" stroke="#0009" stroke-width=".6"/><path d="M5 ${Number(y) + .5}v2.3M8 ${Number(y) + .5}v2.3M11 ${Number(y) + .5}v2.3" stroke="${c === '#f4f1e8' ? '#2f6fd0' : '#fff'}" stroke-width=".9"/>`).join('')}</svg>`;
 
 function holeCards(c: HoldemCtx, s: string, big: boolean) {
   const { g } = c, best = g.result?.best[s]?.five ?? [], sd = showdown(g) && !c.pay;
@@ -122,21 +123,20 @@ const actBadge = (g: G, s: string) => {
   return `<span class="hd-act act-${a.act}">${a.act === 'raise' || a.act === 'bet' ? `${ACTS[a.act]}${a.act === 'raise' ? ' à' : ''} ${fmt(a.amount)}` : ACTS[a.act]}</span>`;
 };
 /** A bet on the felt, under its player: its chips and the amount (mine: with the chips I clicked, not yet bet). */
-function betSpot(s: string, amount: number, pending: number[] = [], cls = '', act = '') {
+function betSpot(s: string, amount: number, pending: number[] = [], cls = '', act = '', cards = '') {
   const more = pending.reduce((x, y) => x + y, 0);
-  return `<div class="hd-bet-spot ${cls}" data-bet="${esc(s)}">${chipsHtml(amount)}${more ? chipsHtml(more, 'is-pending', grouped(pending)) : ''}${amount + more ? `<b>${amount ? fmt(amount) : ''}${more ? `<i>${amount ? ' + ' : '+ '}${fmt(more)}</i>` : ''}</b>` : ''}${act}</div>`;
+  return `<div class="hd-bet-spot ${cls}" data-bet="${esc(s)}">${cards}${chipsHtml(amount)}${more ? chipsHtml(more, 'is-pending', grouped(pending)) : ''}${amount + more ? `<b>${amount ? fmt(amount) : ''}${more ? `<i>${amount ? ' + ' : '+ '}${fmt(more)}</i>` : ''}</b>` : ''}${act}</div>`;
 }
 
 function seatHtml(c: HoldemCtx, s: string, crown: Set<string>) {
-  const { g } = c, p = c.who(s), out = g.out.includes(s), folded = g.folded.includes(s), won = c.pay ? 0 : g.result?.won[s] ?? 0;
-  const late = c.late?.seat === s ? c.late : null, b = bank(c, s);
-  const state = out ? `<span class="seat-state">éliminé · ${placeName(g.places[s] ?? 0)}</span>` : won ? `<span class="hd-won">+${fmt(won)}</span>` : '';
+  const { g } = c, p = c.who(s), out = g.out.includes(s), folded = g.folded.includes(s), won = c.pay ? 0 : g.result?.won[s] ?? 0, b = bank(c, s);
+  const sub = out ? `<span class="seat-state">éliminé · ${placeName(g.places[s] ?? 0)}</span>`
+    : `<span class="hd-stack" title="Sa banque">${PILE_ICON}${fmt(b)}</span>${won ? `<span class="hd-won">+${fmt(won)}</span>` : ''}`;
+  const side = badges(g, s), cards = out || !g.inHand.includes(s) || folded ? '' : `<span class="hd-holes">${holeCards(c, s, false)}</span>`;   // his cards in front of him, on the felt
   const hand = g.result?.best[s] && showdown(g) && !c.pay ? `<small class="hd-hand">${esc(g.result.best[s]!.name)}</small>` : '';
-  return `<li class="hd-place"><div class="cg-seat hd-seat ${g.turn === s ? 'is-turn' : ''} ${late ? 'is-late' : ''} ${folded || out ? 'is-out' : ''} ${won ? 'is-winner' : ''}" data-seat="${esc(s)}" style="--c:${p.color}">
-    ${crown.has(s) ? CROWN : ''}${avatarHtml(p.name, p.color, p.bot ? null : p.photo)}<span class="hd-who">${seatLabel(p)}<span class="hd-stack" title="Sa banque">${bigChip(b)}${fmt(b)}</span></span>${badges(g, s)}
-    ${out || !g.inHand.includes(s) || folded ? '' : `<span class="hd-holes">${holeCards(c, s, false)}</span>`}${state}${hand}
-    ${late ? (late.vote ? '<span class="seat-state">vote en cours</span>' : `<button class="seat-kick" type="button" data-action="kick" title="Son tour dure depuis ${late.secs} s : proposer au vote qu'un robot joue à sa place (comme /kick)">${icon.kick}Exclure ?</button>`) : ''}</div>
-    ${betSpot(s, g.bets[s] ?? 0, [], '', out || won ? '' : actBadge(g, s))}</li>`;
+  return `<li class="hd-place">${seatPill(p, { tag: 'div', cls: `hd-seat ${g.turn === s ? 'is-turn' : ''} ${c.late?.seat === s ? 'is-late' : ''} ${folded || out ? 'is-out' : ''} ${won ? 'is-winner' : ''}`,
+    attrs: `data-seat="${esc(s)}"`, mark: crown.has(s) ? CROWN : '', sub, side, extra: kickBtn(c.late?.seat === s ? c.late : null) })}
+    ${betSpot(s, g.bets[s] ?? 0, [], '', out ? '' : hand || (won ? '' : actBadge(g, s)), cards)}</li>`;
 }
 
 function boardHtml(c: HoldemCtx) {
@@ -237,7 +237,7 @@ export function holdemTableHtml(c: HoldemCtx) {
       : c.seats.free ? `${c.seats.free} place${c.seats.free > 1 ? 's' : ''} en jeu ${c.seats.free > 1 ? 'sont jouées' : 'est jouée'} par un robot : prends-en une, avec ses jetons ; ta place à la fin de la partie te donne des points.` : `Toutes les places en jeu sont prises par des joueurs.`}</p>
     <button class="btn cg-join ${c.seats.full ? 'is-error' : ''}" type="button" data-action="table-join">${icon.users}${c.seats.full ? `Table complète (${c.seats.total}/${c.seats.total})` : c.seats.mine ? 'Reprendre ma place' : c.seats.free ? `Prendre la place de ${esc(c.seats.takes)}` : 'Rejoindre la partie'}</button></div>`;
   return `<div class="cards-game holdem ${g.turn === me ? 'my-turn' : ''}">${head('Texas Hold\'em', info)}
-    <div class="cg-table hd-table ${g.seats.length - (myself ? 1 : 0) >= 4 ? 'is-many' : ''}"><ul class="cg-seats">${others}</ul><div class="cg-pile hd-middle" data-pile>${middle}</div>${g.over || g.revealed ? `<p class="cg-pile-text">${text}</p>` : ''}
+    <div class="cg-table hd-table ${g.seats.length - (myself ? 1 : 0) >= 4 ? 'is-many' : ''}"><ul class="cg-seats" style="--cols:${seatCols(g.seats.length - (g.seats.includes(me) ? 1 : 0))}">${others}</ul><div class="cg-pile hd-middle" data-pile>${middle}</div>${g.over || g.revealed ? `<p class="cg-pile-text">${text}</p>` : ''}
       ${myself && !g.over ? betSpot(me, g.bets[me] ?? 0, myTurn ? c.pending : [], 'mine', g.result ? '' : actBadge(g, me)) : ''}</div>
     <div class="cg-me">${meBox}${myself ? `${!g.over ? actionsHtml(c) : ''}<button class="btn ghost sm cg-leave" type="button" data-action="table-leave" title="Un robot joue ta place à ta place, avec tes jetons ; ta place à la fin reste la tienne">Quitter la table</button>` : watch}</div></div>`;
 }
@@ -246,6 +246,18 @@ export function holdemTableHtml(c: HoldemCtx) {
 export const levelAnnounce = (sb: number, bb: number) => `<div class="announce-box take"><small>Nouveau niveau</small>Les blindes montent<span class="ann-bid">${fmt(sb)} / ${fmt(bb)}</span></div>`;
 export const outAnnounce = (name: string, place: number, me = false) => `<div class="announce-box take"><small>${me ? 'Tu es éliminé' : 'Éliminé'}</small>${esc(name)}<span class="ann-bid">${placeName(place)} place</span></div>`;
 export const winAnnounce = (name: string, me = false) => `<div class="announce-box take"><small>Fin de la partie</small>${me ? 'Tu gagnes' : `${esc(name)} gagne`}<span class="ann-bid">1re place</span></div>`;
+/** The hand's end, in the foreground: for a pot, who takes it and how much, his two cards + the board, the 5 cards of
+ *  his hand brought forward, its name (also when the others folded). */
+export function handAnnounce(g: G, award: { amount: number; winners: string[]; hand: string; side: number }, name: (s: string) => string, me: string, pots: number) {
+  const r = g.result!, five = new Set(r.best[award.winners[0]!]?.five ?? []), cls = (cd: C) => (five.has(cd.id) ? 'is-best' : 'is-dim');
+  const card = (cd: C) => `<span class="hd-win-card ${cls(cd)}">${holdemCard(cd)}</span>`;
+  const who = award.winners.length > 1 ? `${award.winners.map(w => esc(name(w))).join(' et ')} se partagent` : award.winners[0] === me ? 'Tu remportes' : `${esc(name(award.winners[0]!))} remporte`;
+  return `<div class="announce-box hd-win"><small>${r.uncontested ? 'Les autres se sont couchés' : pots > 1 ? (award.side ? `Pot annexe${pots > 2 ? ` ${award.side}` : ''}` : 'Pot principal') : 'Abattage'}</small>
+    <span>${who} <b class="hd-win-amount">${fmt(award.amount)}</b></span>
+    <div class="hd-win-cards">${award.winners.map(w => `<span class="hd-win-hole">${(g.holes[w] ?? []).filter(cd => cd.r).map(card).join('')}</span>`).join('<span class="hd-win-plus">·</span>')}
+      ${g.board.length ? `<span class="hd-win-plus">+</span><span class="hd-win-board">${g.board.map(card).join('')}</span>` : '<small class="hd-win-none">avant le flop : ses deux cartes seules</small>'}</div>
+    <span class="ann-bid">${esc(award.hand || r.best[award.winners[0]!]?.name || '')}</span></div>`;
+}
 export const allinAnnounce = (name: string, amount: number) => `<div class="announce-box take hd-allin"><small>Tapis</small>${esc(name)}<span class="ann-bid">${fmt(amount)}</span></div>`;
 
 // ------------------------------------------------------------------ the rules
@@ -266,7 +278,7 @@ const HANDS: [string, string, string][] = [
 
 export function holdemRulesHtml() {
   return rulesFrame('Texas Hold\'em — les règles', `
-    <section><h3>But</h3><p>Une partie se joue en <b>tournoi</b> avec des <b>jetons fictifs</b> : tout le monde commence avec la même banque ; qui n'a plus de jetons est <b>éliminé</b> ; le dernier à en avoir gagne. Chaque main, on remporte le <b>pot</b> (toutes les mises) avec la meilleure combinaison, ou parce que les autres se sont couchés. La plus grosse banque porte la couronne <span class="hd-rule-crown">${CROWN}</span>.</p>
+    <section><h3>But</h3><p>Une partie se joue en <b>tournoi</b> avec des <b>jetons fictifs</b> : tout le monde commence avec la même banque ; qui n'a plus de jetons est <b>éliminé</b> ; le dernier à en avoir gagne. Chaque main, on remporte le <b>pot</b> (toutes les mises) avec la meilleure combinaison, ou parce que les autres se sont couchés. La plus grosse banque porte la couronne 👑.</p>
       <p class="note">Points au classement selon la place : 10 × (nombre de places − sa place). À 6 : le 1er +50, le 2e +40… le dernier 0. Les robots ne marquent pas.</p></section>
     <section><h3>Les jetons</h3><p class="hd-rule-chips">${H.CHIP_VALUES.map(v => `<span>${chipSvg(v)}<b>${fmt(v)}</b><small>${CHIP_LOOK[v]!.name}</small></span>`).join('')}</p>
       <p>À ton tour, <b>clique tes jetons</b> : ils s'ajoutent à ta mise, sous ta place ; « Relancer à … » la confirme, « Effacer » la reprend. Ou utilise les boutons : se coucher, parler, suivre, tapis, et les raccourcis min, ½ pot, pot.</p>
@@ -292,5 +304,5 @@ export function holdemRulesHtml() {
       <p class="note">Exemple : Léa (300 jetons) fait tapis, Malo et Zoé suivent puis misent encore 400 chacun. Pot principal 900 (Léa, Malo, Zoé), pot annexe 800 (Malo et Zoé). Léa a la meilleure main, Malo la deuxième : 900 pour Léa, 800 pour Malo.</p>
       <p>Quand plus personne ne peut miser, les mains sont retournées et les cartes communes sortent jusqu'au bout.</p></section>
     <section><h3>Les blindes montent</h3><p>Selon le réglage de l'hôte, toutes les 5, 10 ou 20 mains : 10 / 20, 20 / 40, 30 / 60, 40 / 80, 60 / 120, 80 / 160, 100 / 200, 150 / 300… La partie accélère, les banques courtes doivent oser.</p>
-      <p class="note">Une mise que personne n'a suivie revient à son joueur. Un joueur seul en jeu gagne sans montrer ses cartes.</p></section>`);
+      <p class="note">Une mise que personne n'a suivie revient à son joueur. Un joueur seul en jeu (les autres couchés) gagne sans abattage ; ses cartes sont quand même montrées à la fin, pour comprendre la main.</p></section>`);
 }

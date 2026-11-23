@@ -285,11 +285,12 @@ function burnAndDeal(g: Holdem, n: number) {
   for (let k = 0; k < n; k++) g.board.push(g.deck.pop()!);
 }
 
-/** The others folded: the pot to the last one, without showing. */
+/** The others folded: the pot to the last one, no showdown (his cards shown at the end all the same). */
 function win(g: Holdem, s: string) {
   const amount = pot(g);
   g.stacks[s]! += amount;
-  g.result = { awards: [{ amount, winners: [s], hand: '', side: 0 }], uncontested: true, shown: [], best: {}, won: { [s]: amount }, out: [] };
+  const e = evaluate([...g.holes[s]!, ...g.board]);   // shown anyway, to understand the hand's end (not a TDA rule)
+  g.result = { awards: [{ amount, winners: [s], hand: handName(e), side: 0 }], uncontested: true, shown: [s], best: { [s]: { cat: e.cat, name: handName(e), five: e.five.map(c => c.id) } }, won: { [s]: amount }, out: [] };
   endHand(g);
 }
 
@@ -357,6 +358,6 @@ export const placePoints = (place: number, seats: number) => 10 * (seats - place
 /** What a seat sees: its own cards, the others' only once turned over (showdown, or nobody can bet any more). */
 export function holdemView(g: Holdem, seat: string | null): Holdem {
   const back = (cs: HCard[]) => cs.map((_, i) => ({ id: `x${i}`, r: 0, s: 'S' as Suit }));
-  const open = (s: string) => s === seat || (g.revealed && active(g, s));
+  const open = (s: string) => s === seat || (g.revealed && active(g, s)) || (g.street === 'showdown' && !!g.result?.shown.includes(s));
   return { ...g, deck: [], holes: Object.fromEntries(Object.entries(g.holes).map(([s, h]) => [s, open(s) ? h : back(h)])) };
 }

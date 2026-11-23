@@ -64,6 +64,20 @@ export interface TableCtx {
 export const seatLabel = (p: { name: string; bot?: boolean }, cls = 'seat-name') => `<span class="${cls}">${esc(p.name)}</span>${p.bot
   ? `<span class="seat-bot" title="Un robot joue cette place">${icon.bot}</span>` : ''}`;
 
+/** A seat's pill, the same size for all (the row shares the table's width): the avatar, the name (cut with « … » if
+ *  needed) and a line under it, what goes on the right; a robot's icon on the top-right corner, a mark (the Hold'em's
+ *  crown) on the top-left one. `extra`: a button that floats under the pill (« Exclure ? »). */
+export function seatPill(p: { name: string; color: string; bot?: boolean; photo?: string | null }, o: { tag?: 'li' | 'div'; cls?: string; attrs?: string; sub?: string; side?: string; mark?: string; extra?: string } = {}) {
+  const tag = o.tag ?? 'li';
+  return `<${tag} class="cg-seat ${o.cls ?? ''}" ${o.attrs ?? ''} style="--c:${p.color}">${o.mark ?? ''}${p.bot ? `<span class="seat-bot corner" title="Un robot joue cette place">${icon.bot}</span>` : ''}
+    ${avatarHtml(p.name, p.color, p.bot ? null : p.photo)}<span class="seat-main"><span class="seat-name" title="${esc(p.name)}">${esc(p.name)}</span>${o.sub ? `<span class="seat-sub">${o.sub}</span>` : ''}</span>${o.side ? `<span class="seat-side">${o.side}</span>` : ''}${o.extra ?? ''}</${tag}>`;
+}
+/** How many pills per row: all on one row up to 4, else two rows. */
+export const seatCols = (n: number) => (n <= 4 ? Math.max(1, n) : Math.ceil(n / 2));
+const kickBtn = (late: { secs: number; vote: boolean } | null) => (!late ? '' : late.vote ? '<span class="seat-kick is-vote">vote en cours</span>'
+  : `<button class="seat-kick" type="button" data-action="kick" title="Son tour dure depuis ${late.secs} s : proposer au vote qu'un robot joue à sa place (comme /kick)">${icon.kick}Exclure ?</button>`);
+export { kickBtn };
+
 export const handAngle = (i: number, n: number, step: number) => ((i - (n - 1) / 2) * step).toFixed(4);
 export const head = (title: string, info: string) => `<header class="cg-head"><b class="cg-title">${esc(title)}</b><span class="cg-info">${info}</span><span class="spacer"></span>
   <span class="cg-clock" data-card-clock title="Temps de jeu"></span>
@@ -83,11 +97,9 @@ export function tableHtml(c: TableCtx) {
   const seats = t.seats.filter(id => id !== me).map(id => {
     const p = c.who(id), n = t.hands[id].length, place = t.out.indexOf(id);
     const late = c.late?.seat === id ? c.late : null;
-    return `<li class="cg-seat ${t.turn === id ? 'is-turn' : ''} ${late ? 'is-late' : ''} ${t.passed.includes(id) ? 'has-passed' : ''} ${place >= 0 ? 'is-out' : ''}" data-seat="${esc(id)}" style="--c:${p.color}">
-      ${avatarHtml(p.name, p.color, p.bot ? null : p.photo)}${seatLabel(p)}${roleBadge(t.roles[id])}
-      <span class="seat-cards" title="${n} cartes">${backSvg('mini')}<b>${n}</b></span>
-      ${place >= 0 ? `<span class="seat-state">sorti ${place + 1}${place ? 'e' : 'er'}</span>` : t.passed.includes(id) ? '<span class="seat-state">passe</span>' : ''}
-      ${late ? (late.vote ? '<span class="seat-state">vote en cours</span>' : `<button class="seat-kick" type="button" data-action="kick" title="Son tour dure depuis ${late.secs} s : proposer au vote qu'un robot joue à sa place (comme /kick)">${icon.kick}Exclure ?</button>`) : ''}</li>`;
+    return seatPill(p, { cls: `${t.turn === id ? 'is-turn' : ''} ${late ? 'is-late' : ''} ${t.passed.includes(id) ? 'has-passed' : ''} ${place >= 0 ? 'is-out' : ''}`, attrs: `data-seat="${esc(id)}"`,
+      sub: `${roleBadge(t.roles[id])}${place >= 0 ? `<span class="seat-state">sorti ${place + 1}${place ? 'e' : 'er'}</span>` : t.passed.includes(id) ? '<span class="seat-state">passe</span>' : ''}`,
+      side: `<span class="seat-cards" title="${n} cartes">${backSvg('mini')}<b>${n}</b></span>`, extra: kickBtn(late) });
   }).join('');
   const closed = !t.trick.length && t.lastTrick.length > 0;   // the trick just taken stays shown, dimmed
   const plays = (closed ? t.lastTrick : t.trick).slice(-3).map((p, k, arr) => `<div class="play ${k === arr.length - 1 ? 'is-last' : ''} ${closed ? 'is-closed' : ''}" style="--t:${tilt(p.cards)}deg">
@@ -111,7 +123,7 @@ export function tableHtml(c: TableCtx) {
     <header class="cg-head"><b class="cg-title">Trou du cul</b><span class="cg-info">${info}</span><span class="spacer"></span>
       <span class="cg-clock" data-card-clock title="Temps de jeu">${c.elapsed}</span>
       <button class="icon-btn sm cg-rules" type="button" data-action="cards-rules" title="Règles du jeu" aria-label="Règles du jeu">${icon.info}</button></header>
-    <div class="cg-table"><ul class="cg-seats">${seats}</ul>
+    <div class="cg-table"><ul class="cg-seats" style="--cols:${seatCols(t.seats.filter(id => id !== me).length)}">${seats}</ul>
       <div class="cg-pile" data-pile>${plays}${results}</div><p class="cg-pile-text">${pileText}</p></div>
     <div class="cg-me">${hand}</div></div>`;
 }

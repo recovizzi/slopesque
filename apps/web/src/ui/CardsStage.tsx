@@ -58,12 +58,12 @@ export function CardsStage() {
       paid: id => { const u = c.paid[id]; const m = u ? members.get(u) : undefined; return u ? { name: u === me ? 'Toi' : m?.name ?? '?', color: m ? hueColor(m.hue) : '#8a8f98', bot: false } : { ...who(id), bot: true }; } } })
     : (() => {   // before the first deal: the seats (take one, or leave it), the host deals when the players are seated
       const n = c.settings[want as 'tdc'] ?? 2, seats = c.game === want ? c.seats : [];
-      const chips = seats.map(st => { const w = who(st.id); return `<li class="cg-seat" style="--c:${w.color}">${K.seatLabel(w)}</li>`; }).join('');
+      const chips = seats.map(st => K.seatPill(who(st.id))).join('');
       const freeSeats = seats.filter(st => !st.user).length;
       const mine = !!mySeat;
       return `<div class="cards-game"><header class="cg-head"><b class="cg-title">${want === 'tarot' ? `Tarot à ${c.settings.tarot}` : want === 'holdem' ? `Texas Hold'em à ${n}` : `Trou du cul à ${c.settings.tdc}`}</b>
         <span class="cg-info">Avant la donne : prends une place ; des robots jouent les places libres.</span></header>
-        <div class="cg-table"><ul class="cg-seats">${chips}</ul><div class="cg-pile">${room.hostId === me ? `<button class="btn big" type="button" data-action="cards-deal">Distribuer</button>` : ''}</div>
+        <div class="cg-table"><ul class="cg-seats" style="--cols:${K.seatCols(seats.length)}">${chips}</ul><div class="cg-pile">${room.hostId === me ? `<button class="btn big" type="button" data-action="cards-deal">Distribuer</button>` : ''}</div>
           <p class="cg-pile-text">${seats.length - freeSeats} joueur${seats.length - freeSeats > 1 ? 's' : ''} sur ${n} place${n > 1 ? 's' : ''}${room.hostId === me ? '' : ' · l\'hôte distribue'}</p></div>
         <div class="cg-me"><div class="cg-watch">${mine ? '<button class="btn ghost" type="button" data-action="table-leave">Quitter la table</button>'
           : `<button class="btn cg-join ${full ? 'is-error' : ''}" type="button" data-action="table-join">${freeSeats || !seats.length ? 'Prendre une place' : `Table complète (${n}/${n})`}</button>`}</div></div></div>`;
@@ -114,7 +114,11 @@ export function CardsStage() {
   async function holdemStep(el: HTMLElement, prev: CardsView, next: CardsView) {
     const a = prev.game === 'holdem' ? prev.holdem : null, b = next.holdem!, seat = next.seats.find(x => x.user === me)?.id ?? '';
     const name = (id: string) => { const s = next.seats.find(x => x.id === id), u = s?.user ?? s?.credit; return u === me ? 'Toi' : (u && useStore.getState().room?.members.find(m => m.id === u)?.name) || s?.bot || '?'; };
-    const p = HA.plan(el, a, b, seat, () => setPay(false));
+    const reveal = async () => {   // the hand's end in the foreground: each pot, its winner's cards + the board, the hand's name
+      for (const aw of b.result?.awards ?? []) { setAnnounce(HV.handAnnounce(b as unknown as HE.Holdem, aw, name, seat, b.result!.awards.length)); await A.wait(HA.T.read); }
+      setAnnounce('');
+    };
+    const p = HA.plan(el, a, b, seat, () => setPay(false), reveal);
     hideSel.current = new Set(p?.hide ?? []);
     setPay(!!p && !!a && a.hand === b.hand && a.street !== 'showdown' && b.street === 'showdown' && !!b.result);
     show(next);

@@ -185,7 +185,11 @@ secrets, du développement testable en local sans aucune clé.
     20 mains ou jamais. Les mains s'enchaînent seules ; la partie s'arrête d'elle-même quand plus aucune place en jeu
     n'appartient à un joueur. Robots : formule de Chen avant le flop, Monte-Carlo contre la cote du pot ensuite,
     niveaux communs aux cartes (`cards:bots`, qui remplace `tarot:bots`) ; mesurés par `pnpm holdem:duel` : Moyen
-    bat Facile (+32 grosses blindes / 100 mains), Fort bat Moyen (+10 à +13) et Facile (+77). *Rejeté* : points selon les jetons gagnés à
+    bat Facile (+32 grosses blindes / 100 mains), Fort bat Moyen (+10 à +13) et Facile (+77).
+    Retours du 2026-11-23 : la main du gagnant montrée aussi quand les autres se couchent (écart assumé à la règle TDA,
+    pour comprendre la fin d'une main), un panneau au premier plan nomme le coup gagnant ; pastilles de même taille
+    sur tous les jeux de cartes, robot et couronne (👑) sur les angles ; au palmarès, une partie sans autre joueur ne
+    compte que dans les parties jouées. *Rejeté* : points selon les jetons gagnés à
     chaque main (un tapis de départ différent changerait l'échelle du classement) ; Limit (moins joué).
 
 ## Risks / Trade-offs

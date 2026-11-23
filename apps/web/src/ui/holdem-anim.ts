@@ -12,7 +12,7 @@ import { painted, wait } from './cards-anim';
 type View = NonNullable<CardsView['holdem']>;
 const centre = (r: DOMRect) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
 /** The durations (ms), the server's pauses are made of the same. */
-export const T = { chips: 380, gather: 450, card: 380, cardGap: 260, deal: 90, turn: 450, read: 2400, readFold: 900, pay: 650 };
+export const T = { chips: 380, gather: 450, card: 380, cardGap: 260, deal: 90, turn: 450, read: 2800, pay: 650 };
 
 /** A piece flies over everything from a place to another: its HTML (cards at the target's size, chips at theirs). */
 export function fly(html: string, from: DOMRect, to: DOMRect, o: { ms?: number; delay?: number; cls?: string; sized?: boolean } = {}): Promise<void> {
@@ -44,9 +44,9 @@ export interface Plan {
 }
 const q = (s: string) => CSS.escape(s);
 
-/** What flies between two views of the same game (nothing when it changed). `paying`: the showdown arrives — the pot
- *  goes to the winners after the reading time, `payDone` then shows the banks with it. */
-export function plan(box: HTMLElement, a: View | null, b: View, me: string, payDone: () => void): Plan | null {
+/** What flies between two views of the same game (nothing when it changed). The hand's end: `reveal` shows the winning
+ *  hands (the reading time), then the pot goes to the winners, `payDone` shows the banks with it. */
+export function plan(box: HTMLElement, a: View | null, b: View, me: string, payDone: () => void, reveal: () => Promise<void>): Plan | null {
   if (!a || a.startedAt !== b.startedAt) return null;
   const was = places(box, a), hide: string[] = [], steps: ((box: HTMLElement, show: (sel: string) => void) => Promise<void>)[] = [];
   const sameHand = a.hand === b.hand;
@@ -95,7 +95,7 @@ export function plan(box: HTMLElement, a: View | null, b: View, me: string, payD
     if (b.street === 'showdown' && b.result && a.street !== 'showdown') {
       const r = b.result;
       steps.push(async () => {
-        await wait(r.uncontested ? T.readFold : T.read);
+        await reveal();
         const pot = at('[data-pot]');
         if (pot) await Promise.all(r.awards.flatMap(aw => aw.winners.map(w => {
           const to = at(seatSel(w));

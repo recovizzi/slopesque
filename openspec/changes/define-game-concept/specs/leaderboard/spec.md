@@ -17,6 +17,15 @@ gardé à part des scores du classement : « Réinitialiser la partie » et la p
 l'effacer. Le nom et la couleur du joueur au moment du résultat MUST être gardés (le palmarès montre les plus
 récents). Les robots MUST ne pas y figurer.
 
+Un résultat MUST ne compter dans les mesures de niveau (victoires, taux, perfects, places, prises, marques…) que si
+**au moins deux joueurs** y ont pris part : on ne progresse pas en jouant seul contre des robots. Il MUST compter
+quand même dans les **parties jouées** (une mesure de répétition, pas de niveau). Les taux se calculent sur les
+parties qui comptent.
+
+#### Scenario: Seul contre les robots
+- **WHEN** je gagne une partie de Texas Hold'em seul avec trois robots
+- **THEN** mes parties jouées augmentent de 1, mes victoires et mon taux de victoires ne changent pas
+
 #### Scenario: Après une réinitialisation
 - **WHEN** l'hôte réinitialise la partie (les scores repartent de zéro)
 - **THEN** le palmarès est inchangé
@@ -30,7 +39,9 @@ Le palmarès MUST se filtrer par **jeu** (Tous les jeux, Demi-disque, Trou du cu
 - Trou du cul (une manche gagnée = Président) : présidences, % de présidences, le moins souvent Trou du cul, manches
   jouées ;
 - Tarot (une donne gagnée = dans le camp gagnant) : donnes gagnées, % de donnes gagnées, prises, % de prises réussies,
-  meilleure marque, donnes jouées.
+  meilleure marque, donnes jouées ;
+- Texas Hold'em (une partie gagnée = 1re place) : parties gagnées, % de parties gagnées, place moyenne, parties dans
+  la première moitié, parties jouées.
 Pour un taux, les joueurs avec trop peu de parties (moins de 5 ; moins de 3 prises pour les prises) MUST apparaître à
 part, non classés. Il MUST s'ouvrir sur le jeu en cours (le Demi-disque, le jeu de cartes choisi), sinon sur tous les
 jeux. Chaque ligne MUST montrer la mesure choisie en grand et son contexte en petit (gagnées / jouées, taux, mesures du

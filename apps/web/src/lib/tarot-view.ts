@@ -3,8 +3,8 @@
 // on a white box whose free corner is rounded and whose edges flow into the border with small concave curves — the
 // suit cards (as the Trou du cul's), the table (bids, chien and écart, tricks, the count) and the rules.
 // See openspec/changes/define-game-concept/specs/card-games/spec.md.
-import { backSvg, faceSvg, handAngle, head, rulesFrame, SUIT_EMOJI } from './cards';
-import { avatarHtml, esc } from './html';
+import { backSvg, faceSvg, handAngle, head, rulesFrame, seatCols, seatPill, SUIT_EMOJI } from './cards';
+import { esc } from './html';
 import { Tarot as TA } from '@slopesque/engines';
 
 const { BIDS, bidsFor, callable, canDiscard, cardName, ecartSize, handfulLevels, handfulSizes, HANDFUL_NAMES, HANDFUL_POINTS, isBout, legal, NEED, suitLabel } = TA;
@@ -47,7 +47,7 @@ export interface TarotCtx {
   host: boolean;
   selected: Set<string>;
   fan: { r: number; step: number };
-  who: (id: string) => { name: string; color: string; photo?: string | null };
+  who: (id: string) => { name: string; color: string; bot?: boolean; photo?: string | null };
   art: Record<string, string>;
   showLast: boolean;                  // the trick just completed, still on the table (before it goes to its winner)
   wonView: string | null;             // the player whose won tricks are shown (hovering his chip, or my pile)
@@ -105,12 +105,10 @@ export function tarotTableHtml(c: TarotCtx) {
   const seats = t.seats.filter(id => id !== me).map(id => {
     const p = c.who(id), b = t.bids[id];
     const won = t.tricks[id]?.length ?? 0;
-    return `<li class="cg-seat ${t.turn === id ? 'is-turn' : ''} ${c.wonView === id ? 'is-viewed' : ''}" data-seat="${esc(id)}" ${won && c.showTricks ? `data-won="${esc(id)}"` : ''} style="--c:${p.color}">
-      ${avatarHtml(p.name, p.color, p.photo)}<span class="seat-name">${esc(p.name)}</span>
-      ${t.taker === id ? `<span class="role-badge role-president">Preneur · ${BIDS[t.bid!].name}</span>` : t.revealed && t.partner === id ? '<span class="role-badge role-vice">Partenaire</span>' : t.phase === 'bid' && b ? `<span class="role-badge">${bidName(b)}</span>` : ''}
-      ${t.handfuls?.[id] ? `<span class="role-badge role-handful" title="${t.handfuls[id].cards.length} atouts montrés">${HANDFUL_NAMES[t.handfuls[id].level - 1]}</span>` : ''}${t.chelem === id ? '<span class="role-badge role-chelem">Chelem annoncé</span>' : ''}
-      <span class="seat-cards" title="${t.hands[id].length} cartes"><b>${t.hands[id].length}</b></span>
-      ${won ? `<span class="seat-tricks" title="${c.showTricks ? 'Survoler pour voir ses plis' : 'Plis cachés : l\'hôte a désactivé leur consultation'}">${won} pli${won > 1 ? 's' : ''}</span>` : ''}</li>`;
+    return seatPill(p, { cls: `${t.turn === id ? 'is-turn' : ''} ${c.wonView === id ? 'is-viewed' : ''}`, attrs: `data-seat="${esc(id)}" ${won && c.showTricks ? `data-won="${esc(id)}"` : ''}`,
+      sub: `${t.taker === id ? `<span class="role-badge role-president" title="Preneur : ${BIDS[t.bid!].name}">Preneur</span>` : t.revealed && t.partner === id ? '<span class="role-badge role-vice">Partenaire</span>' : t.phase === 'bid' && b ? `<span class="role-badge">${bidName(b)}</span>` : ''}
+        ${t.handfuls?.[id] ? `<span class="role-badge role-handful" title="${t.handfuls[id].cards.length} atouts montrés">${HANDFUL_NAMES[t.handfuls[id].level - 1]}</span>` : ''}${t.chelem === id ? '<span class="role-badge role-chelem">Chelem annoncé</span>' : ''}${won ? `<span class="seat-tricks" title="${c.showTricks ? 'Survoler pour voir ses plis' : 'Plis cachés : l\'hôte a désactivé leur consultation'}">${won} pli${won > 1 ? 's' : ''}</span>` : ''}`,
+      side: `<span class="seat-cards" title="${t.hands[id].length} cartes"><b>${t.hands[id].length}</b></span>` });
   }).join('');
 
   // the middle of the table: the chien shown, the trick (the last one, dimmed, until the next card), or the count
@@ -178,7 +176,7 @@ export function tarotTableHtml(c: TarotCtx) {
       <button class="btn" type="button" data-action="cards-play" ${t.phase === 'play' && myTurn && sel ? '' : 'disabled'}>Jouer</button></div>`;
   }
   return `<div class="cards-game tarot ${active || (myTurn && (t.phase === 'bid' || t.phase === 'call')) ? 'my-turn' : ''}">${head(`Tarot à ${t.seats.length}`, info)}
-    <div class="cg-table"><ul class="cg-seats">${seats}</ul><div class="cg-pile" data-pile>${pile}</div><p class="cg-pile-text">${text}</p>
+    <div class="cg-table"><ul class="cg-seats" style="--cols:${seatCols(t.seats.filter(id => id !== me).length)}">${seats}</ul><div class="cg-pile" data-pile>${pile}</div><p class="cg-pile-text">${text}</p>
       ${c.playing ? myPile(t, me, c.showTricks) : ''}${c.showTricks && c.wonView && t.tricks[c.wonView]?.length ? tricksView(t, c.wonView, name(c.wonView), c.art) : ''}</div>
     <div class="cg-me">${hand}${c.playing ? '<button class="btn ghost sm cg-leave" type="button" data-action="table-leave" title="Un robot joue ta main à ta place">Quitter la table</button>' : ''}${actions}</div></div>`;
 }

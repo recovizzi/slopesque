@@ -17,6 +17,7 @@ export interface StatEvent {
   partner?: boolean;     // tarot at 5: was called
   place?: number;        // holdem: the place in the game…
   of?: number;           // … of so many seats
+  humans?: number;       // the players who took part (robots aside): under 2, it counts only as played
 }
 
 export const GAMES: Record<StatGame | 'all', { name: string; unit: string; win: string }> = {
@@ -30,6 +31,7 @@ export const GAMES: Record<StatGame | 'all', { name: string; unit: string; win: 
 export interface Row {
   id: string; name: string; color: string;
   played: number; won: number; rate: number;
+  counted: number;                             // played with at least one other player: what the level measures count
   perfects: number; avg: number;               // disk
   trous: number;                               // tdc
   takes: number; takesWon: number; takeRate: number; best: number;   // tarot
@@ -60,12 +62,14 @@ export function rows(events: StatEvent[], f: Filter, now = Date.now()): Row[] {
     if (e.at < since || (f.game !== 'all' && e.game !== f.game)) continue;
     let r = map.get(e.id);
     if (!r) {
-      r = { id: e.id, name: e.name, color: e.color, played: 0, won: 0, rate: 0, perfects: 0, avg: 0, trous: 0, takes: 0, takesWon: 0, takeRate: 0, best: -Infinity, avgPlace: 0, podiums: 0, games: 0, last: 0, gameSet: new Set(), ptsSum: 0, ptsN: 0, placeSum: 0, placeN: 0 };
+      r = { id: e.id, name: e.name, color: e.color, played: 0, counted: 0, won: 0, rate: 0, perfects: 0, avg: 0, trous: 0, takes: 0, takesWon: 0, takeRate: 0, best: -Infinity, avgPlace: 0, podiums: 0, games: 0, last: 0, gameSet: new Set(), ptsSum: 0, ptsN: 0, placeSum: 0, placeN: 0 };
       map.set(e.id, r);
     }
     if (e.at >= r.last) { r.last = e.at; r.name = e.name; r.color = e.color; }   // the latest name and colour
-    r.played++; if (e.won) r.won++;
+    r.played++;
     r.gameSet.add(e.game);
+    if ((e.humans ?? 2) < 2) continue;   // alone with robots: played, not a level (openspec: leaderboard)
+    r.counted++; if (e.won) r.won++;
     if (e.perfect) r.perfects++;
     if (e.role === 'tdc') r.trous++;
     if (e.taker) { r.takes++; if (e.won) r.takesWon++; }
@@ -73,15 +77,15 @@ export function rows(events: StatEvent[], f: Filter, now = Date.now()): Row[] {
     if (e.pts !== undefined) { r.ptsSum += e.pts; r.ptsN++; if (e.game === 'tarot') r.best = Math.max(r.best, e.pts); }
   }
   return [...map.values()].map(({ gameSet, ptsSum, ptsN, placeSum, placeN, ...r }) => ({
-    ...r, avgPlace: placeN ? placeSum / placeN : 0, rate: r.played ? r.won / r.played : 0, avg: ptsN ? ptsSum / ptsN : 0, takeRate: r.takes ? r.takesWon / r.takes : 0,
-    trous: r.played ? r.trous / r.played : 0, best: r.best === -Infinity ? 0 : r.best, games: gameSet.size,
+    ...r, avgPlace: placeN ? placeSum / placeN : 0, rate: r.counted ? r.won / r.counted : 0, avg: ptsN ? ptsSum / ptsN : 0, takeRate: r.takes ? r.takesWon / r.takes : 0,
+    trous: r.counted ? r.trous / r.counted : 0, best: r.best === -Infinity ? 0 : r.best, games: gameSet.size,
   }));
 }
 
 /** Sorted by the measure; for a rate, the players with fewer than MIN_PLAYED games come after, not ranked. */
 export function ranked(list: Row[], f: Filter) {
   const s = SORTS[f.game].find(x => x.key === f.sort) ?? SORTS[f.game][0];
-  const enough = (r: Row) => !s.rate || (s.key === 'takeRate' ? r.takes >= 3 : r.played >= MIN_PLAYED);
+  const enough = (r: Row) => !s.rate || (s.key === 'takeRate' ? r.takes >= 3 : r.counted >= MIN_PLAYED);
   const by = (a: Row, b: Row) => ((s.asc ? 1 : -1) * ((a[s.key] as number) - (b[s.key] as number))) || b.played - a.played || a.name.localeCompare(b.name);
   return { sort: s, ranked: list.filter(enough).sort(by), unranked: list.filter(r => !enough(r)).sort((a, b) => b.played - a.played) };
 }
@@ -94,7 +98,7 @@ const ago = (t: number, now: number) => { const d = Math.floor((now - t) / 86_40
 function cells(r: Row, f: Filter, key: keyof Row): { main: string; sub: string[] } {
   const main = key === 'rate' || key === 'takeRate' ? pct(r[key] as number) : key === 'trous' ? pct(r.trous) : key === 'avg' || key === 'avgPlace' ? num(Math.round((r[key] as number) * 10) / 10) : key === 'best' ? (r.best > 0 ? `+${r.best}` : String(r.best)) : String(r[key]);
   const unit = GAMES[f.game].unit;
-  const sub = [`${r.won} / ${r.played} ${unit}`, pct(r.rate)];
+  const sub = [`${r.won} / ${r.counted} ${unit}${r.played > r.counted ? ` (+${r.played - r.counted} sans autre joueur)` : ''}`, pct(r.rate)];
   if (f.game === 'all') sub.push(`${r.games} jeu${r.games > 1 ? 'x' : ''}`);
   if (f.game === 'disk') sub.push(`${r.perfects} perfect${r.perfects > 1 ? 's' : ''}`, `moy. ${num(Math.round(r.avg * 10) / 10)}`);
   if (f.game === 'tdc') sub.push(`Trou du cul ${pct(r.trous)}`);

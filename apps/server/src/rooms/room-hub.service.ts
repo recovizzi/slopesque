@@ -513,7 +513,8 @@ export class RoomHub implements OnModuleInit {
     rt.disk = r.state;
     for (const [id, pts] of Object.entries(r.points)) if (pts) await this.addScore(rt, id, 'disk', pts);
     const top = Math.max(0, ...Object.values(r.state.results).map(x => x.points));
-    for (const [id, x] of Object.entries(r.state.results)) await this.db.insert(palmares).values({ roomId: rt.room.id, game: 'disk', data: { account: id, won: x.points === top && top > 0, pts: x.points, perfect: x.perfect } });
+    const humans = Object.keys(r.state.results).length;   // the Palmarès: a round counts for the level with 2 players or more
+    for (const [id, x] of Object.entries(r.state.results)) await this.db.insert(palmares).values({ roomId: rt.room.id, game: 'disk', data: { account: id, won: x.points === top && top > 0, pts: x.points, perfect: x.perfect, humans } });
     await this.saveDisk(rt);
     await this.emitDisk(rt);
     for (const id of Object.keys(r.points)) await this.emitMember(rt, id);
@@ -802,12 +803,13 @@ export class RoomHub implements OnModuleInit {
     if (t.turn === null && !c.settled) {   // the round's end, counted once
       c.settled = true;
       await this.setLive(rt, 'cards', null);
+      const humans = c.seats.filter(s => s.credit).length;   // the Palmarès: alone with robots, it counts only as played
       for (const sid of t.out) {
         const uid = c.seats.find(s => s.id === sid)?.credit ?? null, role = t.roles[sid]!;
         c.paid[sid] = uid;
         if (!uid) continue;
         await this.addScore(rt, uid, 'tdc', Tdc.ROLES[role].points);
-        await this.db.insert(palmares).values({ roomId: rt.room.id, game: 'tdc', data: { account: uid, won: role === 'president', role } });
+        await this.db.insert(palmares).values({ roomId: rt.room.id, game: 'tdc', data: { account: uid, won: role === 'president', role, humans } });
         await this.emitMember(rt, uid);
       }
       const parts = [];
@@ -939,13 +941,13 @@ export class RoomHub implements OnModuleInit {
     if (t.phase === 'done' && t.result && !c.settled) {
       c.settled = true;
       await this.setLive(rt, 'cards', null);
-      const r = t.result;
+      const r = t.result, humans = c.seats.filter(s => s.credit).length;
       for (const sid of t.seats) {
         const uid = c.seats.find(s => s.id === sid)?.credit ?? null, mark = r.marks[sid] ?? 0;
         c.paid[sid] = uid;
         if (!uid) continue;
         await this.addScore(rt, uid, 'tarot', mark);
-        await this.db.insert(palmares).values({ roomId: rt.room.id, game: 'tarot', data: { account: uid, won: mark > 0, pts: mark, taker: sid === r.taker, partner: sid === r.partner } });
+        await this.db.insert(palmares).values({ roomId: rt.room.id, game: 'tarot', data: { account: uid, won: mark > 0, pts: mark, taker: sid === r.taker, partner: sid === r.partner, humans } });
         await this.emitMember(rt, uid);
       }
       await this.say(rt, null, `${await this.seatName(rt, r.taker)} ${r.won ? 'gagne' : 'chute'} sa ${Tarot.BIDS[r.bid].name} (${String(r.made).replace('.', ',')} points pour ${r.need}) : ${(r.marks[r.taker] ?? 0) > 0 ? '+' : ''}${r.marks[r.taker] ?? 0}.`);
@@ -1074,14 +1076,14 @@ export class RoomHub implements OnModuleInit {
     if (g.over && !c.settled) {
       c.settled = true;
       await this.setLive(rt, 'cards', null);
-      const n = g.seats.length, order = [...g.seats].sort((a, b) => g.places[a]! - g.places[b]!), parts = [];
+      const n = g.seats.length, order = [...g.seats].sort((a, b) => g.places[a]! - g.places[b]!), parts = [], humans = c.seats.filter(s => s.credit).length;
       for (const sid of order) {
         const uid = c.seats.find(s => s.id === sid)?.credit ?? null, place = g.places[sid]!, pts = Holdem.placePoints(place, n);
         c.paid[sid] = uid;
         parts.push(`${place}. ${await this.seatName(rt, sid)}${uid && pts ? ` +${pts}` : ''}`);
         if (!uid) continue;
         if (pts) await this.addScore(rt, uid, 'holdem', pts);
-        await this.db.insert(palmares).values({ roomId: rt.room.id, game: 'holdem', data: { account: uid, won: place === 1, place, of: n, pts } });
+        await this.db.insert(palmares).values({ roomId: rt.room.id, game: 'holdem', data: { account: uid, won: place === 1, place, of: n, pts, humans } });
         await this.emitMember(rt, uid);
       }
       await this.say(rt, null, `Fin de la partie de Texas Hold'em (${g.hand} main${g.hand > 1 ? 's' : ''}) : ${parts.join(', ')}.`);

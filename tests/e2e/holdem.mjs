@@ -36,7 +36,7 @@ await frame.getByRole('button', { name: 'Distribuer' }).click();
 await frame.locator('.hd-hole .pcard').first().waitFor();
 const myCards = await frame.locator('.hd-hole .pcard svg').evaluateAll(els => els.map(e => e.getAttribute('aria-label')));
 check(myCards.length === 2 && myCards.every(Boolean), `my two cards, face up (${myCards.join(', ')})`);
-check(await frame.locator('.hd-seat .hd-holes .back').count() >= 4, 'the others\' cards: backs');
+check(await frame.locator('.hd-place .hd-holes .back').count() >= 4, 'the others\' cards: backs');
 check(await frame.locator('.hd-pos.dealer').count() === 1 && await frame.locator('.hd-pos', { hasText: 'GB' }).count() === 1, 'the button and the big blind shown');
 
 // the flights, seen as they happen (cards from the deck, chips to the felt, to the pot, to the winner)
@@ -81,9 +81,12 @@ const playing = cond => until(async () => {
   return false;
 }, 60000);
 // the showdown or a hand won: the pots and who took them
-check(await playing(async () => (await frame.locator('.hd-awards li').count()) > 0), 'a hand ends: who takes the pot');
+check(await playing(async () => (await frame.locator('.announce-box.hd-win').count()) > 0), 'the hand\'s end in the foreground: the winner, his cards + the board, the hand\'s name');
+await shot(page, '33a-holdem-winning-hand');
+check(await frame.locator('.hd-win .hd-win-card').count() >= 2 && (await frame.locator('.hd-win .ann-bid').textContent())?.trim().length > 0, 'the winning cards and the hand named');
+check(await playing(async () => (await frame.locator('.hd-awards li').count()) > 0), 'then the pot goes to the winner: who took it');
 await shot(page, '33-holdem-pot');
-check(await playing(async () => (await frame.locator('.hd-crown').count()) >= 1), 'a crown on the biggest bank (once the banks differ)');
+check(await playing(async () => (await frame.locator('.seat-crown').count()) >= 1), 'a crown on the biggest bank (once the banks differ)');
 
 // the rules: the hands drawn, strongest first
 await frame.locator('[data-action="cards-rules"]').click();

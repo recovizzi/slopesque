@@ -85,12 +85,13 @@ describe('Hold\'em betting', () => {
     expect([g.stacks.lea, g.stacks.malo, g.stacks.zoe]).toEqual([900, 1100, 300]);
   });
 
-  it('a bet nobody calls comes back; the others folded: won without showing', () => {
+  it('a bet nobody calls comes back; the others folded: won without a showdown, the cards shown at the end', () => {
     const g = table({ a: 1000, b: 1000, c: 1000 }, {}, undefined, 'c');
     play(g, ['c', 'raise', 200], ['a', 'fold'], ['b', 'fold']);
     expect(g.result!.uncontested).toBe(true);
     expect(g.stacks.c).toBe(1030);
-    expect(H.holdemView(g, 'a').holes.c!.every(x => x.r === 0)).toBe(true);
+    expect(H.holdemView(g, 'a').holes.c!.every(x => x.r > 0)).toBe(true);   // shown at the end, to understand it
+    expect(g.result!.best.c!.name).toBeTruthy();
   });
 
   it('a split pot: the odd chip to the first winner left of the button', () => {

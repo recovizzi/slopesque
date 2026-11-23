@@ -146,7 +146,8 @@ joueur ait tous les jetons (ou que l'hôte la termine). Règles (TDA, les plus r
   sans enchères, les mains retournées.
 - **Abattage** : la meilleure combinaison de 5 cartes parmi ses 2 et les 5 communes gagne (« les cartes parlent »)
   ; à égalité, le pot est partagé, le jeton impair au premier gagnant à gauche du bouton. Un joueur seul en jeu (les
-  autres couchés) gagne sans montrer ses cartes.
+  autres couchés) gagne sans abattage ; ses cartes MUST quand même être montrées à tous à la fin de la main, pour
+  comprendre la fin du tour (choix de Slopesque : la règle TDA le dispense de les montrer).
 - **Combinaisons**, de la plus forte : quinte flush (royale : As en tête), carré, full, couleur, quinte (l'As
   peut faire 5-4-3-2-A), brelan, double paire, paire, carte haute ; les cartes restantes (kickers) départagent.
 - **Blindes** : elles commencent à 10 / 20 et **montent** toutes les N mains (réglage) : 20 / 40, 30 / 60, 40 / 80,
@@ -175,7 +176,10 @@ fin de la main, le pot MUST glisser vers le ou les gagnants. Le joueur à la plu
 **couronne**, en plus du montant de sa banque. Le **paquet** MUST être sur le tapis : les cartes en partent, vers
 chaque joueur à la donne, vers le tapis pour le flop, le turn et la river, puis se retournent ; à l'abattage, les
 mains se retournent et chacun a le temps de lire avant que les jetons partent au gagnant (les robots attendent les
-animations).
+animations). La fin d'une main MUST être explicite : un panneau au premier plan montre, pour chaque pot, le gagnant,
+le montant, **ses deux cartes + les cartes communes**, les 5 cartes de la combinaison mises en avant et son **nom**
+(« Brelan de 7 ») — aussi quand les autres se sont couchés. Les autres joueurs MUST montrer leur banque avec une
+**icône de pile de jetons** ; la couronne est l'emoji 👑.
 
 #### Scenario: Pot annexe
 - **WHEN** Léa (300 jetons) part à tapis, Malo et Zoé (1 000 chacun) suivent puis misent encore 400 chacun, et Léa a
@@ -190,6 +194,16 @@ animations).
 - **WHEN** à 4 places, Malo prend les derniers jetons de Léa
 - **THEN** Malo est 1ᵉʳ (+30), Léa 2ᵉ (+20) ; les places 3 et 4 (éliminées avant) ont +10 et 0 ; une place tenue par
   un robot du début à la fin ne rapporte rien
+
+### Requirement: Pastilles des places
+Autour de la table (tous les jeux de cartes), les pastilles des joueurs MUST avoir **toutes la même taille**, calculée
+sur la place disponible (une rangée jusqu'à 4, deux au-delà), le pseudo coupé (« … ») s'il est trop long, et le
+reste sur une ligne en dessous (rôle, annonces, banque…). Une place jouée par un robot MUST porter l'icône robot
+**sur l'angle haut droit** de la pastille (pas dedans) ; la couronne du Hold'em, sur l'angle haut gauche.
+
+#### Scenario: Un long pseudo
+- **WHEN** « Maximilien-Alexandre » est assis à côté de « Léa »
+- **THEN** les deux pastilles ont la même largeur, son pseudo finit par « … » et se lit en entier au survol
 
 ### Requirement: Robots du Texas Hold'em
 Les robots du Hold'em MUST jouer avec ce qu'un joueur voit (leurs 2 cartes, les cartes communes, les mises, les
