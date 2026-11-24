@@ -100,7 +100,8 @@ if (minExt) {
   writeFileSync(f, `${JSON.stringify(pkg, null, 2)}\n`);
 }
 run('git', ['add', ...MANIFESTS]);
-run('git', ['commit', '-m', `chore(release): ${tag}`, '-m', `Portée : ${scope}${minExt ? ` ; le serveur refuse les extensions plus anciennes que ${tag}` : ''}.`]);
+if (gitTry('diff', '--cached', '--name-only')) run('git', ['commit', '-m', `chore(release): ${tag}`, '-m', `Portée : ${scope}${minExt ? ` ; le serveur refuse les extensions plus anciennes que ${tag}` : ''}.`]);
+else console.log(`  (les package.json sont déjà en ${version} : le tag porte sur le commit actuel)`);   // a first release at the version already written
 run('git', ['tag', '-a', tag, '-m', `Slopesque ${tag}\n\nportée : ${scope}${minExt ? `\nextension minimale : ${version}` : ''}`]);
 run('git', ['push', 'origin', 'main']);
 run('git', ['push', 'origin', tag]);
