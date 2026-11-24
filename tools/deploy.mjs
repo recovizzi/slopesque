@@ -41,7 +41,7 @@ if (process.argv[2] === 'admin') {
   const args = process.argv.slice(3).map(quote).join(' ');
   if (!args) fail('Usage : pnpm prod:admin <commande> [options] (pnpm prod:admin help pour la liste)');
   const inner = `cd ~/${dir}/infra && docker compose -f docker-compose.prod.yml $(grep -qE '^PROXY_NETWORK=.+' .env && echo -f docker-compose.proxy.yml) --env-file .env exec -T server admin ${args}`;
-  run('ssh', ['-t', ...login, direct ? inner : `sudo -iu ${user} sh -c ${quote(inner)}`]);
+  run('ssh', ['-t', '-q', ...login, direct ? inner : `sudo -iu ${user} sh -c ${quote(inner)}`]);
   process.exit(0);
 }
 
@@ -99,7 +99,7 @@ const lines = [
 ];
 if (check) lines.push(
   `as_ 'sh ${infra}/caddy.sh check ${caddyDir}'`,
-  `as_ 'echo "PUBLIC_URL de la machine : $(grep -E "^PUBLIC_URL=" ${infra}/.env 2>/dev/null | cut -d= -f2- || echo "(pas encore de infra/.env)")"; echo "conteneurs :"; docker ps --format "  {{.Names}}  ({{.Image}})"'`);
+  `as_ 'u=$(grep -E "^PUBLIC_URL=" ${infra}/.env 2>/dev/null | cut -d= -f2-); echo "PUBLIC_URL de la machine : \${u:-(pas encore de infra/.env)}"; echo "conteneurs :"; docker ps --format "  {{.Names}}  ({{.Image}})"'`);
 else {
   if (init) lines.push(
     `as_ 'cd ${infra} && if [ -f .env ]; then cat > /dev/null; echo "infra/.env déjà là : gardé tel quel"; else umask 077 && cat > .env && echo "infra/.env écrit (secrets tirés au hasard)"; fi' < "$D/machine.env"`,
@@ -116,6 +116,6 @@ try {
   console.log('→ envoi sur la machine');
   run('ssh', ['-o', 'BatchMode=yes', ...login, `umask 077 && mkdir ${remoteDir}`]);
   run('scp', ['-q', '-o', 'BatchMode=yes', ...(direct ? ['-o', `User=${user}`] : []), ...['run.sh', 'docker-compose.prod.yml', 'docker-compose.proxy.yml', 'deploy.sh', 'caddy.sh', ...(init && !check ? ['machine.env', 'site.caddyfile'] : []), ...(image === 'local' && !check ? ['image.tar.gz'] : [])].map(f => join(bundle, f)), `${host}:${remoteDir}/`]);
-  run('ssh', ['-t', ...login, `sh ${remoteDir}/run.sh`]);
+  run('ssh', ['-t', '-q', ...login, `sh ${remoteDir}/run.sh`]);   // -q: no « Connection to <address> closed »
 } finally { rmSync(bundle, { recursive: true, force: true }); }
 console.log(check ? '\n✓ Vérification faite (rien n\'a changé).' : `\n✓ Déployé : ${tag}. Vérifie ${get('PROD_PUBLIC_URL') || 'l\'adresse publique'}/api/health.`);
