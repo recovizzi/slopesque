@@ -22,3 +22,7 @@ tests/e2e/shots/
 tests/e2e/.cache/
 infra/.env
 SECURITE.md
+
+# Backlog local et méthode personnelle (non versionnés)
+.ai-docs/
+CLAUDE.perso.md

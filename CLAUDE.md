@@ -45,3 +45,9 @@ pnpm deploy:prod         # déploiement (--check, --init la 1re fois, --dry-run 
 6. **ESM partout** : imports relatifs avec l'extension `.js` dans les paquets et le serveur.
 7. **Jetable** : pas de sauvegarde, fichiers sans usage supprimés aussitôt, et c'est dit.
 8. Conventional commits (`feat:`, `fix:`, `chore:`…), en anglais.
+
+## Méthode de travail personnelle
+
+Si présent, `CLAUDE.perso.md` (local, non versionné) définit la méthode de travail du poste (backlog local `.ai-docs/`) :
+
+@CLAUDE.perso.md
