@@ -20,6 +20,5 @@ export const HTML = {
 export const SIZE = {
   'app/App.tsx': 'app 3.6 — shell, settings tabs and state pages split',
   'features/chat/Chat.tsx': 'chat 3.4 — list, message, composer, panels split',
-  'features/poll/poll.ts': 'poll 3.1 — the views as components, the model in model.ts',
   'features/cards/holdem/holdem-view.ts': "cards 3.3 — the Hold'em views as components",
 };

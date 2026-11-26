@@ -2,6 +2,7 @@
 // activity changes while it is open, it goes on as a chat message, answered there, closed, its results there.
 // Choices with pictures (image, sticker, GIF), free answers (secret results), gradient 1D (2 ends), gradient 2D
 // (3 and 8 corners), closed when everyone answered or by its host. Run after run.mjs (`pnpm e2e`), on the same port.
+import { Poll } from '@slopesque/engines';
 import { SERVER, admin, check, failures, player, shot, startServer, stopServer, until } from './lib.mjs';
 
 await startServer();
@@ -68,7 +69,7 @@ async function pollToChat(question, kind, build, secret = false) {
   await until(async () => (await box.isChecked()) === secret);
   await h.frame.locator('.drawer-right [aria-label="Fermer"]').click();
   await h.frame.locator('[data-poll="question"]').fill(question);
-  await h.frame.locator(`[data-action="poll-kind"][data-v="${kind}"]`).click();
+  await h.frame.getByRole('group', { name: 'Type de réponse' }).getByRole('button', { name: Poll.POLL_KINDS[kind].name, exact: true }).click();
   await build?.();
   await h.frame.getByRole('button', { name: 'Publier le sondage' }).click();
   await until(async () => (await g.frame.locator('.stage-head .topic', { hasText: question }).count()) === 1, 8000);
@@ -99,15 +100,16 @@ const loaded = card => card.locator('.poll-results img').evaluateAll(xs => xs.le
   const { gc, hc } = await pollToChat('Ton animal ?', 'choices', async () => {
     await choices(['Chien', 'Chat', 'Lapin', 'Poisson']);
     const plus = i => h.frame.locator(`.plus-wrap [data-action="choice-plus"][data-i="${i}"]`);
+    const item = name => h.frame.locator('.choice-menu').getByRole('menuitem', { name, exact: true });   // in the open "+" menu
     await plus(0).click();
-    const [file] = await Promise.all([h.page.waitForEvent('filechooser'), h.frame.locator('[data-action="choice-file"][data-i="0"]').click()]);
+    const [file] = await Promise.all([h.page.waitForEvent('filechooser'), item('Image').click()]);
     await file.setFiles({ name: 'chien.png', mimeType: 'image/png', buffer: await png(h.frame, 500, 400, '#2a6f97') });
     await until(async () => (await h.frame.locator('.choice-thumb img').count()) === 1, 8000);
     await plus(1).click();
-    await h.frame.locator('[data-action="choice-sticker"][data-i="1"]').click();
+    await item('Sticker').click();
     await h.frame.locator('[data-action="choice-sticker-pick"][data-i="1"]').first().click();
     await plus(2).click();
-    await h.frame.locator('[data-action="choice-gif"][data-i="2"]').click();
+    await item('GIF').click();
     await h.frame.locator('.gif-pop .gif-item .gif-send').first().click();
     check(await until(async () => (await h.frame.locator('.choice-thumb img').count()) === 3), 'choices: an image, a sticker and a GIF on three choices');
   });

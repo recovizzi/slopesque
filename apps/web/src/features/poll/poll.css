@@ -1,4 +1,4 @@
-/* The Sondage (PollWheel.tsx, poll.ts) and a poll continued in the chat (PollCard.tsx). */
+/* The Sondage (PollStage.tsx: PollCompose, PollAnswer, Gradient, PollResults) and a poll continued in the chat (PollCard.tsx). */
 .poll-box { display: none; }
 .activity-poll .disk-box { display: none; }
 .activity-poll .poll-box { display: flex; flex-direction: column; justify-content: safe center; gap: 10px; width: min(100%, 560px);
@@ -72,11 +72,11 @@
 .temp-badge { padding: 2px 7px; border-radius: 99px; background: var(--t); color: var(--on-color); font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .host-edge { position: absolute; left: 0; bottom: 0; margin: 0; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--accent);
   background: var(--surface); color: var(--accent); font-size: 12px; font-weight: 700; }
-/* a poll continued in the chat (ui/PollCard.tsx): the Sondage's views, smaller */
+/* a poll continued in the chat (PollCard.tsx): the Sondage's views, smaller */
 .chat-poll .vote-q small { color: var(--muted); font-weight: 400; }
 .chat-poll-body { min-width: min(100%, 320px); }
 .chat-poll-body .poll-box { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
 .chat-poll-body svg[data-gradient] { max-width: 100%; height: auto; max-height: 220px; }
-.chat-poll-body .poll-answer, .chat-poll-body .poll-results { margin: 0; padding: 0; }
+.chat-poll-body .poll-results { margin: 0; padding: 0; }
 .chat-poll-done { margin: 0; color: var(--muted); font-size: 12.5px; }
 .msg.chat-poll .vote-actions { display: flex; gap: 6px; flex-wrap: wrap; }
