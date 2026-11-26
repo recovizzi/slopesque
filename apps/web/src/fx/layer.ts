@@ -13,17 +13,37 @@ export const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matc
 export const wait = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 export const rand = (a: number, b: number) => a + Math.random() * (b - a);
 export const pick = <T>(list: readonly T[]) => list[Math.floor(Math.random() * list.length)]!;
-/** An element of the layer: a class, some HTML (trusted: built here), absolutely placed. */
-export function make(cls: string, html = '', parent?: HTMLElement) {
+/** An element of the layer (placed by fx.css): a class, what it holds (a text, or an element), in `parent`. */
+export function make(cls: string, content: string | Node = '', parent?: HTMLElement) {
   const el = document.createElement('div');
   el.className = cls;
-  el.innerHTML = html;
+  if (content !== '') el.append(content);
   parent?.append(el);
   return el;
 }
-const escAttr = (s: string) => s.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
-/** A player's round: his photo, or his first letter on his colour. */
-export const avatarHtml = (w: Who) => (w.photo ? `<img src="${escAttr(w.photo)}" alt="" draggable="false">` : escAttr(w.name.slice(0, 1).toUpperCase()));
+/** A drawing of the effects, as elements: an SVG `tag`, its attributes, its children. */
+export function svg(tag: string, attrs: Record<string, string | number> = {}, ...children: Node[]) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+  el.append(...children);
+  return el;
+}
+/** A little thing of the effects (a star, a drop, dust): a span, its class, its text. */
+export function span(cls: string, text = '') {
+  const el = document.createElement('span');
+  el.className = cls;
+  el.textContent = text;
+  return el;
+}
+/** A player's round: his photo, or his first letter (on his colour: fx.css). */
+export function avatarFace(w: Who): Node {
+  if (!w.photo) return document.createTextNode(w.name.slice(0, 1).toUpperCase());
+  const img = document.createElement('img');
+  img.src = w.photo;
+  img.alt = '';
+  img.draggable = false;
+  return img;
+}
 export const colorOf = (hue: number) => hueColor(hue);
 
 export class FxLayer {
@@ -70,7 +90,7 @@ export class FxLayer {
     el.style.setProperty('--s', `${size}px`);
     const box = make('fx-box', '', el);         // what shakes (the effect and the photo), inside what follows
     const face = make('fx-face', '', box);
-    const avatar = make('fx-avatar', avatarHtml(w), face);
+    const avatar = make('fx-avatar', avatarFace(w), face);
     avatar.style.setProperty('--c', colorOf(w.hue));
     // his place is looked for again on every frame: the table may be drawn again meanwhile (a new element)
     let x = this.width / 2, y = this.height / 2, now: HTMLElement | null = real;

@@ -10,7 +10,6 @@ export const HTML = {
   'features/chat/gif.ts': [3, 'chat 3.4 — the GIF window (GifPop) as a component'],
   'features/chat/hover.ts': [1, 'chat 3.4 — the quoted message on hover'],
   'features/cards/holdem/holdem-anim.ts': [1, 'cards 3.3 — the chips that fly'],
-  'fx/layer.ts': [1, "chat 3.4 (effects) — the players' rounds of the effects as elements"],
 };
 
 /** Source files over 300 lines without a `size-exception:` comment in their first lines. */
