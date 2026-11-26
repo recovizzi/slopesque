@@ -77,7 +77,7 @@ const taken = async () => frame.evaluate(() => [...document.querySelectorAll('.c
 let lastSeen = false;
 for (let k = 0; k < 60 && !lastSeen; k++) {
   const c = frame.locator('.cards-game.coinche.my-turn .cg-hand .in-hand:not(.is-off)');
-  if (await c.count()) { await c.first().click().catch(() => {}); await c.first().click().catch(() => {}); }
+  if (await c.count()) { await c.first().click({ timeout: 1500 }).catch(() => {}); await c.first().click({ timeout: 1500 }).catch(() => {}); }
   if (await taken() >= 2 && await frame.locator('[data-won]').count()) {
     await frame.locator('[data-won]').first().hover();
     lastSeen = await until(async () => (await frame.locator('.co-last .pcard').count()) === 4, 2000);
@@ -95,7 +95,7 @@ await shot(page, '41c-coinche-score');
 // I play to the end of the deal: its count in the foreground, « Continuer » for the next one
 for (let k = 0; k < 120 && !(await frame.locator('.co-overlay').count()); k++) {
   const c = frame.locator('.cards-game.coinche.my-turn .cg-hand .in-hand:not(.is-off)');
-  if (await c.count()) { await c.first().click().catch(() => {}); await c.first().click().catch(() => {}); }
+  if (await c.count()) { await c.first().click({ timeout: 1500 }).catch(() => {}); await c.first().click({ timeout: 1500 }).catch(() => {}); }
   await page.waitForTimeout(400);
 }
 check(await frame.locator('.co-overlay .co-results').count() === 1, 'the deal\'s count in the foreground: contract made or fallen, each team\'s points, the score sheet');

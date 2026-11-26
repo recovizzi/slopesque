@@ -77,7 +77,7 @@ if (sawFlop) { await page.waitForTimeout(1200); await shot(page, '32-holdem-flop
 const playing = cond => until(async () => {
   if (await cond()) return true;
   const mine = frame.locator('.hd-actions.is-mine [data-action="holdem-check"], .hd-actions.is-mine [data-action="holdem-call"]');
-  if (await mine.count()) await mine.first().click().catch(() => {});
+  if (await mine.count()) await mine.first().click({ timeout: 1500 }).catch(() => {});
   return false;
 }, 60000);
 // the showdown or a hand won: the pots and who took them
