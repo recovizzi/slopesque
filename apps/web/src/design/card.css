@@ -1,8 +1,9 @@
 /* Card: a page card centred in the stage (.room-card), and its tones. */
-.room-card { width: min(100%, 440px); display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 28px 24px; text-align: center;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 16px; }
-.room-card h1 { margin: 0; font-size: 22px; }
+.room-card { width: min(100%, 440px); display: flex; flex-direction: column; align-items: center; gap: var(--space-6);
+  padding: var(--space-14) var(--space-12); text-align: center; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-2xl); }
+.room-card h1 { margin: 0; font-size: var(--text-2xl); }
 .room-card p { margin: 0; color: var(--muted); }
 .room-card .room-name { color: var(--text); font-weight: 700; }
 .room-card.unknown h1, .room-card.offline h1 { color: var(--danger); }
-.room-card.pending h1 { color: #b07400; }
+.room-card.pending h1 { color: var(--wait); }

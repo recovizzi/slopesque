@@ -19,8 +19,8 @@
 .code-meter { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
 .code-meter span { height: 5px; border-radius: 3px; background: var(--surface-2); }
 .code-meter.lv-1 span:nth-child(1) { background: var(--danger); }
-.code-meter.lv-2 span:nth-child(-n+2) { background: #d88a00; }
-.code-meter.lv-3 span { background: #1f9d55; }
+.code-meter.lv-2 span:nth-child(-n+2) { background: var(--warn); }
+.code-meter.lv-3 span { background: var(--ok); }
 .code-warn { display: flex; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
   background: color-mix(in srgb, var(--danger) 9%, transparent); font-size: 13px; }
 .code-warn > svg { flex: none; color: var(--danger); }

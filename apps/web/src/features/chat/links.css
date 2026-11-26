@@ -1,4 +1,9 @@
 /* Links in the chat and their previews (lib/links.ts). */
+/* The previews' own colours: a video's thumbnail and player. */
+:root {
+  --lp-thumb-top: #1b4b6e; --lp-thumb-bottom: #141518; --lp-play-hover: #d93d42;
+  --lp-player-bg: #000;
+}
 .msg-link { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; overflow-wrap: anywhere; }
 .msg-link:hover { text-decoration-thickness: 2px; }
 .link-preview { display: flex; gap: 10px; width: min(100%, 420px); margin: 4px 0 2px; padding: 8px 10px; border: 1px solid var(--border); border-left: 3px solid var(--accent);
@@ -12,7 +17,7 @@
 .lp-desc { margin: 0; color: var(--text); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .lp-image { flex: none; width: 72px; height: 72px; object-fit: cover; border-radius: 6px; }
 .lp-thumb { position: relative; display: grid; place-items: center; width: 100%; aspect-ratio: 16 / 9; padding: 0; border: 0; border-radius: 6px; cursor: pointer;
-  background: var(--img) center / cover no-repeat, linear-gradient(135deg, #1b4b6e, #141518); }
-.lp-play { display: grid; place-items: center; width: 54px; height: 38px; border-radius: 10px; background: rgb(0 0 0 / .72); color: #fff; transition: background .15s; }
-.lp-thumb:hover .lp-play, .lp-thumb:focus-visible .lp-play { background: #d93d42; }
-.lp-player { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 6px; background: #000; }
+  background: var(--img) center / cover no-repeat, linear-gradient(135deg, var(--lp-thumb-top), var(--lp-thumb-bottom)); }
+.lp-play { display: grid; place-items: center; width: 54px; height: 38px; border-radius: 10px; background: var(--shade-72); color: var(--on-color); transition: background .15s; }
+.lp-thumb:hover .lp-play, .lp-thumb:focus-visible .lp-play { background: var(--lp-play-hover); }
+.lp-player { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 6px; background: var(--lp-player-bg); }

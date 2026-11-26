@@ -17,12 +17,12 @@
 .gif-send img { display: block; width: 100%; height: auto; }
 .gif-send:hover, .gif-send:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .gif-fav { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%;
-  background: rgb(0 0 0 / .45); color: #fff; cursor: pointer; opacity: 0; transition: opacity .1s; }
+  background: var(--shade-45); color: var(--on-color); cursor: pointer; opacity: 0; transition: opacity .1s; }
 .gif-fav svg { width: 15px; height: 15px; }
 .gif-item:hover .gif-fav, .gif-fav:focus-visible, .gif-fav.on { opacity: 1; }
-.gif-fav.on { color: #ffc93c; }
+.gif-fav.on { color: var(--star); }
 .gif-fav.on svg { fill: currentColor; }
 .gif-status { margin: 8px 0 4px; text-align: center; color: var(--muted); font-size: 12px; }
 .gif-status[hidden] { display: none; }
 .gif-credit { margin: 0; padding: 5px 8px; border-top: 1px solid var(--border); font-size: 10.5px; color: var(--muted); text-align: right; }
-.gif-badge { position: absolute; left: 6px; bottom: 6px; padding: 0 5px; border-radius: 4px; background: rgb(0 0 0 / .55); color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .5px; }
+.gif-badge { position: absolute; left: 6px; bottom: 6px; padding: 0 5px; border-radius: 4px; background: var(--shade-55); color: var(--on-color); font-size: 10px; font-weight: 800; letter-spacing: .5px; }

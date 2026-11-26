@@ -1,26 +1,34 @@
 /* The Coinche (coinche-view.ts). */
-.co-suit { font-weight: 800; color: #1c1b19; }
-.co-suit.red { color: #c62828; }
-.announce-box .co-suit, .co-board .co-suit { text-shadow: 0 0 2px #fff; }
-.co-mult { color: #c62828; font-weight: 800; }
-.co-board { position: absolute; left: 0; top: 50%; transform: translateY(-50%); z-index: 6; display: flex; align-items: stretch; border-radius: 0 10px 10px 0; background: rgb(0 0 0 / .45); color: #fff; font-size: 12.5px; cursor: default; outline: none; }
+/* The Coinche's own colours (with the table's, features/cards/cards.css): the two teams, the trump. */
+:root {
+  --co-us-light: #9fe0b8; --co-them-light: #ffc9b0; --co-us-bg: #d6f0df;
+  --co-us-ink: #1f5a37; --co-them-bg: #fbe0d4; --co-them-ink: #7a2e10;
+  --co-say-edge: #00000026; --co-pass: #8a8f98; --co-trump-line: #d4a017;
+  --co-trump-bg: #fff7d6; --co-trump-ink: #6b5a20; --co-tout-atout: #b8860b;
+  --co-overlay: rgb(8 14 11 / .62);
+}
+.co-suit { font-weight: 800; color: var(--ink); }
+.co-suit.red { color: var(--cg-red); }
+.announce-box .co-suit, .co-board .co-suit { text-shadow: 0 0 2px var(--paper); }
+.co-mult { color: var(--cg-red); font-weight: 800; }
+.co-board { position: absolute; left: 0; top: 50%; transform: translateY(-50%); z-index: 6; display: flex; align-items: stretch; border-radius: 0 10px 10px 0; background: var(--shade-45); color: var(--on-color); font-size: 12.5px; cursor: default; outline: none; }
 .co-board-tab { writing-mode: vertical-rl; transform: rotate(180deg); padding: 10px 4px; font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; opacity: .9; }
 .co-board-body { display: flex; flex-direction: column; justify-content: center; gap: 2px; max-width: 0; overflow: hidden; white-space: nowrap; transition: max-width .25s ease, padding .25s ease; }
 .co-board:hover .co-board-body, .co-board:focus .co-board-body { max-width: 240px; padding: 6px 12px 6px 4px; }
 .co-board small { opacity: .75; }
 .co-score b { font-variant-numeric: tabular-nums; margin-left: 4px; }
-.co-score.us b { color: #9fe0b8; }
-.co-score.them b { color: #ffc9b0; }
-.co-team { padding: 0 5px; border-radius: 99px; font-size: 9.5px; font-weight: 800; white-space: nowrap; background: #e8e5dc; color: #4a463f; }
-.co-team.us { background: #d6f0df; color: #1f5a37; }
-.co-team.them { background: #fbe0d4; color: #7a2e10; }
-.co-team.t1 { background: #fbe0d4; color: #7a2e10; }
-.co-say { background: #fffdf8; box-shadow: 0 0 0 1px #00000026; }
-.co-say.pass { color: #8a8f98; font-style: italic; }
-.co-say.coinche { background: #c62828; color: #fff; box-shadow: none; }
-.co-belote { background: #ffd34d; color: #5a4300; }
-.co-bidding { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 16px; border-radius: 12px; background: rgb(0 0 0 / .25); color: #fff; }
-.co-best { font-size: 26px; font-weight: 800; background: #fffdf8; color: #1c1b19; padding: 0 12px; border-radius: 10px; }
+.co-score.us b { color: var(--co-us-light); }
+.co-score.them b { color: var(--co-them-light); }
+.co-team { padding: 0 5px; border-radius: 99px; font-size: 9.5px; font-weight: 800; white-space: nowrap; background: var(--cg-neutral); color: var(--cg-neutral-ink); }
+.co-team.us { background: var(--co-us-bg); color: var(--co-us-ink); }
+.co-team.them { background: var(--co-them-bg); color: var(--co-them-ink); }
+.co-team.t1 { background: var(--co-them-bg); color: var(--co-them-ink); }
+.co-say { background: var(--cg-paper); box-shadow: 0 0 0 1px var(--co-say-edge); }
+.co-say.pass { color: var(--co-pass); font-style: italic; }
+.co-say.coinche { background: var(--cg-red); color: var(--on-color); box-shadow: none; }
+.co-belote { background: var(--cg-gold); color: var(--cg-gold-ink); }
+.co-bidding { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 16px; border-radius: 12px; background: var(--shade-25); color: var(--on-color); }
+.co-best { font-size: 26px; font-weight: 800; background: var(--cg-paper); color: var(--ink); padding: 0 12px; border-radius: 10px; }
 .co-bidding small { font-size: 12px; opacity: .85; }
 .co-results { max-width: min(94%, 400px); gap: 6px; }
 .co-results li { gap: 8px; }
@@ -35,8 +43,8 @@
 .co-suits { display: inline-flex; gap: 3px; }
 .co-suit-btn { padding: 3px 9px; font-size: 17px; line-height: 1; }
 .co-suit-btn[aria-pressed="true"], .co-values .btn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); }
-.co-suit-btn[aria-pressed="true"] .co-suit { color: #fff; }
-.card-svg.is-trump .cbg { stroke: #d4a017; stroke-width: 2.2; }
+.co-suit-btn[aria-pressed="true"] .co-suit { color: var(--on-color); }
+.card-svg.is-trump .cbg { stroke: var(--co-trump-line); stroke-width: 2.2; }
 .co-values-rule { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .co-values-rule li { display: flex; flex-direction: column; align-items: center; gap: 1px; font-size: 12px; }
 .cards-game.coinche .cg-actions:not(.co-actions) { flex-wrap: wrap; justify-content: center; }
@@ -45,32 +53,32 @@
 .cg-seat.co-seat { box-shadow: inset 0 -4px 0 var(--team); }
 .cg-seat.co-us, .cg-seat.co-t0 { --team: #2c8a55; }
 .cg-seat.co-them, .cg-seat.co-t1 { --team: #d9692e; }
-.cg-seat.co-seat.is-turn { box-shadow: inset 0 -4px 0 var(--team), 0 0 0 3px rgb(255 211 77 / .35); }
-.cg-seat.co-seat.is-viewed { box-shadow: inset 0 -4px 0 var(--team), 0 0 0 3px #ffd34d; }
+.cg-seat.co-seat.is-turn { box-shadow: inset 0 -4px 0 var(--team), 0 0 0 3px var(--cg-gold-glow); }
+.cg-seat.co-seat.is-viewed { box-shadow: inset 0 -4px 0 var(--team), 0 0 0 3px var(--cg-gold); }
 /* each player's pile of won tricks (the trick flies there; the last one shown again when hovered) */
 .co-pile { position: relative; display: inline-flex; align-items: center; gap: 2px; padding: 1px 4px; border-radius: 6px; }
 .co-pile .mini { width: 13px; height: 18px; }
 .co-pile b { font-size: 12px; font-variant-numeric: tabular-nums; }
 .co-pile.is-empty { opacity: .45; }
-.co-pile.is-last { background: #ffd34d; cursor: zoom-in; }
-.won-pile[data-won] { box-shadow: 0 0 0 3px #ffd34d; border-radius: 6px; }
+.co-pile.is-last { background: var(--cg-gold); cursor: zoom-in; }
+.won-pile[data-won] { box-shadow: 0 0 0 3px var(--cg-gold); border-radius: 6px; }
 .co-last .tarot-trick { justify-content: center; }
 .co-last .pcard { width: 52px; height: 73px; }
 /* the trump, under the table */
-.co-trump { align-self: center; display: flex; align-items: center; gap: 6px; padding: 3px 14px; border-radius: 99px; background: #fff7d6; color: #3d2f00; box-shadow: 0 0 0 2px #d4a017; font-size: 13px; }
+.co-trump { align-self: center; display: flex; align-items: center; gap: 6px; padding: 3px 14px; border-radius: 99px; background: var(--co-trump-bg); color: var(--cg-gold-deep); box-shadow: 0 0 0 2px var(--co-trump-line); font-size: 13px; }
 .co-trump .co-suit { font-size: 22px; line-height: 1; }
-.co-trump span { color: #6b5a20; }
+.co-trump span { color: var(--co-trump-ink); }
 /* Coinche: sans atout, tout atout; the deal's count in the foreground, « Continuer » */
-.co-suit.co-sa, .co-suit.co-ta { display: inline-block; padding: 0 4px; border-radius: 4px; font-size: .8em; letter-spacing: .02em; color: #fff; background: #4a463f; text-shadow: none; }
-.co-suit.co-ta { background: #b8860b; }
+.co-suit.co-sa, .co-suit.co-ta { display: inline-block; padding: 0 4px; border-radius: 4px; font-size: .8em; letter-spacing: .02em; color: var(--on-color); background: var(--cg-neutral-ink); text-shadow: none; }
+.co-suit.co-ta { background: var(--co-tout-atout); }
 .co-suit-btn.co-word { font-size: 12px; padding: 4px 8px; }
 .cards-game.coinche { position: relative; }
-.co-overlay { position: absolute; inset: 0; z-index: 40; display: grid; place-items: center; padding: 10px; background: rgb(8 14 11 / .62); animation: tv-in .25s ease; }
-.co-overlay-card.cg-results { position: static; max-height: 100%; overflow: auto; width: min(100%, 440px); gap: 8px; padding: 14px 16px; border-radius: 14px; box-shadow: 0 14px 44px rgb(0 0 0 / .5); }
+.co-overlay { position: absolute; inset: 0; z-index: 40; display: grid; place-items: center; padding: 10px; background: var(--co-overlay); animation: tv-in .25s ease; }
+.co-overlay-card.cg-results { position: static; max-height: 100%; overflow: auto; width: min(100%, 440px); gap: 8px; padding: 14px 16px; border-radius: 14px; box-shadow: 0 14px 44px var(--shade-50); }
 .co-next { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; }
 .co-next .btn.is-done { opacity: .7; cursor: default; }
 .co-ready { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
 .co-ready li { padding: 1px 8px; border-radius: 99px; font-size: 12px; background: var(--border); color: var(--muted); }
-.co-ready li.is-ready { background: #d6f0df; color: #1f5a37; font-weight: 700; }
+.co-ready li.is-ready { background: var(--co-us-bg); color: var(--co-us-ink); font-weight: 700; }
 .co-next .note { margin: 0; text-align: center; }
 @container stage (max-width: 480px) { .co-overlay-card.cg-results { padding: 10px; } .co-sheet { font-size: 10.5px; } }

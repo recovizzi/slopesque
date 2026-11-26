@@ -1,16 +1,20 @@
 /* Button (.btn: primary, ghost, danger, danger-fill; sm, big) and IconButton (.icon-btn). */
-.icon-btn { display: inline-grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 8px; background: none; cursor: pointer; color: var(--muted); }
-.icon-btn:hover { background: var(--surface-2); color: var(--text); }
-.icon-btn.sm { width: 26px; height: 26px; }
-.icon-btn.sm svg { width: 14px; height: 14px; }
-.btn.sm { padding: 5px 10px; font-size: 13px; align-self: flex-start; margin-top: 4px; }
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 14px; border: 0; border-radius: 8px; background: var(--accent); color: var(--accent-text);
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-3); padding: var(--space-4) var(--space-7);
+  border: 0; border-radius: var(--radius-md); background: var(--accent); color: var(--accent-text);
   font-weight: 600; cursor: pointer; text-decoration: none; white-space: nowrap; }
 .btn:hover { filter: brightness(1.08); }
 .btn:disabled { opacity: .4; cursor: not-allowed; filter: none; }
-.btn.big { padding: 11px 22px; font-size: 15px; }
+.btn svg { width: 15px; height: 15px; }
+.btn.sm { padding: 5px var(--space-5); font-size: var(--text-md); align-self: flex-start; margin-top: var(--space-2); }
+.btn.big { padding: 11px var(--space-11); font-size: var(--text-lg); }
 .btn.ghost { background: var(--surface-2); color: var(--text); }
 .btn.danger { background: none; color: var(--danger); border: 1px solid currentColor; }
-.btn svg { width: 15px; height: 15px; }
+.btn.danger-fill { background: var(--danger); color: var(--on-color); }
 .danger-text { color: var(--danger) !important; }
-.btn.danger-fill { background: var(--danger); color: #fff; }
+
+.icon-btn { display: inline-grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: var(--radius-md);
+background: none;
+  cursor: pointer; color: var(--muted); }
+.icon-btn:hover { background: var(--surface-2); color: var(--text); }
+.icon-btn.sm { width: 26px; height: 26px; }
+.icon-btn.sm svg { width: 14px; height: 14px; }

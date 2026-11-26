@@ -1,5 +1,18 @@
 /* The card table (CardsStage, cards.ts) shared by every card game: seats, hand, cards, announcements, won tricks,
    rules; the Trou du cul. */
+/* The card table's own colours (shared by every card game; the theme's are in design/tokens.css): the felt, the
+   cards, the gold of a turn, the roles. */
+:root {
+  --cg-felt: #2f7d55; --cg-felt-dark: #1d5a3b; --cg-felt-line: #164a30;
+  --cg-felt-glow: #2f7d5560; --cg-felt-text: #e8f3ec; --cg-green: #2c6b48;
+  --cg-green-tint: #dff3e6; --cg-pill: rgb(255 255 255 / .92); --cg-paper: #fffdf8;
+  --cg-edge: #00000040; --cg-red: #c62828; --cg-back: #3d55c4;
+  --cg-back-line: #ffffff70; --cg-back-line-2: #ffffff30; --cg-gold: #ffd34d;
+  --cg-gold-glow: rgb(255 211 77 / .35); --cg-gold-pale: #ffe9a3; --cg-gold-ink: #5a4300;
+  --cg-gold-deep: #3d2f00; --cg-copper: #f3c1a8; --cg-copper-ink: #6b2d10;
+  --cg-bronze: #8a5a3c; --cg-neutral: #e8e5dc; --cg-neutral-ink: #4a463f;
+  --cg-bot: #5b5bd6; --cg-muted: #6b6860; --cg-overlay: rgb(12 18 15 / .82);
+}
 /* card games (cards.ts): the table instead of the game area — a header (game, info, clock, rules), the other players,
    the trick, my hand in a fan */
 .cards-stage { display: none; }
@@ -14,9 +27,9 @@ body.activity-cards:not(.room-blocked) .cards-stage { display: flex; height: 100
 .cg-clock { font: 700 13px ui-monospace, monospace; font-variant-numeric: tabular-nums; }
 .cg-rules { color: var(--accent); }
 .cg-table { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: 6px; padding: 8px;
-  border-radius: 16px; background: radial-gradient(ellipse at center, #2f7d55, #1d5a3b); box-shadow: inset 0 0 0 3px #164a30, inset 0 0 30px rgb(0 0 0 / .35); }
+  border-radius: 16px; background: radial-gradient(ellipse at center, var(--cg-felt), var(--cg-felt-dark)); box-shadow: inset 0 0 0 3px var(--cg-felt-line), inset 0 0 30px var(--shade-35); }
 .cg-seats { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 210px)); justify-content: center; gap: 12px 8px; }
-.cg-seat { display: flex; align-items: center; gap: 6px; padding: 3px 9px 3px 3px; border-radius: 99px; background: rgb(255 255 255 / .92); color: #1c1b19; font-size: 12px;
+.cg-seat { display: flex; align-items: center; gap: 6px; padding: 3px 9px 3px 3px; border-radius: 99px; background: var(--cg-pill); color: var(--ink); font-size: 12px;
   border: 2px solid transparent; transition: border-color .2s, opacity .2s; }
 .cg-seat .avatar.sm { width: 24px; height: 24px; font-size: 11px; }
 .seat-name { font-weight: 700; }
@@ -28,28 +41,28 @@ body.activity-cards:not(.room-blocked) .cards-stage { display: flex; height: 100
 .cg-seat .seat-sub:empty { display: none; }
 .cg-seat .seat-side { flex: none; display: flex; align-items: center; gap: 3px; }
 .seat-bot.corner { position: absolute; z-index: 2; top: -8px; right: -6px; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
-  background: #fff; box-shadow: 0 0 0 1.5px #5b5bd6, 0 1px 3px rgb(0 0 0 / .3); }
+  background: var(--paper); box-shadow: 0 0 0 1.5px var(--cg-bot), 0 1px 3px var(--shade-30); }
 .seat-bot.corner svg { width: 13px; height: 13px; }
-.seat-crown { position: absolute; z-index: 2; top: -13px; left: -6px; font-size: 17px; line-height: 1; transform: rotate(-16deg); filter: drop-shadow(0 1px 1px rgb(0 0 0 / .4)); }
+.seat-crown { position: absolute; z-index: 2; top: -13px; left: -6px; font-size: 17px; line-height: 1; transform: rotate(-16deg); filter: drop-shadow(0 1px 1px var(--shade-40)); }
 .cg-seat .seat-kick { position: absolute; z-index: 3; left: 50%; bottom: -11px; transform: translateX(-50%); white-space: nowrap; }
 .seat-cards { display: inline-flex; align-items: center; gap: 2px; }
 .seat-cards .mini { width: 12px; height: 17px; }
-.seat-state { color: #6b6860; font-style: italic; }
-.cg-seat.is-turn { border-color: #ffd34d; box-shadow: 0 0 0 3px rgb(255 211 77 / .35); }
+.seat-state { color: var(--cg-muted); font-style: italic; }
+.cg-seat.is-turn { border-color: var(--cg-gold); box-shadow: 0 0 0 3px var(--cg-gold-glow); }
 .cg-seat.has-passed, .cg-seat.is-out { opacity: .6; }
-.role-badge { padding: 0 6px; border-radius: 99px; font-size: 10.5px; font-weight: 800; white-space: nowrap; background: #e8e5dc; color: #4a463f; }
-.role-president { background: #ffd34d; color: #5a4300; }
-.role-vice { background: #ffe9a3; color: #5a4300; }
-.role-vtdc { background: #f3c1a8; color: #6b2d10; }
-.role-tdc { background: #8a5a3c; color: #fff; }
+.role-badge { padding: 0 6px; border-radius: 99px; font-size: 10.5px; font-weight: 800; white-space: nowrap; background: var(--cg-neutral); color: var(--cg-neutral-ink); }
+.role-president { background: var(--cg-gold); color: var(--cg-gold-ink); }
+.role-vice { background: var(--cg-gold-pale); color: var(--cg-gold-ink); }
+.role-vtdc { background: var(--cg-copper); color: var(--cg-copper-ink); }
+.role-tdc { background: var(--cg-bronze); color: var(--on-color); }
 .cg-pile { position: relative; flex: 1; min-height: calc(var(--ch) + 16px); width: 100%; display: grid; place-items: center; }
 .play { position: absolute; display: flex; transform: rotate(var(--t)); transition: opacity .3s, transform .3s; }
 .play.is-closed { filter: grayscale(.5) brightness(.85); }
 .play:not(.is-last) { opacity: .45; transform: translate(-34px, -8px) rotate(var(--t)) scale(.88); }
 .pcard { display: block; width: var(--cw); height: var(--ch); padding: 0; border: 0; background: none; }
 .play .pcard + .pcard { margin-left: calc(var(--cw) * -0.55); }
-.pcard .card-svg { display: block; width: 100%; height: 100%; filter: drop-shadow(0 2px 3px rgb(0 0 0 / .35)); }
-.cg-pile-text { margin: 0; color: #e8f3ec; font-size: 12px; text-align: center; min-height: 16px; }
+.pcard .card-svg { display: block; width: 100%; height: 100%; filter: drop-shadow(0 2px 3px var(--shade-35)); }
+.cg-pile-text { margin: 0; color: var(--cg-felt-text); font-size: 12px; text-align: center; min-height: 16px; }
 .cg-results { position: absolute; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 16px; border-radius: 12px;
   background: var(--surface); box-shadow: var(--shadow); min-width: 220px; }
 .cg-results h3 { margin: 0; font-size: 14px; }
@@ -72,61 +85,61 @@ body.activity-cards:not(.room-blocked) .cards-stage { display: flex; height: 100
 .cg-watch .note { margin: 0; max-width: 46ch; }
 .cg-join svg { margin-right: 6px; vertical-align: -3px; }   /* its size: .btn svg */
 /* a full table: the button says so (red, a shake) for a moment */
-.cg-join.is-error { background: var(--danger); color: #fff; animation: join-shake .35s; }
+.cg-join.is-error { background: var(--danger); color: var(--on-color); animation: join-shake .35s; }
 @keyframes join-shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 .btn.cg-leave { margin: 4px auto 0 0; }   /* top margin and alignment: .btn.sm's */
 /* a robot plays the seat (for a player who left: his name until the end of the round) */
-.seat-bot { display: inline-flex; color: #5b5bd6; }
+.seat-bot { display: inline-flex; color: var(--cg-bot); }
 .seat-bot svg { width: 15px; height: 15px; }
 .cg-results li b, .cg-results .res-name { flex: 1; font-weight: 700; }
 .cg-results li .seat-bot { margin-left: -3px; }
 .cg-results li.is-bot { color: var(--muted); }
 .cg-results li.is-bot .pts { color: var(--muted); }
 .card-fly { position: fixed; z-index: 65; pointer-events: none; } /* under a dialog (70) */
-.card-fly .card-svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 4px 8px rgb(0 0 0 / .4)); }
+.card-fly .card-svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 4px 8px var(--shade-40)); }
 /* a card (cards.ts): a light face in both themes, like a real card; red or black values, emoji suits */
-.cbg { fill: #fffdf8; stroke: #00000040; stroke-width: 1.2; }
+.cbg { fill: var(--cg-paper); stroke: var(--cg-edge); stroke-width: 1.2; }
 .cv { font: 800 15px system-ui, sans-serif; }
-.card-svg.red .cv { fill: #c62828; }
-.card-svg.black .cv { fill: #1c1b19; }
+.card-svg.red .cv { fill: var(--cg-red); }
+.card-svg.black .cv { fill: var(--ink); }
 .cs { font-size: 12px; }
 .cc { font-size: 24px; dominant-baseline: middle; }
-.cbk { fill: #3d55c4; stroke: #fff; stroke-width: 1.5; }
-.cbk-in { fill: none; stroke: #ffffff70; stroke-width: 1.5; }
-.cbk-l { stroke: #ffffff30; stroke-width: 1.2; fill: none; }
+.cbk { fill: var(--cg-back); stroke: var(--paper); stroke-width: 1.5; }
+.cbk-in { fill: none; stroke: var(--cg-back-line); stroke-width: 1.5; }
+.cbk-l { stroke: var(--cg-back-line-2); stroke-width: 1.2; fill: none; }
 .pcard.in-hand.is-off { filter: grayscale(.75) brightness(.8); cursor: default; }
 .pcard.in-hand.is-off:hover { --lift: -6px; }
-.pcard.in-hand.is-new .card-svg { filter: drop-shadow(0 0 5px #ffd34d) drop-shadow(0 2px 3px rgb(0 0 0 / .35)); }
+.pcard.in-hand.is-new .card-svg { filter: drop-shadow(0 0 5px var(--cg-gold)) drop-shadow(0 2px 3px var(--shade-35)); }
 .tarot-trick { display: flex; gap: 8px; align-items: flex-end; }
 .tarot-trick.is-closed { filter: grayscale(.5) brightness(.85); opacity: .7; }
 .tarot-trick.dog { gap: 4px; }
 .trick-card { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.trick-card small { color: #e8f3ec; font-size: 11px; font-weight: 700; }
+.trick-card small { color: var(--cg-felt-text); font-size: 11px; font-weight: 700; }
 .pts.neg { color: var(--danger) !important; }
 .announce-layer { position: absolute; inset: 0; z-index: 30; pointer-events: none; display: grid; place-items: center; }
 .announce-layer:empty { display: none; }
 .announce { display: grid; place-items: center; }
-.announce-box { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 26px; border-radius: 16px; background: rgb(12 18 15 / .82); color: #fff;
-  font-size: 22px; font-weight: 800; text-align: center; box-shadow: 0 12px 40px rgb(0 0 0 / .45); animation: ann-pop 2s ease forwards; }
+.announce-box { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 26px; border-radius: 16px; background: var(--cg-overlay); color: var(--on-color);
+  font-size: 22px; font-weight: 800; text-align: center; box-shadow: 0 12px 40px var(--shade-45); animation: ann-pop 2s ease forwards; }
 .announce-box small { font-size: 12px; font-weight: 600; opacity: .8; }
-.announce-box .ann-bid { padding: 2px 12px; border-radius: 99px; background: #ffd34d; color: #3d2f00; font-size: 16px; }
+.announce-box .ann-bid { padding: 2px 12px; border-radius: 99px; background: var(--cg-gold); color: var(--cg-gold-deep); font-size: 16px; }
 @keyframes ann-pop { 0% { transform: scale(.6); opacity: 0; } 12% { transform: scale(1.06); opacity: 1; } 20% { transform: scale(1); } 85% { opacity: 1; } 100% { transform: scale(.97); opacity: 0; } }
 .flip { width: 86px; height: 120px; perspective: 700px; margin-bottom: 6px; }
 .flip-inner { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; animation: flip-card .9s .45s cubic-bezier(.4,.1,.3,1) forwards; }
 .flip-face { position: absolute; inset: 0; backface-visibility: hidden; }
-.flip-face .card-svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 4px 10px rgb(0 0 0 / .5)); }
+.flip-face .card-svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 4px 10px var(--shade-50)); }
 .flip-face.front { transform: rotateY(180deg); }
 @keyframes flip-card { to { transform: rotateY(180deg); } }
 /* my pile of won tricks, printed on the felt when empty; the others' tricks count on their chip */
 .won-pile { position: absolute; right: 10px; bottom: 10px; z-index: 5; width: 34px; height: 48px; border-radius: 5px; }
-.won-pile.is-empty { border: 2px solid #164a30; box-shadow: inset 0 0 0 2px #2f7d5560; }
+.won-pile.is-empty { border: 2px solid var(--cg-felt-line); box-shadow: inset 0 0 0 2px var(--cg-felt-glow); }
 .won-card { position: absolute; inset: 0; transform: translate(calc(var(--k) * -2px), calc(var(--k) * -2px)); }
-.won-card .card-svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 1px 2px rgb(0 0 0 / .35)); }
-.won-n { position: absolute; left: -8px; bottom: -6px; min-width: 18px; padding: 0 5px; border-radius: 99px; background: #ffd34d; color: #3d2f00; font-size: 11px; text-align: center; }
+.won-card .card-svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 1px 2px var(--shade-35)); }
+.won-n { position: absolute; left: -8px; bottom: -6px; min-width: 18px; padding: 0 5px; border-radius: 99px; background: var(--cg-gold); color: var(--cg-gold-deep); font-size: 11px; text-align: center; }
 .won-pile[data-won] { cursor: zoom-in; }
-.seat-tricks { font-size: 10.5px; font-weight: 700; color: #2c6b48; background: #dff3e6; padding: 0 6px; border-radius: 99px; }
+.seat-tricks { font-size: 10.5px; font-weight: 700; color: var(--cg-green); background: var(--cg-green-tint); padding: 0 6px; border-radius: 99px; }
 .cg-seat[data-won] { cursor: zoom-in; }
-.cg-seat.is-viewed { box-shadow: 0 0 0 3px #ffd34d; }
+.cg-seat.is-viewed { box-shadow: 0 0 0 3px var(--cg-gold); }
 .cg-seats { position: relative; z-index: 5; } /* above the tricks shown: the chips stay hoverable */
 /* the rules window */
 .modal.rules { width: min(560px, calc(100vw - 32px)); gap: 6px; }
@@ -137,14 +150,14 @@ body.activity-cards:not(.room-blocked) .cards-stage { display: flex; height: 100
 .card-svg.small { width: 30px; height: 42px; }
 .rule-example { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .rule-arrow { font-size: 12px; font-weight: 700; color: var(--muted); }
-.rule-arrow.ok { color: #2c8a4b; }
+.rule-arrow.ok { color: var(--ok-text); }
 .rule-arrow.ko { color: var(--danger); }
 .rule-roles { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .rule-roles li { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .rule-roles li span:nth-child(2) { flex: 1; color: var(--muted); }
 /* Trou du cul: a turn that lasts 30 s; the button to propose a kick (a vote) */
 .cg-seat.is-late { border-color: var(--danger); }
-.seat-kick { display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px; border: 0; border-radius: 99px; background: var(--danger); color: #fff;
+.seat-kick { display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px; border: 0; border-radius: 99px; background: var(--danger); color: var(--on-color);
   font: 700 11px system-ui, sans-serif; cursor: pointer; }
 .seat-kick svg { width: 12px; height: 12px; }
 .cards-holder { display: contents; }

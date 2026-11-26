@@ -9,17 +9,17 @@
 .vote-left { flex: none; font: 700 12px ui-monospace, monospace; color: var(--muted); }
 .vote-bar { display: flex; height: 6px; border-radius: 99px; overflow: hidden; background: var(--surface-2); }
 .vote-bar span { width: calc(var(--n) * 100%); transition: width .3s; }
-.vb-yes { background: #1f9d55; }
+.vb-yes { background: var(--ok); }
 .vb-no { background: var(--danger); }
 .vote-count { margin: 0; font-size: 11.5px; color: var(--muted); }
 .vote-actions { display: flex; gap: 6px; }
 .vote-actions .btn { flex: 1; padding: 5px 10px; font-size: 13px; border: 2px solid transparent; }
-.btn.vote-yes { background: #1f9d55; color: #fff; }
-.btn.vote-no { background: var(--danger); color: #fff; }
+.btn.vote-yes { background: var(--ok); color: var(--on-color); }
+.btn.vote-no { background: var(--danger); color: var(--on-color); }
 .vote-actions .btn:not(.on) { opacity: .78; }
 .vote-actions .btn.on { border-color: var(--text); opacity: 1; }
 .vote-actions .btn.on::before { content: '✓ '; }
 .vote-result { margin: 0; font-weight: 800; font-size: 13px; }
-.vote-result.ok { color: #1f9d55; }
+.vote-result.ok { color: var(--ok); }
 .vote-result.ko { color: var(--danger); }
 .msg.vote .note { margin: 0; font-size: 12px; }

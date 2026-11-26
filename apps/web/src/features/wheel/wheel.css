@@ -14,7 +14,7 @@
 .wheel-rim { fill: none; stroke: var(--text); stroke-width: 2.2; pointer-events: none; }
 .sector path, .sector circle { fill: var(--c); stroke: var(--disk-fill); stroke-width: 1.2; stroke-linejoin: round; }
 .sector { transition: opacity .4s; }
-.sector-label, .sector-pct { fill: #1c1b19; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+.sector-label, .sector-pct { fill: var(--ink); text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
 .sector-label { font-size: 9px; font-weight: 700; }
 .sector-pct { font-size: 7.5px; opacity: .7; }
 .wheel.has-winner .sector:not(.is-winner) { opacity: .3; }

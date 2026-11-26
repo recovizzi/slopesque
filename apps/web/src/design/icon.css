@@ -1,3 +1,3 @@
 /* Icon: the host's crown (.crown). */
-.crown { color: #c99a06; vertical-align: -2px; }
+.crown { color: var(--crown); vertical-align: -2px; }
 .crown svg { width: 14px; height: 14px; }

@@ -7,8 +7,8 @@ body.popup { width: 780px; height: 600px; }
 button, input, select { font: inherit; color: inherit; }
 svg { flex: none; }
 .spacer { flex: 1; }
-.row { display: flex; gap: 8px; }
-form { display: flex; flex-direction: column; gap: 12px; }
-hr { border: 0; border-top: 1px solid var(--border); margin: 4px 0; width: 100%; }
-hr.sep { border-top-width: 2px; margin: 6px 0; }
-.section { margin: 0; font-size: 13px; }
+.row { display: flex; gap: var(--space-4); }
+form { display: flex; flex-direction: column; gap: var(--space-6); }
+hr { border: 0; border-top: 1px solid var(--border); margin: var(--space-2) 0; width: 100%; }
+hr.sep { border-top-width: 2px; margin: var(--space-3) 0; }
+.section { margin: 0; font-size: var(--text-md); }

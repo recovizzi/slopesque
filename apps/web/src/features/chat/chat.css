@@ -1,5 +1,9 @@
 /* The chat (Chat.tsx): messages, reactions, replies, pictures, panels (upload, stickers), the + menu, the players'
    list. */
+/* The chat's own colours. */
+:root {
+  --presence-gone: #d97706;
+}
 .chat { list-style: none; margin: 0; padding: 10px 12px; flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
 .msg { overflow-wrap: anywhere; }
 .msg.sys { color: var(--muted); font-size: 12px; font-style: italic; }
@@ -18,7 +22,7 @@
 .msg-body:hover, .msg:has(.react-bar:hover) .msg-body, .msg.is-reacting .msg-body { background: var(--surface-2); }
 .react-bar { position: absolute; z-index: 5; right: 8px; width: fit-content; margin-top: -3px; display: flex; align-items: center; gap: 1px; padding: 3px;
   visibility: hidden; opacity: 0; transition: opacity .1s;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 99px; box-shadow: 0 3px 12px rgb(0 0 0 / .16); }
+  background: var(--surface); border: 1px solid var(--border); border-radius: 99px; box-shadow: var(--shadow-pop); }
 .msg-body:hover + .react-bar, .react-bar:hover, .msg.is-reacting .react-bar { visibility: visible; opacity: 1; }
 .react-bar button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer;
   font-size: 18px; line-height: 1; transition: transform .12s; }
@@ -122,7 +126,7 @@
 /* away: the window or the extension closed (a moon); 5 min or more (the moon and its z) */
 .presence { display: inline-flex; vertical-align: -2px; color: var(--muted); }
 .presence svg { width: 14px; height: 14px; }
-.presence.gone { color: #d97706; }
+.presence.gone { color: var(--presence-gone); }
 .msg-expired { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px dashed var(--border); border-radius: 10px; color: var(--muted); font-size: 13px; }
 .msg-expired svg { flex: none; }
 .msg-expired span { display: flex; flex-direction: column; }
@@ -134,7 +138,7 @@
 .to-bottom-anchor { position: relative; height: 0; }
 .to-bottom { position: absolute; left: 0; bottom: 0; z-index: 6; display: inline-flex; align-items: center; gap: 4px; height: 32px; min-width: 36px;
   padding: 0 10px 0 9px; border: 1px solid var(--border); border-left: 0; border-bottom: 0; border-radius: 0 12px 0 0; background: var(--surface);
-  color: var(--muted); cursor: pointer; box-shadow: 2px -2px 8px rgb(0 0 0 / .08); }
+  color: var(--muted); cursor: pointer; box-shadow: 2px -2px 8px var(--shade-08); }
 .to-bottom:hover, .to-bottom:focus-visible { color: var(--text); background: var(--surface-2); outline: none; }
 .to-bottom.has-new { color: var(--accent); }
 .to-bottom b { font-size: 12px; }

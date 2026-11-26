@@ -1,6 +1,7 @@
 /* The hover tip (features/chat/hover.ts wireTip): the names behind a count. Last of the list: its cursor overrides
    the components'. */
 [data-names] { cursor: help; }
-.tip { position: fixed; z-index: 50; max-width: 260px; padding: 4px 9px; border-radius: 6px; background: var(--text); color: var(--bg);
-  font-size: 12px; font-weight: 600; pointer-events: none; box-shadow: var(--shadow); }
+.tip { position: fixed; z-index: 50; max-width: 260px; padding: var(--space-2) 9px; border-radius: var(--radius-sm);
+background: var(--text); color: var(--bg);
+  font-size: var(--text-sm); font-weight: 600; pointer-events: none; box-shadow: var(--shadow); }
 .tip[hidden] { display: none; }

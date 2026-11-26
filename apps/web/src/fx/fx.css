@@ -1,8 +1,15 @@
 /* The effects' layer (fx/): over the game area, under the windows (70) and the cards in flight (65), above the
    table's announcements (30); never in the way of the pointer. */
+/* The effects' own colours: the night sky, the star, the tomato, the dust. */
+:root {
+  --fx-sky-1: #101634; --fx-sky-2: #070914; --fx-sky-3: #020308;
+  --fx-star: #ffd166; --fx-star-glow: #fff3c4; --fx-drop: #d62828;
+  --fx-dust: #e9e2d8; --fx-dust-edge: #bfb4a6; --fx-stain-shadow: rgb(80 0 0 / .35);
+  --fx-drip-top: #c1121f; --fx-drip-bottom: #a4161a;
+}
 .fx-layer { position: fixed; z-index: 32; pointer-events: none; overflow: hidden; }
 .fx-dim { position: absolute; inset: 0; opacity: 0; transition: opacity .9s ease;
-  background: radial-gradient(ellipse at 50% 65%, #101634 0%, #070914 55%, #020308 100%); }
+  background: radial-gradient(ellipse at 50% 65%, var(--fx-sky-1) 0%, var(--fx-sky-2) 55%, var(--fx-sky-3) 100%); }
 .fx-dim.on { opacity: .96; transition-duration: .45s; }
 .fx-sky { position: absolute; inset: 0; width: 100%; height: 100%; }
 
@@ -10,27 +17,27 @@
 .fx-spot { position: absolute; left: 0; top: 0; width: var(--s); height: var(--s); margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2); }
 .fx-box, .fx-face { position: absolute; inset: 0; }
 .fx-face { transform-origin: 50% 100%; }
-.fx-avatar { position: absolute; inset: 0; display: grid; place-items: center; overflow: hidden; border-radius: 50%; background: var(--c); color: #fff;
+.fx-avatar { position: absolute; inset: 0; display: grid; place-items: center; overflow: hidden; border-radius: 50%; background: var(--c); color: var(--on-color);
   font-weight: 800; font-size: calc(var(--s) * .46); line-height: 1; }
-.fx-spot.in-middle .fx-avatar { box-shadow: 0 10px 30px rgb(0 0 0 / .35), 0 0 0 calc(var(--s) * .045) #fff; }
-.fx-spot.on-seat .fx-avatar { box-shadow: 0 0 0 2px #fff, 0 2px 8px rgb(0 0 0 / .35); }
+.fx-spot.in-middle .fx-avatar { box-shadow: 0 10px 30px var(--shade-35), 0 0 0 calc(var(--s) * .045) var(--paper); }
+.fx-spot.on-seat .fx-avatar { box-shadow: 0 0 0 2px var(--paper), 0 2px 8px var(--shade-35); }
 .fx-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .fx-glyph { position: absolute; left: 50%; top: 50%; width: 1em; height: 1em; margin: -.5em 0 0 -.5em; line-height: 1; text-align: center;
-  filter: drop-shadow(0 4px 6px rgb(0 0 0 / .35)); will-change: transform; }
-.fx-spikes { position: absolute; z-index: 2; filter: drop-shadow(0 2px 4px rgb(0 0 0 / .25)); }
+  filter: drop-shadow(0 4px 6px var(--shade-35)); will-change: transform; }
+.fx-spikes { position: absolute; z-index: 2; filter: drop-shadow(0 2px 4px var(--shade-25)); }
 .fx-spikes svg, .fx-stain svg, .fx-hammer svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .fx-bit { position: absolute; z-index: 3; }
-.fx-star { display: block; color: #ffd166; font-size: calc(var(--s) * .22); text-shadow: 0 0 6px #fff3c4; }
-.fx-drop { display: block; width: var(--d); height: var(--d); border-radius: 50% 50% 50% 0; background: #d62828; transform: rotate(-45deg); }
-.fx-dust { display: block; width: calc(var(--s) * .22); height: calc(var(--s) * .22); border-radius: 50%; background: radial-gradient(circle, #e9e2d8 0%, #bfb4a6 60%, transparent 70%); }
-.fx-stain { position: absolute; z-index: 2; left: 50%; top: 50%; width: calc(var(--s) * 1.15); height: calc(var(--s) * 1.15); filter: drop-shadow(0 3px 4px rgb(80 0 0 / .35)); }
-.fx-drip { position: absolute; z-index: 1; transform-origin: 50% 0; border-radius: 0 0 99px 99px; background: linear-gradient(#c1121f, #a4161a); transform: scaleY(0); }
-.fx-hammer { position: absolute; z-index: 3; transform-origin: 50% 100%; filter: drop-shadow(0 6px 8px rgb(0 0 0 / .35)); }
+.fx-star { display: block; color: var(--fx-star); font-size: calc(var(--s) * .22); text-shadow: 0 0 6px var(--fx-star-glow); }
+.fx-drop { display: block; width: var(--d); height: var(--d); border-radius: 50% 50% 50% 0; background: var(--fx-drop); transform: rotate(-45deg); }
+.fx-dust { display: block; width: calc(var(--s) * .22); height: calc(var(--s) * .22); border-radius: 50%; background: radial-gradient(circle, var(--fx-dust) 0%, var(--fx-dust-edge) 60%, transparent 70%); }
+.fx-stain { position: absolute; z-index: 2; left: 50%; top: 50%; width: calc(var(--s) * 1.15); height: calc(var(--s) * 1.15); filter: drop-shadow(0 3px 4px var(--fx-stain-shadow)); }
+.fx-drip { position: absolute; z-index: 1; transform-origin: 50% 0; border-radius: 0 0 99px 99px; background: linear-gradient(var(--fx-drip-top), var(--fx-drip-bottom)); transform: scaleY(0); }
+.fx-hammer { position: absolute; z-index: 3; transform-origin: 50% 100%; filter: drop-shadow(0 6px 8px var(--shade-35)); }
 
 /* the screamer: in front, in the middle, a second */
 .fx-screamer { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; }
-.fx-flash { position: absolute; inset: 0; background: radial-gradient(circle, rgb(0 0 0 / .2) 0%, rgb(0 0 0 / .85) 100%); opacity: 0; }
+.fx-flash { position: absolute; inset: 0; background: radial-gradient(circle, var(--shade-20) 0%, var(--shade-85) 100%); opacity: 0; }
 .fx-scream { position: relative; display: grid; place-items: center; width: 72%; height: 72%; }
-.fx-scream img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 10px; box-shadow: 0 20px 60px rgb(0 0 0 / .55); }
-.fx-scream.emoji { font-size: min(40vmin, 200px); line-height: 1; filter: drop-shadow(0 12px 30px rgb(0 0 0 / .5)); }
+.fx-scream img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 10px; box-shadow: 0 20px 60px var(--shade-55); }
+.fx-scream.emoji { font-size: min(40vmin, 200px); line-height: 1; filter: drop-shadow(0 12px 30px var(--shade-50)); }
 .fx-still { position: absolute; inset: 0; display: grid; place-items: center; font-size: 72px; opacity: 0; }

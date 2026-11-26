@@ -8,7 +8,7 @@ body.activity-web:not(.room-blocked) .web-stage { display: flex; flex-direction:
 .web-bar .web-host { font: 11px ui-monospace, monospace; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .web-bar .note { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .web-bar .btn.sm { margin: 0; align-self: center; text-decoration: none; }
-.web-frame { flex: 1; width: 100%; min-height: 0; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; }
+.web-frame { flex: 1; width: 100%; min-height: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--paper); }
 .web-state { display: none; }
 body.web-blocked .web-frame { display: none; }
 body.web-blocked .web-state { display: grid; place-items: center; flex: 1; min-height: 0; overflow: auto; }

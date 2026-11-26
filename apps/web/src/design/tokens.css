@@ -1,7 +1,10 @@
-/* Simple first design, to evolve. Colours are tokens; the dark theme follows the system unless forced in the
-   settings (html[data-theme]). */
+/* The design tokens: every colour, radius, spacing, shadow, text size and duration of the app has a name here (the
+   values the app already used). The theme's colours follow the system, unless forced in the settings
+   (html[data-theme]); the other tokens are the same in both themes. A feature's own colours (the felt of the card
+   table, the chips…) are named custom properties at the top of its stylesheet, never written out in its rules. */
 :root {
   color-scheme: light;
+  /* the theme */
   --bg: #f5f4f0;
   --surface: #ffffff;
   --surface-2: #efede7;
@@ -12,9 +15,65 @@
   --accent-text: #ffffff;
   --danger: #d93d42;
   --disk-fill: #fbfaf7;
-  --shadow: 0 8px 30px rgb(0 0 0 / .14);
+  --shadow: 0 8px 30px rgb(0 0 0 / .14);   /* a window, a drawer, a floating panel */
+
+  /* colours that don't change with the theme */
+  --on-color: #fff;     /* text and icons on a coloured background (a player's colour, a filled button) */
+  --paper: #fff;        /* a white surface in both themes (a framed page, a trump, a badge on the felt) */
+  --ink: #1c1b19;       /* dark text on such a surface (a card's values, the wheel's labels) */
+  --ok: #1f9d55;        /* yes, given, strong */
+  --ok-text: #2c8a4b;   /* a success said in a line */
+  --warn: #d88a00;      /* medium (a code's strength) */
+  --wait: #b07400;      /* waiting, pending */
+  --wait-tint: #e0a020; /* … its background, mixed */
+  --crown: #c99a06;     /* the host's crown */
+  --star: #ffc93c;      /* a favourite */
+  /* black at an opacity: shadows, scrims over a picture, backdrops */
+  --shade-08: rgb(0 0 0 / .08); --shade-15: rgb(0 0 0 / .15); --shade-16: rgb(0 0 0 / .16); --shade-20: rgb(0 0 0 / .2);
+  --shade-25: rgb(0 0 0 / .25); --shade-28: rgb(0 0 0 / .28); --shade-30: rgb(0 0 0 / .3); --shade-32: rgb(0 0 0 / .32);
+  --shade-35: rgb(0 0 0 / .35); --shade-40: rgb(0 0 0 / .4); --shade-45: rgb(0 0 0 / .45); --shade-50: rgb(0 0 0 / .5);
+  --shade-55: rgb(0 0 0 / .55); --shade-72: rgb(0 0 0 / .72); --shade-85: rgb(0 0 0 / .85);
+  --backdrop: var(--shade-35);       /* behind a window */
+  --backdrop-soft: var(--shade-20);  /* behind the right drawer */
+
+  /* shadows (and --shadow above) */
+  --shadow-sm: 0 1px 2px var(--shade-15);
+  --shadow-pop: 0 3px 12px var(--shade-16);                                 /* a small floating bar */
+  --shadow-thumb: 0 0 0 1px var(--border), 0 1px 4px var(--shade-35);       /* a slider's thumb */
+  --ring-focus: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+
+  /* radii */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;     /* buttons, fields, rows */
+  --radius-lg: 10px;    /* panels, lists */
   --radius: 12px;
-  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --radius-xl: 14px;    /* windows */
+  --radius-2xl: 16px;   /* page cards, the card table */
+  --radius-pill: 99px;
+
+  /* spacings: --space-N = N × 2 px */
+  --space-1: 2px; --space-2: 4px; --space-3: 6px; --space-4: 8px; --space-5: 10px; --space-6: 12px; --space-7: 14px;
+  --space-8: 16px; --space-9: 18px; --space-11: 22px; --space-12: 24px; --space-14: 28px; --space-16: 32px;
+
+  /* text */
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, monospace;
+  --text-2xs: 10px;
+  --text-xs: 11px;
+  --text-sm: 12px;      /* help lines, labels */
+  --text-md: 13px;
+  --text-base: 14px;    /* the body */
+  --text-lg: 15px;
+  --text-xl: 17px;      /* a window's title */
+  --text-2xl: 22px;     /* a page's title */
+
+  /* durations */
+  --duration-fast: .1s;
+  --duration: .2s;      /* drawers, backdrops */
+  --duration-slow: .3s;
+
+  font: var(--text-base)/1.45 var(--font);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
