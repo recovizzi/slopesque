@@ -1,5 +1,4 @@
 /* An integration (WebStage.tsx): an external page framed in the game area, a thin bar above it. */
-/* an integration (integrations.ts): an external page framed in the game area, a thin bar above it */
 .web-stage { display: none; }
 .activity-web .stage-grid { display: none; }
 body.activity-web:not(.room-blocked) .web-stage { display: flex; flex-direction: column; height: 100%; padding: 8px 10px 10px; gap: 6px; }
@@ -9,7 +8,6 @@ body.activity-web:not(.room-blocked) .web-stage { display: flex; flex-direction:
 .web-bar .note { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .web-bar .btn.sm { margin: 0; align-self: center; text-decoration: none; }
 .web-frame { flex: 1; width: 100%; min-height: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--paper); }
-.web-state { display: none; }
-body.web-blocked .web-frame { display: none; }
-body.web-blocked .web-state { display: grid; place-items: center; flex: 1; min-height: 0; overflow: auto; }
+/* while the page is checked, or when it doesn't answer: an explanation instead of the frame */
+.web-state { display: grid; place-items: center; flex: 1; min-height: 0; overflow: auto; }
 .web-down-card code { font: 12px ui-monospace, monospace; overflow-wrap: anywhere; }

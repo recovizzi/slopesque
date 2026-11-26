@@ -7,20 +7,28 @@ import { codeOf, EmojiPop, THUMBS_UP } from '../lib/emoji';
 import * as X from '../lib/ext';
 import { connect, request, upload } from './net';
 import { useStore } from './store';
-import { AccountSection, CodeModal, Welcome, type CodeMode } from '../features/account/Account';
+import { AccountSection } from '../features/account/AccountSection';
+import { CodeModal } from '../features/account/CodeModal';
+import type { CodeMode } from '../features/account/model';
+import { Welcome } from '../features/account/Welcome';
 import { Chat, People } from '../features/chat/Chat';
 import {
   Avatar, Badge, Button, Card, Checkbox, Drawer, DrawerBody, Field, Icon, IconButton, LinkButton, Modal, ModalButtons, Note, RichText, Select, Tabs,
   TextInput,
 } from '../design';
-import { KeyBadge, RoomList, RoomPage } from '../features/rooms/Rooms';
+import { KeyBadge } from '../features/rooms/KeyBadge';
+import { RoomList } from '../features/rooms/RoomList';
+import { RoomPage } from '../features/rooms/RoomPage';
 import { ServerField } from '../features/rooms/ServerField';
-import { DiskSettings, DiskStage, Ranking } from '../features/disk/DiskStage';
+import { DiskSettings } from '../features/disk/DiskSettings';
+import { DiskStage } from '../features/disk/DiskStage';
+import { Ranking } from '../features/disk/Ranking';
 import { PollSettings, PollStage, WheelStage } from '../features/poll/PollWheel';
 import { CardsStage } from '../features/cards/CardsStage';
 import { TrumpArt } from '../features/cards/tarot/TrumpArt';
 import { Palmares } from '../features/palmares/Palmares';
-import { WebSettings, WebStage } from '../features/web/WebStage';
+import { WebSettings } from '../features/web/WebSettings';
+import { WebStage } from '../features/web/WebStage';
 import { EXT_VERSION, APP_NAME } from './version';
 import { CARD_PLAYERS, COINCHE_TARGETS, HOLDEM_EVERY, HOLDEM_STACKS, cardGameOf, READY_ACTIVITIES, SCORE_NAMES, scoreKey, versionBelow } from '@slopesque/shared';
 
