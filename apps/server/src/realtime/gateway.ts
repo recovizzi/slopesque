@@ -74,26 +74,8 @@ export class Gateway {
   gameReset(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('game:reset', b, async () => { await this.hub.gameReset(s); return null; }); }
 
   // ---------------------------------------------------------------- Sondage, Roulette
-  @SubscribeMessage('poll:settings')
-  pollSettings(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('poll:settings', b, async v => { await this.hub.pollSettings(s, v); return null; }); }
-  @SubscribeMessage('poll:publish')
-  pollPublish(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('poll:publish', b, async v => { await this.hub.pollPublish(s, v); return null; }); }
-  @SubscribeMessage('poll:answer')
-  pollAnswer(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('poll:answer', b, async v => { await this.hub.pollAnswer(s, v.answer); return null; }); }
-  @SubscribeMessage('poll:end')
-  pollEnd(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('poll:end', b, async () => { await this.hub.pollEnd(s); return null; }); }
-  @SubscribeMessage('poll:next')
-  pollNext(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('poll:next', b, async () => { await this.hub.pollNext(s); return null; }); }
-  @SubscribeMessage('wheel:set')
-  wheelSet(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('wheel:set', b, async v => { await this.hub.wheelSet(s, v.items); return null; }); }
-  @SubscribeMessage('wheel:spin')
-  wheelSpin(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('wheel:spin', b, async () => { await this.hub.wheelSpin(s); return null; }); }
-  @SubscribeMessage('wheel:edit')
-  wheelEdit(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('wheel:edit', b, async () => { await this.hub.wheelEdit(s); return null; }); }
 
   // ---------------------------------------------------------------- Cartes
-  @SubscribeMessage('web:set')
-  setWeb(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('web:set', b, async v => { await this.hub.setWeb(s, v.integration, v.url); return null; }); }
   @SubscribeMessage('cards:deal')
   cardsDeal(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('cards:deal', b, async () => { await this.hub.cardsDeal(s); return null; }); }
   @SubscribeMessage('cards:play')
@@ -106,10 +88,6 @@ export class Gateway {
   holdemAct(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('holdem:act', b, async v => { await this.hub.holdemDo(s, v); return null; }); }
   @SubscribeMessage('holdem:rules')
   holdemRules(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('holdem:rules', b, async v => { await this.hub.holdemSetRules(s, v); return null; }); }
-  @SubscribeMessage('poll:chat-answer')
-  pollChatAnswer(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('poll:chat-answer', b, async v => { await this.hub.chatPollAnswer(s, v.id, v.answer); return null; }); }
-  @SubscribeMessage('poll:chat-end')
-  pollChatEnd(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('poll:chat-end', b, async v => { await this.hub.chatPollEnd(s, v.id); return null; }); }
   @SubscribeMessage('coinche:say')
   coincheSay(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('coinche:say', b, async v => { await this.hub.coincheDo(s, { say: (v.kind === 'bid' ? { kind: 'bid', value: v.value ?? 0, suit: v.suit ?? 'S' } : { kind: v.kind }) as Coinche.Say }); return null; }); }
   @SubscribeMessage('cards:deal-mode')
@@ -131,8 +109,6 @@ export class Gateway {
   tarotCall(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('tarot:call', b, async v => { await this.hub.tarotDo(s, { call: v.card }); return null; }); }
   @SubscribeMessage('tarot:discard')
   tarotDiscard(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('tarot:discard', b, async v => { await this.hub.tarotDo(s, { discard: v.cards }); return null; }); }
-  @SubscribeMessage('effect:play')
-  effectPlay(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('effect:play', b, async v => { await this.intents.limit(s, 'effects'); await this.hub.playEffect(s, v); return null; }); }
 
   @SubscribeMessage('tarot:art')
   tarotArt(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('tarot:art', b, async v => { await this.hub.tarotArt(s, v.card, v.mediaId); return null; }); }
