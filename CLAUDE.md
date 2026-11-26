@@ -10,7 +10,7 @@ concept, les règles des jeux). La maquette de référence (comportements, captu
 | Dossier | Contenu |
 |---|---|
 | `apps/server` | NestJS 12 (ESM, TypeScript 6). `src/rooms/room-hub.service.ts` = les salons en mémoire (présence, votes, crédit, Demi-disque, Sondage, Roulette, cartes, Low Tide, palmarès), `src/realtime/gateway.ts` = les intentions Socket.IO, `src/chat`, `src/media` (images par usage, `/media/:id`), `src/external` (GIF, aperçus de lien, `safeFetch`), `src/accounts`, `src/admin.ts` (console), `src/db/schema.ts` (Drizzle, migrations dans `drizzle/`). Tests : `test/*.test.ts` lancent le vrai serveur (`dist/`) |
-| `apps/web` | React + Vite, construit dans l'extension. `src/App.tsx` (coque, onglets), `src/ui/*` (chat, compte, salons, Demi-disque, Sondage / Roulette, cartes, palmarès, Low Tide), `src/lib/*` (vues HTML reprises de la maquette : disque, amphi, sondage, roue, cartes, tarot, hold'em, coinche, palmarès, emoji, liens), `src/net.ts` (Socket.IO, état complet + événements numérotés), `src/store.ts` (Zustand) |
+| `apps/web` | React + Vite, construit dans l'extension (refonte en cours : `openspec/changes/refactor-architecture`). `src/app/` (coque `App.tsx`, `store.ts` Zustand, `net.ts` Socket.IO, `styles.ts` = la liste ordonnée de toutes les feuilles de style), `src/design/` (la bibliothèque de composants — `Button`, `Field`, `Modal`, `Tabs`, `Icon`, `RichText`… — sur les jetons de `tokens.css` ; `pnpm dev` puis `?kit` les montre en clair et en sombre), `src/features/<fonctionnalité>/` (chat, poll, wheel, disk, cards + tarot/holdem/coinche, rooms, account, palmares, credit, vote, activity-picker, web : composants, styles, logique), `src/lib/*` (fonctions sans DOM : liens, texte en segments `rich-text.ts`, commandes, appareil, caches), `src/legacy/` (`LiveHtml`, `Html`, `esc`, icônes en chaînes : en sursis, supprimés à la tâche 4.1), `src/fx/` (effets canvas). `pnpm --filter @slopesque/web lint` vérifie aussi : pas de HTML texte, fichiers ≤ 300 lignes, pas de couleur en dur (`scripts/check-source.mjs`, exceptions provisoires et leur propriétaire dans `scripts/source-allowlist.mjs`) |
 | `apps/extension` | MV3 : `src/panel-core.js` (panneau), `panel.js` (icône, raccourci), `panel-auto.js` (« toutes les pages »), `background.js`, `tools/build.mjs`. `public-key.txt` fixe l'identifiant Chrome (la clé privée : `slopesque-crx.pem`, non versionnée) |
 | `packages/shared` | constantes, schéma de l'environnement, protocole (zod + types) |
 | `packages/engines` | règles pures testées : code, clés, couleurs, liens, votes, crédit, Demi-disque, Sondage, Roulette, Trou du cul, places à table, Tarot, Texas Hold'em et Coinche (vues par place, robots par niveau ; `pnpm tarot:duel`, `pnpm holdem:duel`, `pnpm coinche:duel` les mesurent) |
@@ -45,6 +45,10 @@ pnpm deploy:prod         # déploiement (--check, --init la 1re fois, --dry-run 
 6. **ESM partout** : imports relatifs avec l'extension `.js` dans les paquets et le serveur.
 7. **Jetable** : pas de sauvegarde, fichiers sans usage supprimés aussitôt, et c'est dit.
 8. Conventional commits (`feat:`, `fix:`, `chore:`…), en anglais.
+9. **Interface** : les pièces de `design/` (jamais une classe `btn`, `field`, `modal`… refaite à la main), le texte d'un
+   joueur rendu par React (`RichText`), jamais de HTML texte. Une feuille de style vit à côté de sa fonctionnalité et
+   s'ajoute à la liste de `app/styles.ts` (pas d'`import` CSS dans un composant) ; couleurs : un jeton, ou une propriété
+   nommée en tête de la feuille de la fonctionnalité.
 
 ## Méthode de travail personnelle
 
