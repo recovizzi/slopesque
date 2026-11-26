@@ -3,14 +3,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { MIN_HUE_GAP, RAINBOW, hueColor, hueDistance, newCode } from '@slopesque/engines';
 import { isInsecureUrl, type ActivityChoice, type MemberView } from '@slopesque/shared';
-import { codeOf, EmojiPop, emojiHtml } from '../lib/emoji';
+import { codeOf, EmojiPop, THUMBS_UP } from '../lib/emoji';
 import * as X from '../lib/ext';
 import { connect, request, upload } from './net';
 import { useStore } from './store';
 import { AccountSection, CodeModal, Welcome, type CodeMode } from '../features/account/Account';
 import { Chat, People } from '../features/chat/Chat';
-import { Avatar, Icon, useEscape } from '../design';
-import { Html } from '../legacy/Html';
+import {
+  Avatar, Badge, Button, Card, Checkbox, Drawer, DrawerBody, Field, Icon, IconButton, LinkButton, Modal, ModalButtons, Note, RichText, Select, Tabs,
+  TextInput,
+} from '../design';
 import { KeyBadge, RoomList, RoomPage } from '../features/rooms/Rooms';
 import { ServerField } from '../features/rooms/ServerField';
 import { DiskSettings, DiskStage, Ranking } from '../features/disk/DiskStage';
@@ -25,6 +27,8 @@ import { CARD_PLAYERS, COINCHE_TARGETS, HOLDEM_EVERY, HOLDEM_STACKS, cardGameOf,
 const EMBED = new URLSearchParams(location.search).has('embed');
 const RELEASES = 'https://github.com/recovizzi/slopesque/releases/latest';
 type RightTab = 'profile' | 'extension' | 'game';
+const PLAYERS_TAB = { id: 'ranking', label: 'Joueurs', icon: 'users', title: 'Joueurs' } as const;
+const PALMARES_TAB = { id: 'palmares', label: 'Palmarès', icon: 'chart', title: 'Palmarès : victoires et taux de victoire, gardés dans le temps' } as const;
 
 export function App() {
   const { device, conn, fatal, account, room, roomStatus, insecure, setDevice } = useStore();
@@ -84,38 +88,34 @@ export function App() {
   if (first) page = <Welcome code={welcomeCode} onChange={mode => setCodeModal({ first: true, start: mode })} />;
   else if (fatal) page = <FatalPage onCode={mode => setCodeModal({ first: true, start: mode })} />;
   else if (!account && conn === 'offline') page = <OfflinePage />;
-  else if (!account) page = <div className="room-card"><p className="note">Connexion au serveur…</p></div>;
+  else if (!account) page = <Card><Note>Connexion au serveur…</Note></Card>;
   else if (roomStatus !== 'ok' || !room) page = <RoomPage status={roomStatus === 'ok' ? 'loading' : roomStatus} onList={openList} />;
 
   const me = room && account ? room.members.find(m => m.id === account.id) : null;
+  const closeLeft = <IconButton icon="close" label="Fermer le panneau" title="Fermer" onClick={() => setLeftOpen(false)} />;
   return <>
     <header className="bar">
-      <button className="icon-btn" type="button" onClick={() => setLeftOpen(!leftOpen)} title="Joueurs" aria-label="Joueurs"><Icon name="sidebar" /></button>
+      <IconButton icon="sidebar" label="Joueurs" onClick={() => setLeftOpen(!leftOpen)} />
       <div className="brand"><svg className="brand-logo" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M7 2h10a5 5 0 0 1 5 5v7a5 5 0 0 1-5 5H9.5L4 22.5l1.2-4.4A5 5 0 0 1 2 14V7a5 5 0 0 1 5-5Z" fill="var(--accent)"/><rect x="6" y="5.5" width="5.5" height="5" rx="1.5" fill="#ffd166"/><rect x="12.5" y="5.5" width="5.5" height="5" rx="1.5" fill="#ef476f"/><rect x="6" y="11.5" width="5.5" height="5" rx="1.5" fill="#06d6a0"/><rect x="12.5" y="11.5" width="5.5" height="5" rx="1.5" fill="#4cc9f0"/></svg>{APP_NAME}</div>
-      {conn === 'reconnecting' && <span className="tag wait conn-state" role="status">Reconnexion…</span>}
-      {insecure && <span className="tag insecure" title={`${device.server} : le code et les messages circulent en clair`}><Icon name="lock" />Connexion non chiffrée</span>}
+      {conn === 'reconnecting' && <Badge tone="wait" className="conn-state" role="status">Reconnexion…</Badge>}
+      {insecure && <Badge tone="insecure" icon="lock" title={`${device.server} : le code et les messages circulent en clair`}>Connexion non chiffrée</Badge>}
       <div className="spacer" />
       {!first && <div className="header-tools">
         {device.roomKey && <KeyBadge k={device.roomKey} />}
-        {account && <button className={`avatar${me?.photo ? ' has-photo' : ''}`} type="button" onClick={() => { setRightOpen(!rightOpen); setTab('profile'); }}
-          style={{ '--c': hueColor(me?.hue ?? account.hue ?? 222) } as React.CSSProperties} title={`${account.name} — profil et paramètres`} aria-label="Profil et paramètres">
-          {me?.photo ? <img src={me.photo} alt="" draggable={false} /> : account.name.slice(0, 1).toUpperCase()}</button>}
+        {account && <Avatar name={account.name} hue={me?.hue ?? account.hue ?? 222} photo={me?.photo} size="" onClick={() => { setRightOpen(!rightOpen); setTab('profile'); }}
+          title={`${account.name} — profil et paramètres`} label="Profil et paramètres" />}
       </div>}
-      {EMBED && <button className="icon-btn" type="button" onClick={() => parent.postMessage({ scd: 'close' }, '*')} title="Fermer" aria-label="Fermer"><Icon name="close" /></button>}
+      {EMBED && <IconButton icon="close" label="Fermer" onClick={() => parent.postMessage({ scd: 'close' }, '*')} />}
     </header>
     <div className="main">
-      <aside className="drawer drawer-left">{room && account && (act === 'chat' ? <>
-        <div className="tabs">   {/* the Chat activity: its players, and the Palmarès kept for every game */}
-          <button className={`tab ${leftTab !== 'palmares' ? 'on' : ''}`} type="button" onClick={() => setLeftTab('ranking')} title="Joueurs"><Icon name="users" /><span className="tab-label">Joueurs</span></button>
-          <button className={`tab ${leftTab === 'palmares' ? 'on' : ''}`} type="button" onClick={() => setLeftTab('palmares')} title="Palmarès : victoires et taux de victoire, gardés dans le temps"><Icon name="chart" /><span className="tab-label">Palmarès</span></button>
-          <button className="icon-btn" type="button" onClick={() => setLeftOpen(false)} title="Fermer" aria-label="Fermer le panneau"><Icon name="close" /></button></div>
+      <Drawer side="left">{room && account && (act === 'chat' ? <>
+        {/* the Chat activity: its players, and the Palmarès kept for every game */}
+        <Tabs value={leftTab === 'palmares' ? 'palmares' : 'ranking'} onChange={setLeftTab} tabs={[PLAYERS_TAB, PALMARES_TAB]}>{closeLeft}</Tabs>
         {leftTab === 'palmares' ? <Palmares /> : <People onGiveHost={giveHost} />}</> : <>
-        <div className="tabs">
-          <button className={`tab ${leftTab === 'chat' ? 'on' : ''}`} type="button" onClick={() => setLeftTab('chat')} title="Chat"><Icon name="chat" /><span className="tab-label">Chat</span></button>
-          <button className={`tab ${leftTab === 'ranking' ? 'on' : ''}`} type="button" onClick={() => setLeftTab('ranking')} title={scored ? 'Classement' : 'Joueurs'}>{scored ? <><Icon name="trophy" /><span className="tab-label">Classement</span></> : <><Icon name="users" /><span className="tab-label">Joueurs</span></>}</button>
-          <button className={`tab ${leftTab === 'palmares' ? 'on' : ''}`} type="button" onClick={() => setLeftTab('palmares')} title="Palmarès : victoires et taux de victoire, gardés dans le temps"><Icon name="chart" /><span className="tab-label">Palmarès</span></button>
-          <button className="icon-btn" type="button" onClick={() => setLeftOpen(false)} title="Fermer" aria-label="Fermer le panneau"><Icon name="close" /></button></div>
-        {leftTab === 'chat' ? !blocked && <Chat pop={pop} /> : leftTab === 'palmares' ? <Palmares /> : scored ? <Ranking onGiveHost={giveHost} /> : <People onGiveHost={giveHost} />}</>)}</aside>
+        <Tabs value={leftTab} onChange={setLeftTab}
+          tabs={[{ id: 'chat', label: 'Chat', icon: 'chat', title: 'Chat' }, scored ? { id: 'ranking', label: 'Classement', icon: 'trophy', title: 'Classement' } : PLAYERS_TAB, PALMARES_TAB]}>
+          {closeLeft}</Tabs>
+        {leftTab === 'chat' ? !blocked && <Chat pop={pop} /> : leftTab === 'palmares' ? <Palmares /> : scored ? <Ranking onGiveHost={giveHost} /> : <People onGiveHost={giveHost} />}</>)}</Drawer>
       <main className="stage">
         <div className="room-page">{page}</div>
         <div className="chat-stage">{!blocked && act === 'chat' && <Chat pop={pop} />}</div>
@@ -125,14 +125,12 @@ export function App() {
         {!blocked && act === 'cards' && <CardsStage />}
         {!blocked && act === 'lowtide' && <WebStage onSettings={() => { setRightOpen(true); setTab('game'); }} />}
       </main>
-      <div className="backdrop" onClick={() => setRightOpen(false)} />
-      <aside className="drawer drawer-right">{!first && <>
-        <div className="tabs">
-          {(['profile', 'extension', 'game'] as const).map(t => <button key={t} type="button" className={`tab ${tab === t ? 'on' : ''}`} onClick={() => setTab(t)}>{{ profile: 'Profil', extension: 'Extension', game: 'Partie' }[t]}</button>)}
-          <button className="icon-btn" type="button" onClick={() => setRightOpen(false)} title="Fermer" aria-label="Fermer"><Icon name="close" /></button></div>
-        <div className="drawer-body" key={rightOpen ? 'open' : 'closed'}>{tab === 'profile' ? <Profile pop={pop} onCode={() => setCodeModal({ first: false, start: null })} />
+      <Drawer side="right" onClose={() => setRightOpen(false)}>{!first && <>
+        <Tabs value={tab} onChange={setTab} tabs={[{ id: 'profile', label: 'Profil' }, { id: 'extension', label: 'Extension' }, { id: 'game', label: 'Partie' }]}>
+          <IconButton icon="close" label="Fermer" onClick={() => setRightOpen(false)} /></Tabs>
+        <DrawerBody key={rightOpen ? 'open' : 'closed'}>{tab === 'profile' ? <Profile pop={pop} onCode={() => setCodeModal({ first: false, start: null })} />
           : tab === 'extension' ? <ExtensionTab setDevice={setDevice} />
-          : <GameTab />}</div></>}</aside>
+          : <GameTab />}</DrawerBody></>}</Drawer>
     </div>
     {room?.notice && <NoticeModal notice={room.notice} />}
     {codeModal && <CodeModal first={codeModal.first} start={codeModal.start} onClose={() => setCodeModal(null)} onDone={() => setCodeModal(null)} />}
@@ -155,11 +153,12 @@ function Profile({ pop, onCode }: { pop: EmojiPop | null; onCode: () => void }) 
   const save = async (p: { name?: string; hue?: number; quick?: string }) => { const r = await request('profile:update', p); if (r.ok) set({ account: r.value }); else set({ note: r.error }); };
   const shown = hue ?? me?.hue ?? account.hue ?? 222;
   const pos = (v: number) => `calc(11px + (100% - 22px) * ${(v / 359).toFixed(4)})`;
+  const quick = account.quick || THUMBS_UP;
   return <>
     <PhotoField />
-    <label className="field"><span>Pseudo</span><input name="pseudo" value={name} maxLength={20} onChange={e => setName(e.target.value)}
-      onBlur={() => { if (name.trim() && name.trim() !== account.name) void save({ name: name.trim() }); }} onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} /></label>
-    <div className="field"><span>Couleur</span>
+    <Field label="Pseudo"><TextInput name="pseudo" value={name} maxLength={20} onChange={e => setName(e.target.value)}
+      onBlur={() => { if (name.trim() && name.trim() !== account.name) void save({ name: name.trim() }); }} onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} /></Field>
+    <Field as="div" label="Couleur" help={hueNote}>
       <div className="hue" style={{ '--h': shown } as React.CSSProperties}>
         <input type="range" className="hue-range" min={0} max={359} step={1} value={shown} style={{ background: RAINBOW }} aria-label="Couleur" onChange={e => {
           const h = +e.target.value, other = close(h);
@@ -173,15 +172,13 @@ function Profile({ pop, onCode }: { pop: EmojiPop | null; onCode: () => void }) 
           }, 3000);
         }} />
         <div className="hue-marks">{others.map(m => <span key={m.id} className="hue-mark" style={{ left: pos(m.hue), '--c': hueColor(m.hue) } as React.CSSProperties} title={m.name} />)}</div>
-      </div>
-      <p className="note">{hueNote}</p></div>
-    <div className="field"><span>Réaction au double-clic</span>
+      </div></Field>
+    <Field as="div" label="Réaction au double-clic" help={quickNote ? <b>{quickNote}</b> : 'Double-clique sur un message pour réagir avec cet emoji.'}>
       <button className="quick-btn" type="button" onClick={ev => void pop?.open(ev.currentTarget, e => {
         if (e.startsWith(':')) setQuickNote('Choisis un emoji standard : un emoji personnalisé n\'existe que dans son salon.');
         else { setQuickNote(''); void save({ quick: e }); }
       })} title="Changer d'emoji">
-        <Html className="quick-emoji" html={emojiHtml(account.quick || '\u{1F44D}\u{FE0F}', [])} />{codeOf(account.quick || '\u{1F44D}\u{FE0F}') && <code>:{codeOf(account.quick || '\u{1F44D}\u{FE0F}')}:</code>}<small>Changer</small></button>
-      <p className="note">{quickNote ? <b>{quickNote}</b> : 'Double-clique sur un message pour réagir avec cet emoji.'}</p></div>
+        <span className="quick-emoji"><RichText text={quick} links={false} /></span>{codeOf(quick) && <code>:{codeOf(quick)}:</code>}<small>Changer</small></button></Field>
     <AccountSection onChange={onCode} />
   </>;
 }
@@ -191,11 +188,11 @@ function ExtensionTab({ setDevice }: { setDevice: (p: Partial<ReturnType<typeof 
   void setDevice;
   return <>
     <ServerField onSaved={() => connect()} />
-    {isInsecureUrl(device.server) && <p className="alert">Connexion non chiffrée : ton code et tes messages circulent en clair jusqu'à ce serveur.</p>}
+    {isInsecureUrl(device.server) && <Note tone="alert">Connexion non chiffrée : ton code et tes messages circulent en clair jusqu'à ce serveur.</Note>}
     <RoomList />
     <ExtensionOptions />
-    <label className="field"><span>Thème</span><select value={device.theme} onChange={e => setDevice({ theme: e.target.value as 'auto' })}>
-      <option value="auto">Système</option><option value="light">Clair</option><option value="dark">Sombre</option></select></label>
+    <Field label="Thème"><Select value={device.theme} onChange={v => setDevice({ theme: v as 'auto' })}
+      options={[{ value: 'auto', label: 'Système' }, { value: 'light', label: 'Clair' }, { value: 'dark', label: 'Sombre' }]} /></Field>
     <Versions />
   </>;
 }
@@ -225,12 +222,13 @@ function PhotoField() {
     setBusy(false);
     setNote(r.ok ? '' : r.error);
   };
-  return <div className="field"><span>Photo de profil <small>dans ce salon</small></span>
+  return <Field as="div" label={<>Photo de profil <small>dans ce salon</small></>}
+    help={note ? <b>{note}</b> : 'Propre à ce salon : chaque salon a la sienne. Coupée en carré, au milieu de l\'image ; l\'ancienne est supprimée.'}>
     <div className="photo-row"><span className="photo-wrap"><Avatar name={me.name} hue={me.hue} photo={me.photo} size="lg" />
-      {me.photo && <button className="photo-del" type="button" onClick={() => void request('photo:set', { mediaId: null })} title="Retirer la photo : ta lettre sur ta couleur revient" aria-label="Retirer la photo"><Icon name="close" /></button>}</span>
-      <button className="btn ghost sm" type="button" disabled={busy} onClick={() => file.current?.click()}><Icon name="camera" />{busy ? 'Envoi…' : me.photo ? 'Changer de photo' : 'Ajouter une photo'}</button></div>
-    <input ref={file} type="file" accept="image/*" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void choose(f); }} />
-    <p className="note">{note ? <b>{note}</b> : 'Propre à ce salon : chaque salon a la sienne. Coupée en carré, au milieu de l\'image ; l\'ancienne est supprimée.'}</p></div>;
+      {me.photo && <button className="photo-del" type="button" onClick={() => void request('photo:set', { mediaId: null })}
+        title="Retirer la photo : ta lettre sur ta couleur revient" aria-label="Retirer la photo"><Icon name="close" /></button>}</span>
+      <Button variant="ghost" size="sm" icon="camera" disabled={busy} onClick={() => file.current?.click()}>{busy ? 'Envoi…' : me.photo ? 'Changer de photo' : 'Ajouter une photo'}</Button></div>
+    <input ref={file} type="file" accept="image/*" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void choose(f); }} /></Field>;
 }
 
 /** Partie: the activity first (the host changes it, the others see it), then its settings. */
@@ -254,22 +252,26 @@ const fmtEvery = (n: number) => (n ? `Toutes les ${n} mains` : 'Jamais');
 
 function GameTab() {
   const room = useStore(s => s.room), me = useStore(s => s.account)?.id, set = useStore(s => s.set);
-  if (!room) return <p className="note">Entre dans un salon pour voir sa partie.</p>;
+  if (!room) return <Note>Entre dans un salon pour voir sa partie.</Note>;
   const host = room.hostId === me, act = room.activity.activity;
   const names: Record<string, string> = { chat: 'Chat', disk: 'Demi-disque', poll: 'Sondage', wheel: 'Roulette', cards: 'Cartes', lowtide: 'Low Tide' };
   const choose = async (a: ActivityChoice['activity']) => { const r = await request('activity:choose', { choice: { activity: a } }); if (!r.ok) set({ note: r.error }); };
   const key = scoreKey(room.activity);
   if (!host) return <GameInfo />;
   return <>
-    <label className="field"><span>Activité</span><select value={act} onChange={e => void choose(e.target.value as ActivityChoice['activity'])}>
-      {Object.entries(names).map(([k, n]) => <option key={k} value={k} disabled={!READY_ACTIVITIES.includes(k as ActivityChoice['activity'])}>{n}{READY_ACTIVITIES.includes(k as ActivityChoice['activity']) ? '' : ' (bientôt)'}</option>)}</select></label>
-    <p className="note">{ACT_HELP[act]}</p>
+    <Field label="Activité"><Select value={act} onChange={v => void choose(v as ActivityChoice['activity'])} options={Object.entries(names).map(([k, n]) => {
+      const ready = READY_ACTIVITIES.includes(k as ActivityChoice['activity']);
+      return { value: k, label: `${n}${ready ? '' : ' (bientôt)'}`, disabled: !ready };
+    })} /></Field>
+    <Note>{ACT_HELP[act]}</Note>
     <hr className="sep" />
     <h3 className="section">{{ disk: 'Paramètres du demi-disque', poll: 'Paramètres du sondage', wheel: 'Paramètres de la roulette', chat: 'Paramètres du chat', lowtide: 'Paramètres de Low Tide', cards: 'Paramètres des cartes' }[act]}</h3>
-    {act === 'disk' ? <DiskSettings /> : act === 'poll' ? <PollSettings /> : act === 'lowtide' ? <WebSettings /> : act === 'cards' ? <CardsSettings /> : act === 'wheel' ? <p className="note">Les propositions et leurs poids se règlent dans la zone de jeu : tout le monde voit la roue se construire.</p> : <p className="note">Rien à régler : le chat prend toute la place, la liste des joueurs est à gauche. Les scores ne bougent pas.</p>}
-    {(act === 'disk' || act === 'poll' || act === 'cards') && <p className="note">Les changements faits pendant un tour en cours s'appliquent à sa fin.</p>}
-    {key && <><hr /><button className="btn danger" type="button" onClick={async () => { const r = await request('game:reset'); if (!r.ok) set({ note: r.error }); }}><Icon name="reset" />Réinitialiser la partie</button>
-      <p className="note">Remet le classement {SCORE_NAMES[key]} à zéro (les autres jeux gardent le leur). Le palmarès est toujours gardé.</p></>}
+    {act === 'disk' ? <DiskSettings /> : act === 'poll' ? <PollSettings /> : act === 'lowtide' ? <WebSettings /> : act === 'cards' ? <CardsSettings />
+      : act === 'wheel' ? <Note>Les propositions et leurs poids se règlent dans la zone de jeu : tout le monde voit la roue se construire.</Note>
+      : <Note>Rien à régler : le chat prend toute la place, la liste des joueurs est à gauche. Les scores ne bougent pas.</Note>}
+    {(act === 'disk' || act === 'poll' || act === 'cards') && <Note>Les changements faits pendant un tour en cours s'appliquent à sa fin.</Note>}
+    {key && <><hr /><Button variant="danger" icon="reset" onClick={async () => { const r = await request('game:reset'); if (!r.ok) set({ note: r.error }); }}>Réinitialiser la partie</Button>
+      <Note>Remet le classement {SCORE_NAMES[key]} à zéro (les autres jeux gardent le leur). Le palmarès est toujours gardé.</Note></>}
   </>;
 }
 
@@ -313,7 +315,7 @@ function GameInfo() {
         <small className="ro-help">{help}</small></li>)}
     </ul>
     {act === 'cards' && game === 'tarot' && <TrumpArt edit={false} />}
-    <p className="note">Seul l'hôte modifie la partie ; propose une autre activité au vote avec /activity.</p>
+    <Note>Seul l'hôte modifie la partie ; propose une autre activité au vote avec /activity.</Note>
   </>;
 }
 
@@ -325,18 +327,23 @@ function ExtensionOptions() {
   useEffect(() => { refresh(); addEventListener('focus', refresh); return () => removeEventListener('focus', refresh); }, []);
   if (!X.inExtension()) return null;
   return <>
-    <div className="field"><span>Raccourci clavier</span>
-      <p className="note">Ouvre et ferme le panneau : <b>{keys || 'aucun'}</b>{keys ? '' : ' (le navigateur ne l\'a pas attribué : un autre l\'utilise déjà)'}.</p>
+    <Field as="div" label="Raccourci clavier">
+      <Note>Ouvre et ferme le panneau : <b>{keys || 'aucun'}</b>{keys ? '' : ' (le navigateur ne l\'a pas attribué : un autre l\'utilise déjà)'}.</Note>
       {X.canEditShortcut() ? <form className="row" onSubmit={async e => { e.preventDefault(); try { await X.setShortcut(edit); setNote(''); refresh(); } catch { setNote('Raccourci refusé : par exemple Alt+Shift+S.'); } }}>
-        <input value={edit} onChange={e => setEdit(e.target.value)} placeholder="Alt+Shift+S" /><button className="btn sm">Changer</button></form>
-        : <><button className="btn ghost sm" type="button" onClick={() => X.openShortcutsPage()}>Changer le raccourci</button>
-          <p className="note">Chrome et Edge le changent dans leur page des raccourcis (elle s'ouvre dans un onglet) ; reviens ici ensuite.</p></>}</div>
-    <label className="check"><input type="checkbox" checked={persist} onChange={async e => { const msg = await X.setPersistent(e.target.checked); setNote(msg); refresh(); }} />
-      <span>Rester ouvert sur toutes les pages</span></label>
-    <p className="note">Le panneau se rouvre sur chaque page, à la même place ; le fermer le ferme partout. Le navigateur demande l'accès à tous les sites à l'activation.</p>
-    {note && <p className="alert" role="alert">{note}</p>}
+        <TextInput value={edit} onChange={e => setEdit(e.target.value)} placeholder="Alt+Shift+S" /><Button size="sm" type="submit">Changer</Button></form>
+        : <><Button variant="ghost" size="sm" onClick={() => X.openShortcutsPage()}>Changer le raccourci</Button>
+          <Note>Chrome et Edge le changent dans leur page des raccourcis (elle s'ouvre dans un onglet) ; reviens ici ensuite.</Note></>}</Field>
+    <Checkbox label="Rester ouvert sur toutes les pages" checked={persist} onChange={async on => { const msg = await X.setPersistent(on); setNote(msg); refresh(); }} />
+    <Note>Le panneau se rouvre sur chaque page, à la même place ; le fermer le ferme partout. Le navigateur demande l'accès à tous les sites à l'activation.</Note>
+    {note && <Note tone="alert">{note}</Note>}
   </>;
 }
+
+const BOT_LEVELS = {
+  coinche: ['Facile — des fautes, des enchères au hasard', 'Moyen — compte les cartes, charge son partenaire', 'Fort — simule la fin de la donne'],
+  holdem: ['Facile — suit trop, se trompe, bluffe peu', 'Moyen — ses chances contre la cote du pot', 'Fort — devine les mains d\'après les mises, bluffe mieux'],
+  other: ['Facile — des fautes, des enchères prudentes', 'Moyen — les règles du jeu, un peu de hasard', 'Fort — il calcule la fin de la donne'],
+};
 
 /** Partie (cards): the game first, then its number of players (the values each game allows; robots complete the
  *  free seats, from the next deal), and the Tarot's won tricks shown or not. */
@@ -345,39 +352,39 @@ function CardsSettings() {
   const game = cardGameOf(room.activity), players = room.cards.settings[game] ?? CARD_PLAYERS[game][0];
   const hr = room.cards.settings.holdemRules ?? { stack: 1000, every: 10 }, holdemOn = room.cards.game === 'holdem' && !!room.cards.holdem && !room.cards.holdem.over;
   const ack = (r: { ok: boolean; error?: string }) => { if (!r.ok) set({ note: r.error ?? '' }); };
-  const dealMode = <><label className="field"><span>Distribution</span><select value={room.cards.settings.dealMode ?? 'random'} disabled={!host} onChange={async e => ack(await request('cards:deal-mode', { mode: e.target.value as 'random' }))}>
-      <option value="random">Aléatoire — le paquet mélangé à chaque donne</option><option value="classic">À l'ancienne — plis ramassés, coupe, distribution par paquets</option></select></label>
-    <p className="note">{(room.cards.settings.dealMode ?? 'random') === 'classic' ? 'Comme à table : les couleurs restent groupées, plus de mains déséquilibrées (longues couleurs, coupes franches). La première donne d\'une partie est mélangée.' : 'Le hasard pur : des mains souvent équilibrées. « À l\'ancienne » en donne de plus déséquilibrées.'} À partir de la donne suivante.</p></>;
-  const bots = <><label className="field"><span>Niveau des robots</span><select value={room.cards.settings.bots ?? 'moyen'} disabled={!host} onChange={async e => ack(await request('cards:bots', { level: e.target.value as 'moyen' }))}>
-      {game === 'coinche' ? <><option value="facile">Facile — des fautes, des enchères au hasard</option><option value="moyen">Moyen — compte les cartes, charge son partenaire</option><option value="fort">Fort — simule la fin de la donne</option></>
-        : game === 'holdem' ? <><option value="facile">Facile — suit trop, se trompe, bluffe peu</option><option value="moyen">Moyen — ses chances contre la cote du pot</option><option value="fort">Fort — devine les mains d'après les mises, bluffe mieux</option></>
-        : <><option value="facile">Facile — des fautes, des enchères prudentes</option><option value="moyen">Moyen — les règles du jeu, un peu de hasard</option><option value="fort">Fort — il calcule la fin de la donne</option></>}</select></label>
-    <p className="note">Les robots jouent comme un joueur : avec ce que leur place voit, jamais les cartes des autres. Le niveau vaut pour tous les jeux de cartes.</p></>;
+  const deal = room.cards.settings.dealMode ?? 'random';
+  const dealMode = <><Field label="Distribution"><Select value={deal} disabled={!host} onChange={async v => ack(await request('cards:deal-mode', { mode: v as 'random' }))}
+      options={[{ value: 'random', label: 'Aléatoire — le paquet mélangé à chaque donne' }, { value: 'classic', label: 'À l\'ancienne — plis ramassés, coupe, distribution par paquets' }]} /></Field>
+    <Note>{deal === 'classic' ? 'Comme à table : les couleurs restent groupées, plus de mains déséquilibrées (longues couleurs, coupes franches). La première donne d\'une partie est mélangée.' : 'Le hasard pur : des mains souvent équilibrées. « À l\'ancienne » en donne de plus déséquilibrées.'} À partir de la donne suivante.</Note></>;
+  const levels = BOT_LEVELS[game === 'coinche' || game === 'holdem' ? game : 'other'];
+  const bots = <><Field label="Niveau des robots"><Select value={room.cards.settings.bots ?? 'moyen'} disabled={!host} onChange={async v => ack(await request('cards:bots', { level: v as 'moyen' }))}
+      options={(['facile', 'moyen', 'fort'] as const).map((v, i) => ({ value: v, label: levels[i] }))} /></Field>
+    <Note>Les robots jouent comme un joueur : avec ce que leur place voit, jamais les cartes des autres. Le niveau vaut pour tous les jeux de cartes.</Note></>;
   return <>
-    <label className="field"><span>Jeu</span><select value={game} disabled={!host} onChange={async e => ack(await request('activity:choose', { choice: { activity: 'cards', cardGame: e.target.value as 'tdc' } }))}>
-      <option value="tdc">Trou du cul</option><option value="tarot">Tarot</option><option value="holdem">Texas Hold'em</option><option value="coinche">Coinche</option></select></label>
-    <p className="note">{GAME_HELP[game]}</p>
-    <label className="field"><span>Joueurs</span><select value={players} disabled={!host} onChange={async e => ack(await request('cards:players', { game, players: Number(e.target.value) }))}>
-      {CARD_PLAYERS[game].map(n => <option key={n} value={n}>{n} joueurs{game === 'tarot' && n === 5 ? ' (le preneur appelle un Roi)' : game === 'holdem' && n === 2 ? ' (en tête-à-tête)' : game === 'coinche' ? ' (deux contre deux)' : ''}</option>)}</select></label>
-    <p className="note">À partir de la {game === 'holdem' ? 'partie' : 'donne'} suivante. Prends une place à la table avant la donne ; des robots complètent les places libres. Les règles se lisent avec le bouton « i » de la table.</p>
-    {game === 'tarot' && <><label className="check"><input type="checkbox" checked={room.cards.showTricks} disabled={!host} onChange={e => void request('tarot:tricks', { show: e.target.checked })} /><span>Revoir les plis gagnés (au survol)</span></label>
-      <p className="note">Décoché, la partie est plus dure : personne ne peut revoir les plis déjà joués.</p>
+    <Field label="Jeu"><Select value={game} disabled={!host} onChange={async v => ack(await request('activity:choose', { choice: { activity: 'cards', cardGame: v as 'tdc' } }))}
+      options={[{ value: 'tdc', label: 'Trou du cul' }, { value: 'tarot', label: 'Tarot' }, { value: 'holdem', label: 'Texas Hold\'em' }, { value: 'coinche', label: 'Coinche' }]} /></Field>
+    <Note>{GAME_HELP[game]}</Note>
+    <Field label="Joueurs"><Select value={players} disabled={!host} onChange={async v => ack(await request('cards:players', { game, players: Number(v) }))}
+      options={CARD_PLAYERS[game].map(n => ({ value: n, label: `${n} joueurs${game === 'tarot' && n === 5 ? ' (le preneur appelle un Roi)' : game === 'holdem' && n === 2 ? ' (en tête-à-tête)' : game === 'coinche' ? ' (deux contre deux)' : ''}` }))} /></Field>
+    <Note>À partir de la {game === 'holdem' ? 'partie' : 'donne'} suivante. Prends une place à la table avant la donne ; des robots complètent les places libres. Les règles se lisent avec le bouton « i » de la table.</Note>
+    {game === 'tarot' && <><Checkbox label="Revoir les plis gagnés (au survol)" checked={room.cards.showTricks} disabled={!host} onChange={show => void request('tarot:tricks', { show })} />
+      <Note>Décoché, la partie est plus dure : personne ne peut revoir les plis déjà joués.</Note>
       {dealMode}{bots}
       <TrumpArt edit={host} /></>}
     {game === 'coinche' && <>
-      <label className="field"><span>Objectif</span><select value={room.cards.settings.coincheTarget ?? 1000} disabled={!host} onChange={async e => ack(await request('coinche:target', { target: Number(e.target.value) }))}>
-        {COINCHE_TARGETS.map(n => <option key={n} value={n}>{n} points{n === 1000 ? ' (une partie courte)' : ''}</option>)}</select></label>
-      <p className="note">La première équipe à ce score gagne, après la donne qui l'y amène. À partir de la partie suivante.</p>
+      <Field label="Objectif"><Select value={room.cards.settings.coincheTarget ?? 1000} disabled={!host} onChange={async v => ack(await request('coinche:target', { target: Number(v) }))}
+        options={COINCHE_TARGETS.map(n => ({ value: n, label: `${n} points${n === 1000 ? ' (une partie courte)' : ''}` }))} /></Field>
+      <Note>La première équipe à ce score gagne, après la donne qui l'y amène. À partir de la partie suivante.</Note>
       {dealMode}{bots}</>}
     {game === 'holdem' && <>
-      <label className="field"><span>Tapis de départ</span><select value={hr.stack} disabled={!host} onChange={async e => ack(await request('holdem:rules', { stack: Number(e.target.value) }))}>
-        {HOLDEM_STACKS.map(n => <option key={n} value={n}>{n} jetons ({n / 20} grosses blindes)</option>)}</select></label>
-      <label className="field"><span>Montée des blindes</span><select value={hr.every} disabled={!host} onChange={async e => ack(await request('holdem:rules', { every: Number(e.target.value) }))}>
-        {HOLDEM_EVERY.map(n => <option key={n} value={n}>{n ? `Toutes les ${n} mains` : 'Jamais (blindes fixes 10 / 20)'}</option>)}</select></label>
-      <p className="note">Blindes de départ 10 / 20, puis 20 / 40, 30 / 60, 40 / 80… Plus le tapis est petit et les blindes montent vite, plus la partie est courte. À partir de la partie suivante.</p>
+      <Field label="Tapis de départ"><Select value={hr.stack} disabled={!host} onChange={async v => ack(await request('holdem:rules', { stack: Number(v) }))}
+        options={HOLDEM_STACKS.map(n => ({ value: n, label: `${n} jetons (${n / 20} grosses blindes)` }))} /></Field>
+      <Field label="Montée des blindes"><Select value={hr.every} disabled={!host} onChange={async v => ack(await request('holdem:rules', { every: Number(v) }))}
+        options={HOLDEM_EVERY.map(n => ({ value: n, label: n ? `Toutes les ${n} mains` : 'Jamais (blindes fixes 10 / 20)' }))} /></Field>
+      <Note>Blindes de départ 10 / 20, puis 20 / 40, 30 / 60, 40 / 80… Plus le tapis est petit et les blindes montent vite, plus la partie est courte. À partir de la partie suivante.</Note>
       {bots}
-      {host && holdemOn && <><button className="btn danger" type="button" onClick={async () => { if (confirm('Terminer la partie ? Les joueurs encore en jeu sont classés selon leurs jetons.')) ack(await request('holdem:end')); }}>Terminer la partie</button>
-        <p className="note">Les joueurs encore en jeu sont classés selon leurs jetons ; chacun reçoit les points de sa place.</p></>}</>}
+      {host && holdemOn && <><Button variant="danger" onClick={async () => { if (confirm('Terminer la partie ? Les joueurs encore en jeu sont classés selon leurs jetons.')) ack(await request('holdem:end')); }}>Terminer la partie</Button>
+        <Note>Les joueurs encore en jeu sont classés selon leurs jetons ; chacun reçoit les points de sa place.</Note></>}</>}
   </>;
 }
 
@@ -386,24 +393,24 @@ function FatalPage({ onCode }: { onCode: (m: CodeMode) => void }) {
   const fatal = useStore(s => s.fatal);
   if (fatal === 'protocol' || fatal === 'outdated') {   // blocking: this extension is older than the server accepts
     const v = useStore.getState().versions;
-    return <div className="room-card offline outdated"><h1>Mets l'extension à jour</h1>
+    return <Card tone="offline" className="outdated" title="Mets l'extension à jour">
       <p>Cette version de l'extension ({EXT_VERSION}) n'est plus prise en charge par le serveur{v ? ` : il demande la ${v.minExtension} ou plus récente` : ''}.</p>
-      <a className="btn big" href={v?.download ?? RELEASES} target="_blank" rel="noopener noreferrer">Télécharger la dernière version</a>
-      <p className="note">Puis recharge l'extension (↻ dans la page des extensions du navigateur). Ton compte et tes salons sont gardés sur le serveur.</p></div>;
+      <LinkButton size="big" href={v?.download ?? RELEASES} external>Télécharger la dernière version</LinkButton>
+      <Note>Puis recharge l'extension (↻ dans la page des extensions du navigateur). Ton compte et tes salons sont gardés sur le serveur.</Note></Card>;
   }
-  if (fatal === 'limited') return <div className="room-card offline"><h1>Trop d'essais</h1><p>Le serveur a reçu trop de codes inconnus depuis ta connexion. Réessaie dans une minute.</p>
-    <button className="btn big" type="button" onClick={() => connect()}><Icon name="reset" />Réessayer</button></div>;
-  return <div className="room-card unknown"><h1>{fatal === 'code' ? 'Code invalide' : 'Ce code a été remplacé'}</h1>
+  if (fatal === 'limited') return <Card tone="offline" title="Trop d'essais"><p>Le serveur a reçu trop de codes inconnus depuis ta connexion. Réessaie dans une minute.</p>
+    <Button size="big" icon="reset" onClick={() => connect()}>Réessayer</Button></Card>;
+  return <Card tone="unknown" title={fatal === 'code' ? 'Code invalide' : 'Ce code a été remplacé'}>
     <p>{fatal === 'code' ? 'Ce code utilisateur n\'est pas valable.' : 'Ton code a été renouvelé sur un autre appareil (ou par un admin) : tape le nouveau (Profil → Compte sur ton autre appareil).'}</p>
-    <button className="btn big" type="button" onClick={() => onCode('resume')}>J'ai le nouveau code</button>
-    <button className="btn ghost" type="button" onClick={() => onCode('new')}>Repartir de zéro</button></div>;
+    <Button size="big" onClick={() => onCode('resume')}>J'ai le nouveau code</Button>
+    <Button variant="ghost" onClick={() => onCode('new')}>Repartir de zéro</Button></Card>;
 }
 
 function OfflinePage() {
   const server = useStore(s => s.device.server);
-  return <div className="room-card offline"><h1>Serveur injoignable</h1><p>Aucune réponse de {server}. Vérifie l'adresse du serveur, ou ta connexion.</p>
+  return <Card tone="offline" title="Serveur injoignable"><p>Aucune réponse de {server}. Vérifie l'adresse du serveur, ou ta connexion.</p>
     <ServerField onSaved={() => connect()} />
-    <button className="btn big" type="button" onClick={() => connect()}><Icon name="reset" />Réessayer</button></div>;
+    <Button size="big" icon="reset" onClick={() => connect()}>Réessayer</Button></Card>;
 }
 
 
@@ -414,10 +421,7 @@ function NoticeModal({ notice }: { notice: { id: string; title: string; text: st
   const [open, setOpen] = useState(() => !read().includes(notice.id));
   useEffect(() => { setOpen(!read().includes(notice.id)); }, [notice.id]);
   const close = () => { try { localStorage.setItem(KEY, JSON.stringify([...read(), notice.id].slice(-20))); } catch { /* not kept: shown again next time */ } setOpen(false); };
-  useEscape(close, open);
   if (!open) return null;
-  return <><div className="modal-backdrop" onClick={close} />
-    <div className="modal notice-modal" role="alertdialog" aria-modal="true" aria-label={notice.title}>
-      <h2>{notice.title}</h2><p>{notice.text}</p>
-      <div className="modal-buttons"><button className="btn" type="button" onClick={close} autoFocus>Compris</button></div></div></>;
+  return <Modal title={notice.title} onClose={close} className="notice-modal" role="alertdialog"><p>{notice.text}</p>
+    <ModalButtons><Button onClick={close} autoFocus>Compris</Button></ModalButtons></Modal>;
 }
