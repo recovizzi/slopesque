@@ -7,7 +7,7 @@ import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { eq } from 'drizzle-orm';
 import { newCode, normalizeKey } from '@slopesque/engines';
-import { CoreModule } from './app.module.js';
+import { CoreModule } from './core.module.js';
 import { DB, type Db } from './db/db.module.js';
 import { accounts, adminLog, customEmoji, media, messages, palmares, roomMembers, stickers, trumpArt } from './db/schema.js';
 import { and, sql } from 'drizzle-orm';

@@ -1,28 +1,22 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from './config/config.module.js';
-import { DbModule } from './db/db.module.js';
-import { CacheService } from './cache/cache.service.js';
-import { StorageService } from './storage/storage.service.js';
+import { CoreModule } from './core.module.js';
 import { HealthController } from './health/health.controller.js';
-import { AccountsService } from './accounts/accounts.service.js';
-import { RoomsService } from './rooms/rooms.service.js';
 import { RoomHub } from './rooms/room-hub.service.js';
-import { ChatService } from './chat/chat.service.js';
+import { RoomsModule } from './rooms/rooms.module.js';
+import { RealtimeModule } from './realtime/realtime.module.js';
+import { ConnectionGateway } from './realtime/connection.gateway.js';
 import { Gateway } from './realtime/gateway.js';
 import { AccountsController } from './accounts/accounts.controller.js';
-import { MediaService } from './media/media.service.js';
 import { MediaController } from './media/media.controller.js';
 import { HomeController } from './health/home.controller.js';
 import { GifService } from './external/gif.service.js';
 import { PreviewService } from './external/preview.service.js';
 
-/** What the server and the admin console share (no WebSocket in the console). */
-@Module({
-  imports: [ConfigModule, DbModule],
-  providers: [CacheService, StorageService, AccountsService, RoomsService, ChatService, MediaService],
-  exports: [CacheService, StorageService, AccountsService, RoomsService, ChatService, MediaService],
-})
-export class CoreModule {}
+export { CoreModule };
 
-@Module({ imports: [CoreModule], providers: [RoomHub, Gateway, GifService, PreviewService], controllers: [HomeController, HealthController, AccountsController, MediaController] })
+@Module({
+  imports: [CoreModule, RoomsModule, RealtimeModule],
+  providers: [RoomHub, ConnectionGateway, Gateway, GifService, PreviewService],
+  controllers: [HomeController, HealthController, AccountsController, MediaController],
+})
 export class AppModule {}
