@@ -25,7 +25,7 @@ Prérequis : Node 22+, pnpm 10, Docker.
 
 ```sh
 pnpm install
-pnpm dev        # services Docker + serveur (http://localhost:23100) + app (http://localhost:5173)
+pnpm dev        # services Docker + serveur (http://localhost:23100) + app (http://localhost:23173)
 pnpm doctor     # ce qui marche, ce qui est en mode dégradé, ce qu'il faut faire
 pnpm check      # types, lint, tests (les tests du serveur utilisent les services Docker)
 pnpm build

@@ -22,7 +22,7 @@ app.use('/api/media', (req: Request, res: Response, next: NextFunction) => {
   next();
 });
 app.use('/api/media', raw({ type: () => true, limit: '200mb' }));
-// the extension's pages (and the dev app on :5173) call the API from another origin
+// the extension's pages (and the dev app on :23173) call the API from another origin
 app.enableCors({ origin: (o: string | undefined, cb: (e: Error | null, ok?: boolean) => void) => cb(null, originAllowed(env.ALLOWED_ORIGINS, o)) });
 await app.listen(env.PORT, '0.0.0.0');
 new Logger('Slopesque').log(`prêt sur ${env.PUBLIC_URL} (port ${env.PORT}, ${env.NODE_ENV})${isInsecureUrl(env.PUBLIC_URL) ? ' — connexion non chiffrée' : ''}`);

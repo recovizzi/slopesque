@@ -2,7 +2,7 @@
 // pieces instead of re-making a button, a field or a window; each one renders the app's existing classes (`btn`,
 // `icon-btn`, `field`, `seg-group`, `modal`…), so the look and the e2e selectors stay the same. Their styles are in
 // design/*.css (one file per piece, imported in the order of app/styles.ts), on the tokens of design/tokens.css.
-// Dev: `pnpm dev`, then http://localhost:5173/?kit shows every piece, light and dark.
+// Dev: `pnpm dev`, then http://localhost:23173/?kit shows every piece, light and dark.
 export { Avatar, colorOf, type AvatarProps } from './Avatar';
 export { Badge, type BadgeProps, type BadgeTone } from './Badge';
 export {

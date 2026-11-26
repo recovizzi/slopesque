@@ -21,7 +21,7 @@ concept, les règles des jeux). La maquette de référence (comportements, captu
 ## Commandes
 
 ```sh
-pnpm dev                 # services Docker, paquets, serveur :23100, web :5173 (surveillés)
+pnpm dev                 # services Docker, paquets, serveur :23100, web :23173 (surveillés)
 pnpm doctor              # état des services et des clés
 pnpm check               # typecheck + lint + tests (turbo ; les tests serveur ont besoin de `pnpm services:up`)
 pnpm build && pnpm --filter @slopesque/e2e e2e   # bout en bout (deux navigateurs) ; build = « Slopesque (dev) », SLOPESQUE_RELEASE=1 = la publiée

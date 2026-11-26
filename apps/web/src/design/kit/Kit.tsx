@@ -1,4 +1,4 @@
-// The ?kit page (dev only: `pnpm dev`, then http://localhost:5173/?kit): every piece of the library with its
+// The ?kit page (dev only: `pnpm dev`, then http://localhost:23173/?kit): every piece of the library with its
 // variants, light and dark side by side — two frames of this page, `?kit=light` and `?kit=dark`. Left out of the
 // build (main.tsx imports it under import.meta.env.DEV).
 import { createRoot } from 'react-dom/client';

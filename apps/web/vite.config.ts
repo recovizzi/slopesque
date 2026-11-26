@@ -11,7 +11,7 @@ export default defineConfig({
   base: './',
   define: { __EXT_VERSION__: JSON.stringify(version), __RELEASE__: JSON.stringify(process.env.SLOPESQUE_RELEASE === '1') },
   plugins: [react()],
-  server: { port: 5173, strictPort: true },
+  server: { port: 23173, strictPort: true },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
