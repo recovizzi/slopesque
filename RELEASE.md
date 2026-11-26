@@ -38,6 +38,8 @@ vX.Y.Z ──▶ plan ──┬─▶ extension   zip Chrome, .crx Linux, .xpi s
                   └─▶ page de release      avec ce qui a été fait
 ```
 
+- **extension** construit la version publiée (`SLOPESQUE_RELEASE=1` : « Slopesque », sa clé, son id Firefox, ses
+  icônes) ; `pnpm build` en local donne « Slopesque (dev) », installable à côté.
 - **plan** vérifie que le tag et les versions des `package.json` concordent, puis lit la portée.
 - **Le déploiement attend ton feu vert** (environnement `production`, toi comme relecteur obligatoire). Dans la
   page de l'exécution, **Review deployments → production → Approve**. Il :

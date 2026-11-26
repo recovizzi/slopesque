@@ -24,7 +24,7 @@ concept, les règles des jeux). La maquette de référence (comportements, captu
 pnpm dev                 # services Docker, paquets, serveur :23100, web :5173 (surveillés)
 pnpm doctor              # état des services et des clés
 pnpm check               # typecheck + lint + tests (turbo ; les tests serveur ont besoin de `pnpm services:up`)
-pnpm build && pnpm --filter @slopesque/e2e e2e   # bout en bout (deux navigateurs)
+pnpm build && pnpm --filter @slopesque/e2e e2e   # bout en bout (deux navigateurs) ; build = « Slopesque (dev) », SLOPESQUE_RELEASE=1 = la publiée
 pnpm stack:up / stack:admin <cmd> / stack:logs / stack:down   # la pile de production sur le Docker local (:23180)
 pnpm prod:admin <cmd>    # une commande d'admin sur la machine du projet (alias SSH et compte dans .env ; voir ADMIN.md)
 pnpm release [patch|minor|major] [--only extension|server] [--min-extension] [--dry-run]   # une version : tag → CI Release (voir RELEASE.md)

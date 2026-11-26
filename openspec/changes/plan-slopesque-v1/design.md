@@ -205,6 +205,13 @@ secrets, du développement testable en local sans aucune clé.
     Mesure (`pnpm coinche:duel`, donnes rejouées en échangeant les équipes) : une chute coûtant 160 + l'annonce, les
     enchères prudentes gagnent (contrat tenu environ 85 fois sur 100) ; Moyen bat Facile (+13 points par donne), Fort
     bat Moyen (+8 à +19) et Facile (+31).
+23. **Extension publiée et extension de développement** (2026-11-26, DEV-001, choix de l'utilisateur) : deux
+    extensions côte à côte plutôt qu'une bascule de serveur. `pnpm build` donne « Slopesque (dev) » : icône orange
+    marquée « DEV », nom dans le panneau, pas de clé (Chrome lui donne un identifiant tiré de son dossier), id Firefox
+    `slopesque-dev@recovizzi`, donc son propre stockage, son propre compte et son serveur (`pnpm dev`, :23100, proposé
+    au premier lancement). La CI de release seule construit « Slopesque » (`SLOPESQUE_RELEASE=1` : la clé, l'id
+    `slopesque@recovizzi`, les icônes habituelles). La pile Docker locale accepte toute extension Chrome ; la
+    production garde l'identifiant fixe.
 
 ## Risks / Trade-offs
 

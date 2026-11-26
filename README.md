@@ -50,6 +50,20 @@ ou onglet Extension) doit être celle du serveur où le salon a été créé.
 Valider un salon qu'un joueur a « créé » (il attend, avec sa clé) : `pnpm admin rooms:validate ABCD-EFGH --name "Son nom"`
 (ou `pnpm stack:admin rooms:validate …`). Le joueur clique ensuite « Réessayer ».
 
+## Deux extensions côte à côte : la publiée et « Slopesque (dev) »
+
+`pnpm build` construit **« Slopesque (dev) »** (icône orange marquée « DEV ») dans `apps/extension/dist/extension` :
+une autre extension que celle de la release, avec son propre stockage, son propre compte et son serveur
+(`http://localhost:23100` proposé au premier lancement). Les deux s'installent ensemble, sans rien changer :
+
+- **Slopesque** : la release (Chrome : le `.crx` ou le zip ; Firefox : le `.xpi`), sur le serveur public ;
+- **Slopesque (dev)** : Chrome → `chrome://extensions` → mode développeur → « Charger l'extension non empaquetée » →
+  `apps/extension/dist/extension` (son identifiant vient du dossier : garde-le au même endroit) ; Firefox →
+  `about:debugging` → « Charger un module temporaire » → `apps/extension/dist/extension-firefox/manifest.json`.
+
+Seule la CI de release construit la version publiée (`SLOPESQUE_RELEASE=1 pnpm build` la reproduit en local).
+Les deux raccourcis valent Alt+Maj+S par défaut : Chrome n'en garde qu'un, à changer dans `chrome://extensions/shortcuts`.
+
 ## La version de production sur ta machine
 
 ```sh
@@ -59,7 +73,7 @@ pnpm stack:logs                                 # journaux du serveur
 pnpm stack:down
 ```
 
-Dans l'extension (chargée depuis `apps/extension/dist/extension`) : onglet **Extension** → **Serveur** →
+Dans « Slopesque (dev) » (chargée depuis `apps/extension/dist/extension`) : onglet **Extension** → **Serveur** →
 `http://localhost:23180`, puis « + Ajouter » avec la clé du salon. Seul le port du serveur est exposé ; Postgres, Redis
 et RustFS restent sur le réseau interne de Docker.
 

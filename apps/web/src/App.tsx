@@ -18,7 +18,7 @@ import { CardsStage } from './ui/CardsStage';
 import { TrumpArt } from './ui/TrumpArt';
 import { Palmares } from './ui/Palmares';
 import { WebSettings, WebStage } from './ui/WebStage';
-import { EXT_VERSION } from './version';
+import { EXT_VERSION, APP_NAME } from './version';
 import { CARD_PLAYERS, COINCHE_TARGETS, HOLDEM_EVERY, HOLDEM_STACKS, cardGameOf, READY_ACTIVITIES, SCORE_NAMES, scoreKey, versionBelow } from '@slopesque/shared';
 
 const EMBED = new URLSearchParams(location.search).has('embed');
@@ -90,7 +90,7 @@ export function App() {
   return <>
     <header className="bar">
       <button className="icon-btn" type="button" onClick={() => setLeftOpen(!leftOpen)} title="Joueurs" aria-label="Joueurs"><Icon name="sidebar" /></button>
-      <div className="brand"><svg className="brand-logo" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M7 2h10a5 5 0 0 1 5 5v7a5 5 0 0 1-5 5H9.5L4 22.5l1.2-4.4A5 5 0 0 1 2 14V7a5 5 0 0 1 5-5Z" fill="var(--accent)"/><rect x="6" y="5.5" width="5.5" height="5" rx="1.5" fill="#ffd166"/><rect x="12.5" y="5.5" width="5.5" height="5" rx="1.5" fill="#ef476f"/><rect x="6" y="11.5" width="5.5" height="5" rx="1.5" fill="#06d6a0"/><rect x="12.5" y="11.5" width="5.5" height="5" rx="1.5" fill="#4cc9f0"/></svg>Slopesque</div>
+      <div className="brand"><svg className="brand-logo" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M7 2h10a5 5 0 0 1 5 5v7a5 5 0 0 1-5 5H9.5L4 22.5l1.2-4.4A5 5 0 0 1 2 14V7a5 5 0 0 1 5-5Z" fill="var(--accent)"/><rect x="6" y="5.5" width="5.5" height="5" rx="1.5" fill="#ffd166"/><rect x="12.5" y="5.5" width="5.5" height="5" rx="1.5" fill="#ef476f"/><rect x="6" y="11.5" width="5.5" height="5" rx="1.5" fill="#06d6a0"/><rect x="12.5" y="11.5" width="5.5" height="5" rx="1.5" fill="#4cc9f0"/></svg>{APP_NAME}</div>
       {conn === 'reconnecting' && <span className="tag wait conn-state" role="status">Reconnexion…</span>}
       {insecure && <span className="tag insecure" title={`${device.server} : le code et les messages circulent en clair`}><Icon name="lock" />Connexion non chiffrée</span>}
       <div className="spacer" />

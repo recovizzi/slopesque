@@ -14,7 +14,8 @@ PUBLIC_PORT=23180
 PUBLIC_URL=http://localhost:23180
 # without a domain (http to a public address): ALLOW_INSECURE=true, and the panel says « Connexion non chiffrée »
 ALLOW_INSECURE=false
-ALLOWED_ORIGINS=chrome-extension://flplhoclphjglaebgoabfijfbffbcmbj,moz-extension://*
+# on this machine only: any extension, the published one and « Slopesque (dev) » (Chrome ids it by its folder)
+ALLOWED_ORIGINS=chrome-extension://*,moz-extension://*
 CODE_HMAC_SECRET=${secret(48)}
 POSTGRES_PASSWORD=${secret(24)}
 RUSTFS_SECRET_KEY=${secret(24)}
