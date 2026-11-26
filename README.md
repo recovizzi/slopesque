@@ -52,17 +52,38 @@ Valider un salon qu'un joueur a « créé » (il attend, avec sa clé) : `pnpm a
 
 ## Deux extensions côte à côte : la publiée et « Slopesque (dev) »
 
-`pnpm build` construit **« Slopesque (dev) »** (icône orange marquée « DEV ») dans `apps/extension/dist/extension` :
-une autre extension que celle de la release, avec son propre stockage, son propre compte et son serveur
-(`http://localhost:23100` proposé au premier lancement). Les deux s'installent ensemble, sans rien changer :
+Deux extensions distinctes, installées ensemble : chacune a son identifiant, donc **son propre stockage, son propre
+compte (code utilisateur) et son serveur**. Rien à basculer : on ouvre l'une ou l'autre.
 
-- **Slopesque** : la release (Chrome : le `.crx` ou le zip ; Firefox : le `.xpi`), sur le serveur public ;
-- **Slopesque (dev)** : Chrome → `chrome://extensions` → mode développeur → « Charger l'extension non empaquetée » →
-  `apps/extension/dist/extension` (son identifiant vient du dossier : garde-le au même endroit) ; Firefox →
-  `about:debugging` → « Charger un module temporaire » → `apps/extension/dist/extension-firefox/manifest.json`.
+| | **Slopesque** (la publiée) | **Slopesque (dev)** |
+|---|---|---|
+| Construite par | la CI de release seulement (`SLOPESQUE_RELEASE=1`) | `pnpm build` |
+| Repère | icône bleue | icône orange marquée « DEV », « Slopesque (dev) » dans le panneau |
+| Identifiant | Chrome : fixé par la clé (`flplhoclphjglaebgoabfijfbffbcmbj`) ; Firefox : `slopesque@recovizzi` | Chrome : tiré du dossier chargé ; Firefox : `slopesque-dev@recovizzi` |
+| Serveur proposé au premier lancement | le serveur public | `http://localhost:23100` (`pnpm dev`) |
+| S'installe depuis | les fichiers de la [release GitHub](https://github.com/recovizzi/slopesque/releases), **dans un dossier à part** | `apps/extension/dist/extension` (Chrome), `apps/extension/dist/extension-firefox` (Firefox) |
 
-Seule la CI de release construit la version publiée (`SLOPESQUE_RELEASE=1 pnpm build` la reproduit en local).
-Les deux raccourcis valent Alt+Maj+S par défaut : Chrome n'en garde qu'un, à changer dans `chrome://extensions/shortcuts`.
+> **Ne charge jamais la publiée depuis `apps/extension/dist/`** : chaque `pnpm build` réécrit ce dossier, et
+> l'extension qui le lit devient « Slopesque (dev) » (icône et contenu). Pour la publiée : dézippe
+> `slopesque-chrome-X.Y.Z.zip` dans un dossier hors du dépôt (par exemple `~/slopesque-release`), puis « Charger
+> l'extension non empaquetée » sur ce dossier ; sous Firefox, le `.xpi` signé. Une nouvelle version : remplacer le
+> contenu de ce dossier, puis « Recharger ».
+
+Charger « Slopesque (dev) » :
+
+1. `pnpm dev` (serveur sur :23100), puis `pnpm build` dans un autre terminal ;
+2. Chrome / Edge : `chrome://extensions` → mode développeur → « Charger l'extension non empaquetée » →
+   `apps/extension/dist/extension` (garde ce dossier au même endroit : l'identifiant en dépend). Firefox :
+   `about:debugging` → « Ce Firefox » → « Charger un module complémentaire temporaire » →
+   `apps/extension/dist/extension-firefox/manifest.json` ;
+3. un salon de test : `pnpm admin rooms:create --name "Salon dev"` donne sa clé, à ajouter dans le panneau ;
+4. après une modification : `pnpm build`, puis « Recharger » sur la carte de l'extension.
+
+Les deux raccourcis valent Alt+Maj+S : Chrome n'en garde qu'un, change l'autre dans `chrome://extensions/shortcuts`.
+`SLOPESQUE_RELEASE=1 pnpm build` reproduit la publiée en local (pour la vérifier), dans le même dossier
+`dist/` : refaire `pnpm build` ensuite.
+Retirer une extension efface son stockage : note d'abord ton code utilisateur (Profil → Compte) pour retrouver ton
+compte ensuite.
 
 ## La version de production sur ta machine
 
