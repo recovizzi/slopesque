@@ -20,6 +20,7 @@ test-results/
 playwright-report/
 tests/e2e/shots/
 tests/e2e/.cache/
+tests/e2e/.baseline/
 infra/.env
 SECURITE.md
 

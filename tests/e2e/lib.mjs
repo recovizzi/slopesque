@@ -12,7 +12,8 @@ export const OUT = path.join(ROOT, 'tests/e2e/shots');
 // infra/.env then needs CODE_ATTEMPTS_PER_MINUTE=1000 (the test makes many accounts from one address) and
 // ROBOT_DELAY_MS=60 (the card robots play fast enough for the test's waits)
 export const STACK = process.env.E2E_STACK === '1';
-export const PORT = STACK ? 23180 : 23198, SERVER = `http://localhost:${PORT}`;
+// E2E_PORT: another port for the built server, to run several suites at once (worktrees)
+export const PORT = STACK ? 23180 : Number(process.env.E2E_PORT ?? 23198), SERVER = `http://localhost:${PORT}`;
 const compose = ['compose', '-f', path.resolve(import.meta.dirname, '../../infra/docker-compose.prod.yml'), '--env-file', path.resolve(import.meta.dirname, '../../infra/.env')];
 const env = { ...process.env, PORT: String(PORT), PUBLIC_URL: SERVER, LOG_LEVEL: 'warn', CODE_ATTEMPTS_PER_MINUTE: '1000', ROBOT_DELAY_MS: process.env.ROBOT_DELAY_MS ?? '60',
   KLIPY_API_KEY: '', GIPHY_API_KEY: '', KLIPY_API_KEY_WITH_AD: '' };   // no GIF key: the test spends no credit
