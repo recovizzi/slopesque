@@ -15,7 +15,6 @@ export const HTML = {
 
 /** Source files over 300 lines without a `size-exception:` comment in their first lines. */
 export const SIZE = {
-  'app/App.tsx': 'app 3.6 — shell, settings tabs and state pages split',
   'features/chat/Chat.tsx': 'chat 3.4 — list, message, composer, panels split',
   'features/cards/holdem/holdem-view.ts': "cards 3.3 — the Hold'em views as components",
 };
