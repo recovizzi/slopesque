@@ -9,10 +9,10 @@
 
 ## 2. Serveur : modules d'activité
 
-- [ ] 2.1 [server] Noyau `RoomRegistry` (salons en mémoire, présence, émission, `say`, `saveRules`) et contrat `Activity` (jeton `ACTIVITIES`), `IntentRunner` commun
-- [ ] 2.2 [server] Modules Demi-disque, Sondage (+ sondages du chat), Roulette, intégrations, effets, Palmarès, avec leurs passerelles
-- [ ] 2.3 [server] Module Cartes : table commune (places, robots, rythme, exclusion, habillage des atouts) et modules Trou du cul, Tarot, Texas Hold'em, Coinche
-- [ ] 2.4 [server] Chat (messages, images, stickers, emoji, photo) et `RoomHub` réduit à l'aiguillage (rejoindre, état, activité, votes, hôte, crédit, avis de la console)
+- [x] 2.1 [server] Noyau `RoomRegistry` (salons en mémoire, présence, émission, `say`, `saveRules`) et contrat `Activity` (jeton `ACTIVITIES`), `IntentRunner` commun
+- [x] 2.2 [server] Modules Demi-disque, Sondage (+ sondages du chat), Roulette, intégrations, effets, Palmarès, avec leurs passerelles
+- [x] 2.3 [server] Module Cartes : table commune (places, robots, rythme, exclusion, habillage des atouts) et modules Trou du cul, Tarot, Texas Hold'em, Coinche
+- [x] 2.4 [server] Chat (messages, images, stickers, emoji, photo) et `RoomHub` réduit à l'aiguillage (rejoindre, état, activité, votes, hôte, crédit, avis de la console)
 
 ## 3. Interface : fonctionnalités en React
 

@@ -48,8 +48,10 @@ export class RoomHub implements OnModuleInit {
   private async load(room: Room): Promise<RoomRt> {
     const rt: RoomRt = { room, seq: 0, members: new Map(), vote: null, notice: null, slots: {} as RoomSlots };
     for (const a of this.activities) a.init?.(rt);
-    const lost: string[] = [];
-    for (const a of this.activities) { const l = await a.restore?.(rt); if (l) lost.push(l); }
+    const lost: string[] = [], forget: Activity[] = [];
+    for (const a of this.activities) { const l = await a.restore?.(rt); if (l) { lost.push(l); forget.push(a); } }
+    for (const a of forget) await a.forget?.(rt);
+    if (Object.keys(rt.room.rules.live ?? {}).length) await this.rooms.saveRules(rt, 'live', {});   // nothing runs any more
     if (lost.length) {
       const what = lost.join(' et '), several = lost.length > 1;
       const text = `Le serveur a redémarré pendant ${what} : ${several ? 'ils sont annulés' : 'la partie est annulée'}. `

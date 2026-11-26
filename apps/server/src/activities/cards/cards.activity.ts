@@ -34,9 +34,7 @@ export class CardsActivity implements Activity {
   async restore(rt: RoomRt) {
     for (const a of await this.db.select().from(trumpArt).where(eq(trumpArt.roomId, rt.room.id))) rt.slots.cards.art[a.card] = a.mediaId;
     const live = this.rooms.wasLive(rt, 'cards');
-    if (!live) return null;
-    await this.rooms.setLive(rt, 'cards', null);
-    return GAME_ROUND[live as CardGameKey] ?? 'la partie de cartes';
+    return live ? GAME_ROUND[live as CardGameKey] ?? 'la partie de cartes' : null;
   }
 
   view(rt: RoomRt, me: string) { return { cards: this.table.view(rt, me) }; }

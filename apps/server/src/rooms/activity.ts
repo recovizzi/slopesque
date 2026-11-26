@@ -14,9 +14,12 @@ export interface Activity {
   readonly key: ActivityChoice['activity'];
   /** Its slot in a room that starts being played (its first player since the server started), from the saved rules. */
   init?(rt: RoomRt): void;
-  /** Right after every activity's init: what it takes back from the database, and what the restart lost if a round
-   *  was running (« le sondage »: said once, in the chat and in a window), else null. */
+  /** Right after every activity's init: what it takes back from the database (it writes nothing yet), and what the
+   *  restart lost if a round was running (« le sondage »: said once, in the chat and in a window), else null. */
   restore?(rt: RoomRt): Promise<string | null>;
+  /** Its lost round written down, once every activity is restored (the room's live games are cleared by the hub):
+   *  as before the refactor, a room loaded twice at once still reads them all before either writes. */
+  forget?(rt: RoomRt): Promise<void>;
   /** Its part of the room's full state (RoomState), as this player may see it. */
   view(rt: RoomRt, me: string): Partial<RoomState>;
   /** The room switches to `to` (another activity, or another card game): its running round is cancelled (what is

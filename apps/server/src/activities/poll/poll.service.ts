@@ -35,9 +35,7 @@ export class PollActivity implements Activity {
 
   async restore(rt: RoomRt) {
     await this.chatPolls.restore(rt);
-    if (!this.rooms.wasLive(rt, 'poll')) return null;
-    await this.rooms.setLive(rt, 'poll', null);
-    return 'le sondage';
+    return this.rooms.wasLive(rt, 'poll') ? 'le sondage' : null;
   }
 
   view(rt: RoomRt, me: string) { return { poll: this.pollView(rt, me) }; }

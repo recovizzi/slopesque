@@ -32,12 +32,11 @@ export class DiskActivity implements Activity {
     rt.slots.disk = { state, timer: null };
   }
 
-  /** A round was running: it starts again from the writing (its rules saved without it). */
+  /** A round was running: it starts again from the writing (its rules saved without it, `forget`). */
   async restore(rt: RoomRt) {
-    if (!(rt.room.rules.disk as { guessing?: boolean } | undefined)?.guessing) return null;
-    await this.save(rt);
-    return 'le tour du Demi-disque';
+    return (rt.room.rules.disk as { guessing?: boolean } | undefined)?.guessing ? 'le tour du Demi-disque' : null;
   }
+  async forget(rt: RoomRt) { await this.save(rt); }
 
   /** Each player gets the round as he may see it (the host's answer hidden from the others until the reveal). */
   view(rt: RoomRt, me: string) { return { disk: D.diskView(rt.slots.disk.state, me) }; }
