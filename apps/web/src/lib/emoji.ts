@@ -6,7 +6,7 @@
 import type { Picker } from 'emoji-picker-element';
 import fr from 'emoji-picker-element/i18n/fr';
 import dataSource from '../emoji-fr.json?url';
-import { esc } from './html';
+import { esc } from '../legacy/html';
 
 /** An emoji added to the game by a player, for everyone (kept with the game, purged with it). */
 export interface CustomEmoji { name: string; url: string; by: string }

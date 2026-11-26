@@ -4,8 +4,8 @@
 // after a click. MOCKUP: the previews come from a small local table and a rule for YouTube; in V1 the server reads
 // the page (Open Graph, oEmbed) and keeps the preview.
 // See openspec/changes/define-game-concept/specs/chat-activity/spec.md (Liens dans les messages, Aperçu des liens).
-import { esc } from './html';
-import { icon } from './icons';
+import { esc } from '../legacy/html';
+import { icon } from '../legacy/icons';
 
 /** The usual domain extensions (V1: the whole IANA list). Without http(s)://, only these make a link: « photo.png »
  *  or « M.Dupont » stay text. */

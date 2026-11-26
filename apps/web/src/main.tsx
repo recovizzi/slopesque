@@ -1,15 +1,15 @@
 // The panel's app. Inside the extension (or with ?preview, or in `pnpm dev`) the game; opened as a plain web page,
 // « Installer l'extension ».
-import { wireTip } from './ui/hover';
+import { wireTip } from './features/chat/hover';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './style.css';
 import './app.css';
-import { App } from './App';
+import { App } from './app/App';
 import { loadDevice } from './lib/device';
-import { connect, disconnect } from './net';
+import { connect, disconnect } from './app/net';
 import { PRESENCE } from '@slopesque/shared';
-import { useStore } from './store';
+import { useStore } from './app/store';
 
 const RELEASES = 'https://github.com/recovizzi/slopesque/releases/latest';
 const root = document.getElementById('app')!;

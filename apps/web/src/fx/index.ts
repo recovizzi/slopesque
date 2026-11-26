@@ -1,7 +1,7 @@
 // The visual effects of /effet (openspec: chat-activity, Effets visuels), as they arrive from the server (its « fx »
 // channel): each played on the layer over the game area. A new effect: a function of (layer, effect) here.
 import type { EffectView } from '@slopesque/shared';
-import { useStore } from '../store';
+import { useStore } from '../app/store';
 import { confetti } from './confetti';
 import { firework } from './firework';
 import { FxLayer, reduced, type Who } from './layer';
