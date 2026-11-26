@@ -5,7 +5,7 @@
 // the amounts; the showdown (hands turned over, the winning 5 cards brought forward, the pots and who took them), the
 // game's places; the rules with the hands and the chips drawn. The flights (cards from the deck, chips to the pot and
 // to the winner) are ui/holdem-anim.ts.
-import { backSvg, faceSvg, head, kickBtn, rulesFrame, seatCols, seatLabel, seatPill } from '../cards';
+import { backSvg, faceSvg, head, kickBtn, rulesFrame, seatCols, seatLabel, seatPill } from '../legacy';
 import { esc } from '../../../legacy/html';
 import { icon } from '../../../legacy/icons';
 import { Holdem as H } from '@slopesque/engines';

@@ -1,11 +1,11 @@
-/* The Tarot (tarot-view.ts, TrumpArt.tsx): trumps, the King called, the bonuses, the tricks seen again. */
+/* The Tarot (TarotTable and its pieces, TarotCard, TrumpArt): trumps, the King called, the bonuses, the tricks seen again. */
 /* The Tarot's own colours (with the table's, features/cards/cards.css): a trump's frame, the Excuse, the bonuses. */
 :root {
   --tarot-gold-edge: #b8932f; --tarot-excuse: #7a4fb8; --tarot-line: #0000002e;
   --tarot-mini-edge: #00000038; --tarot-view-bg: rgb(6 18 12 / .8); --tarot-handful-bg: #c7f0d8;
   --tarot-handful-ink: #0d4a2a; --tarot-chelem-bg: #ffd0d6; --tarot-chelem-ink: #7a0019;
 }
-/* the Tarot (tarot-view.ts): a trump — white card and inner border, golden edge, its picture, the number on a white
+/* the Tarot (TarotCard): a trump — white card and inner border, golden edge, its picture, the number on a white
    corner box flowing into the border; the cards that can't be played greyed; the chien's cards just taken glow */
 .tbg { fill: var(--paper); stroke: var(--tarot-gold-edge); stroke-width: 1.6; }
 .card-svg.excuse .tbg { stroke: var(--tarot-excuse); }

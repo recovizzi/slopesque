@@ -10,7 +10,6 @@ export const HTML = {
   'features/chat/gif.ts': [3, 'chat 3.4 — the GIF window (GifPop) as a component'],
   'features/chat/hover.ts': [1, 'chat 3.4 — the quoted message on hover'],
   'features/cards/holdem/holdem-anim.ts': [1, 'cards 3.3 — the chips that fly'],
-  'features/cards/tarot/TrumpArt.tsx': [2, 'cards 3.2 — the trumps as components'],
   'features/activity-picker/ActivityPicker.tsx': [1, 'rooms/account 3.5 — the pictures of the activities as JSX'],
   'fx/layer.ts': [1, "chat 3.4 (effects) — the players' rounds of the effects as elements"],
 };

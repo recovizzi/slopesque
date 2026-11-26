@@ -3,7 +3,7 @@
 // contract; the trick in the middle (taken to its winner, as at the Tarot); my hand in a fan (the cards I can't play
 // greyed, the trumps marked); the bidding bar (a value, a suit, pass, coinche, surcoinche); the deal's count and the
 // score sheet; the rules with the cards drawn. Reuses the Tarot's trick and pile.
-import { backSvg, faceSvg, handAngle, head, kickBtn, rulesFrame, seatCols, seatPill } from '../cards';
+import { backSvg, faceSvg, handAngle, head, kickBtn, rulesFrame, seatCols, seatPill } from '../legacy';
 import { esc } from '../../../legacy/html';
 import { Coinche as CO } from '@slopesque/engines';
 

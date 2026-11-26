@@ -1,5 +1,5 @@
-/* The card table (CardsStage, cards.ts) shared by every card game: seats, hand, cards, announcements, won tricks,
-   rules; the Trou du cul. */
+/* The card table (CardsStage and its pieces: PlayingCard, SeatPill, Hand, TableHead, PreDeal) shared by every card
+   game: seats, hand, cards, announcements, won tricks, rules; the Trou du cul (tdc/). */
 /* The card table's own colours (shared by every card game; the theme's are in design/tokens.css): the felt, the
    cards, the gold of a turn, the roles. */
 :root {
@@ -12,8 +12,9 @@
   --cg-gold-deep: #3d2f00; --cg-copper: #f3c1a8; --cg-copper-ink: #6b2d10;
   --cg-bronze: #8a5a3c; --cg-neutral: #e8e5dc; --cg-neutral-ink: #4a463f;
   --cg-bot: #5b5bd6; --cg-muted: #6b6860; --cg-overlay: rgb(12 18 15 / .82);
+  --cg-robot: #8a8f98;
 }
-/* card games (cards.ts): the table instead of the game area — a header (game, info, clock, rules), the other players,
+/* card games (CardsStage): the table instead of the game area — a header (game, info, clock, rules), the other players,
    the trick, my hand in a fan */
 .cards-stage { display: none; }
 .activity-cards .stage-grid { display: none; }
@@ -32,6 +33,7 @@ body.activity-cards:not(.room-blocked) .cards-stage { display: flex; height: 100
 .cg-seat { display: flex; align-items: center; gap: 6px; padding: 3px 9px 3px 3px; border-radius: 99px; background: var(--cg-pill); color: var(--ink); font-size: 12px;
   border: 2px solid transparent; transition: border-color .2s, opacity .2s; }
 .cg-seat .avatar.sm { width: 24px; height: 24px; font-size: 11px; }
+.cg-seat.is-robot .avatar { background: var(--cg-robot); } /* no player behind the seat: the robots' grey */
 .seat-name { font-weight: 700; }
 /* the pills around the table: the same size for all, the name cut with « … », a line under it; corners: robot, crown */
 .cg-seat { position: relative; min-width: 0; height: 40px; box-sizing: border-box; }
@@ -71,7 +73,7 @@ body.activity-cards:not(.room-blocked) .cards-stage { display: flex; height: 100
 .cg-results .pts { font-weight: 800; color: var(--accent); }
 .cg-me { display: flex; flex-direction: column; gap: 4px; }
 .cg-hand { position: relative; height: calc(var(--ch) + 76px); overflow: visible; }
-/* the fan: every card turns (--a, set by app.ts) around the same point --r below its centre; hovered, it comes up;
+/* the fan: every card turns (--a, set by Hand) around the same point --r below its centre; hovered, it comes up;
    selected, higher, with an outline (neither in front: each card's strip stays clickable) */
 .pcard.in-hand { position: absolute; left: 50%; top: 30px; margin-left: calc(var(--cw) / -2); cursor: pointer;
   transform-origin: 50% calc(50% + var(--r, 400px)); transform: rotate(var(--a, 0rad)) translateY(var(--lift, 0px));
@@ -97,7 +99,7 @@ body.activity-cards:not(.room-blocked) .cards-stage { display: flex; height: 100
 .cg-results li.is-bot .pts { color: var(--muted); }
 .card-fly { position: fixed; z-index: 65; pointer-events: none; } /* under a dialog (70) */
 .card-fly .card-svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 4px 8px var(--shade-40)); }
-/* a card (cards.ts): a light face in both themes, like a real card; red or black values, emoji suits */
+/* a card (PlayingCard): a light face in both themes, like a real card; red or black values, emoji suits */
 .cbg { fill: var(--cg-paper); stroke: var(--cg-edge); stroke-width: 1.2; }
 .cv { font: 800 15px system-ui, sans-serif; }
 .card-svg.red .cv { fill: var(--cg-red); }

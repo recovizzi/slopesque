@@ -5,7 +5,7 @@
 // (CardsStage keeps the selectors) until they land. The server waits as long before the robots go on (×
 // ROBOT_DELAY_MS / 900: the tests go fast).
 import type { CardsView } from '@slopesque/shared';
-import { backSvg } from '../cards';
+import { backSvg } from '../legacy';
 import { chipsHtml } from './holdem-view';
 import { painted, wait } from '../cards-anim';
 
