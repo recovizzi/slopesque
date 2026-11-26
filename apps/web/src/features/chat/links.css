@@ -1,4 +1,4 @@
-/* Links in the chat and their previews (lib/links.ts). */
+/* Links in the chat and their previews (design/RichText.tsx, messages/LinkPreview.tsx). */
 /* The previews' own colours: a video's thumbnail and player. */
 :root {
   --lp-thumb-top: #1b4b6e; --lp-thumb-bottom: #141518; --lp-play-hover: #d93d42;

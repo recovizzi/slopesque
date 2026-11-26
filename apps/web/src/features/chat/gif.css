@@ -1,5 +1,5 @@
-/* The GIF window (gif.ts). */
-/* the GIF window (gif.ts): search, tabs, two columns loaded by pages while scrolling */
+/* The GIF window (gifs/GifPicker.tsx). */
+/* the GIF window: search, tabs, two columns loaded by pages while scrolling */
 .gif-pop { position: fixed; z-index: 60; display: flex; flex-direction: column; overflow: hidden; background: var(--surface); border: 1px solid var(--border);
   border-radius: 12px; box-shadow: var(--shadow); }
 .gif-pop[hidden] { display: none; }

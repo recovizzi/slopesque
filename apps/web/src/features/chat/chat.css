@@ -1,5 +1,5 @@
-/* The chat (Chat.tsx): messages, reactions, replies, pictures, panels (upload, stickers), the + menu, the players'
-   list. */
+/* The chat (Chat.tsx, messages/, composer/, People.tsx): messages, reactions, replies, pictures, panels (upload,
+   stickers), the + menu, the players' list. */
 /* The chat's own colours. */
 :root {
   --presence-gone: #d97706;
@@ -9,11 +9,11 @@
 .msg.sys { color: var(--muted); font-size: 12px; font-style: italic; }
 .chat-form { display: flex; flex-direction: row; align-items: center; gap: 4px; padding: 8px; border-top: 1px solid var(--border); }
 .chat-form input { flex: 1; min-width: 0; }
-/* the chat (chat.ts): in the left drawer, or filling the stage in the Chat activity */
+/* the chat: in the left drawer, or filling the stage in the Chat activity */
 .chat-box { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .msg.has-media .msg-body { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
 /* a message: hovering its text (only) darkens it and shows the reaction bar just below the text, floating (nothing
-   moves: no jump in the chat), where the pointer entered the message (app.ts sets its left); it touches the text, so
+   moves: no jump in the chat), where the pointer entered the message (Message.tsx sets its left); it touches the text, so
    the pointer reaches it, and stays while hovered or while the picker is open for the message (is-reacting). Hidden,
    it is invisible to the pointer. The chat keeps room at its bottom for the last message's bar. */
 .chat-box .chat { padding-bottom: 40px; }

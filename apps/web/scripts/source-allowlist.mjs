@@ -6,14 +6,10 @@
 export const HTML = {
   'legacy/Html.tsx': [1, 'cleanup 4.1 (each feature stops using it first)'],
   'legacy/LiveHtml.tsx': [1, 'cleanup 4.1 (poll, wheel, cards, palmares stop using it first)'],
-  'lib/emoji.ts': [1, 'chat 3.4 — the :code: suggestions (SuggestList)'],
-  'features/chat/gif.ts': [3, 'chat 3.4 — the GIF window (GifPop) as a component'],
-  'features/chat/hover.ts': [1, 'chat 3.4 — the quoted message on hover'],
   'features/cards/holdem/holdem-anim.ts': [1, 'cards 3.3 — the chips that fly'],
 };
 
 /** Source files over 300 lines without a `size-exception:` comment in their first lines. */
 export const SIZE = {
-  'features/chat/Chat.tsx': 'chat 3.4 — list, message, composer, panels split',
   'features/cards/holdem/holdem-view.ts': "cards 3.3 — the Hold'em views as components",
 };

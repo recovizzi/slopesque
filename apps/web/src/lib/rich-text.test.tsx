@@ -1,9 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
 import { RichText } from '../design/RichText';
-import { esc } from '../legacy/html';
-import { withCustom } from './emoji';
-import { linkify } from './links';
 import { parseRich } from './rich-text';
 
 const custom = [
@@ -72,8 +69,9 @@ describe('RichText', () => {
         <RichText text={text} custom={custom} {...o} />
       </p>,
     ).replace(/<link rel="preload"[^>]*>/g, ''); // React's hints for the pictures, not in the DOM
-  // the DOM of the HTML helpers it replaces (lib/links.ts linkify + lib/emoji.ts withCustom): same elements, same
-  // attributes, same text — entities and the closing of <img> aside
+  // the DOM of the HTML helpers it replaced (lib/links.ts linkify + lib/emoji.ts withCustom, deleted with the chat's
+  // conversion, task 3.4), as they wrote it: same elements, same attributes, same text — entities and the closing of
+  // <img> aside
   const decode = (s: string) =>
     s
       .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(+n))
@@ -83,13 +81,27 @@ describe('RichText', () => {
       .replace(/&gt;/g, '>')
       .replace(/&amp;/g, '&')
       .replace(/\/>/g, '>');
+  const link = (href: string, text = href) =>
+    `<a class="msg-link" href="${href}" target="_blank" rel="noopener noreferrer nofollow" title="${href}">${text}</a>`;
+  const img = (name: string, url: string) =>
+    `<img class="emoji-custom" src="${url}" alt=":${name}:" title=":${name}:" draggable="false">`;
+  const pepe = img('pepe', 'https://cdn.test/pepe.png');
   test.each([
-    'salut <b>toi</b> & "vous" \'eux\'',
-    'regarde youtube.com/watch?v=aqz-KE-bpKQ :pepe: !',
-    ':pepe::ok_2: et (voir example.org/a_(b)) :nope:',
-    'https://x.com/:pepe:/ et fr.wikipedia.org/wiki/Tarot.',
-  ])('same DOM as the old HTML: %s', text => {
-    expect(decode(html(text))).toBe(decode(`<p>${linkify(text, t => withCustom(esc(t), custom))}</p>`));
+    ['salut <b>toi</b> & "vous" \'eux\'', '<p>salut &#60;b&#62;toi&#60;/b&#62; &#38; &#34;vous&#34; &#39;eux&#39;</p>'],
+    [
+      'regarde youtube.com/watch?v=aqz-KE-bpKQ :pepe: !',
+      `<p>regarde ${link('https://youtube.com/watch?v=aqz-KE-bpKQ', 'youtube.com/watch?v=aqz-KE-bpKQ')} ${pepe} !</p>`,
+    ],
+    [
+      ':pepe::ok_2: et (voir example.org/a_(b)) :nope:',
+      `<p>${pepe}${img('ok_2', 'https://cdn.test/ok.png')} et (voir ${link('https://example.org/a_(b)', 'example.org/a_(b)')}) :nope:</p>`,
+    ],
+    [
+      'https://x.com/:pepe:/ et fr.wikipedia.org/wiki/Tarot.',
+      `<p>${link('https://x.com/:pepe:/')} et ${link('https://fr.wikipedia.org/wiki/Tarot', 'fr.wikipedia.org/wiki/Tarot')}.</p>`,
+    ],
+  ])('same DOM as the old HTML: %s', (text, old) => {
+    expect(decode(html(text))).toBe(decode(old));
   });
 
   test('player text is never HTML', () => {
