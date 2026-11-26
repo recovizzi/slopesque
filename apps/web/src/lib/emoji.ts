@@ -4,7 +4,6 @@
 // and the suggestions' list are the chat's: features/chat/emoji/, features/chat/composer/Suggestions.tsx.
 // See openspec/changes/define-game-concept/specs/chat-activity/spec.md.
 import dataSource from '../emoji-fr.json?url';
-import { esc } from '../legacy/html';
 
 /** An emoji added to the game by a player, for everyone (kept with the game, purged with it). */
 export interface CustomEmoji {
@@ -20,7 +19,6 @@ export const RECENT_REACTIONS = 4;
 export const pushRecent = (list: string[], e: string) => [e, ...list.filter(x => x !== e)].slice(0, RECENT_REACTIONS);
 
 export const NAME = /^[a-z0-9_]{2,24}$/;
-const CUSTOM = /:([a-z0-9_]{2,24}):/g;
 
 /** A name for a custom emoji from a file name: lower case, no accents, `_` between words, free in the game. */
 export function suggestName(file: string, taken: string[]) {
@@ -115,18 +113,6 @@ export function suggest(q: string, custom: CustomEmoji[], limit = 6): Suggestion
 }
 
 // ------------------------------------------------------------------ transition (deleted in task 4.1)
-/** @deprecated Escaped text with the game's `:name:` as `<img>` HTML: only features/poll/poll.ts still builds its
- *  views as HTML (task 3.1). React code renders a text with <RichText custom> (design). */
-export function withCustom(escaped: string, custom: CustomEmoji[]) {
-  if (!custom.length) return escaped;
-  const map = new Map(custom.map(c => [c.name, c]));
-  return escaped.replace(CUSTOM, (m, n: string) => {
-    const c = map.get(n);
-    return c
-      ? `<img class="emoji-custom" src="${esc(c.url)}" alt=":${c.name}:" title=":${c.name}:" draggable="false">`
-      : m;
-  });
-}
 /** @deprecated The picker opened from code, for app/App.tsx (task 3.6) and features/poll (task 3.1): the chat
  *  renders <EmojiPicker> (features/chat/emoji/EmojiPicker.tsx). */
 export { EmojiPop } from '../features/chat/emoji/emoji-pop';
