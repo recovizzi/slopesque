@@ -112,4 +112,15 @@ export async function player(scheme = 'light', { presetServer = true, allSites =
 }
 
 export function prepareShots() { fs.rmSync(OUT, { recursive: true, force: true }); fs.mkdirSync(OUT, { recursive: true }); }
-export const shot = (page, name) => page.screenshot({ path: path.join(OUT, `${name}.png`) });
+// E2E_DOM=<dir>: each shot also saves the panel's DOM (and its viewport, its colour scheme) there — to compare the
+// computed styles of real screens before / after a change of the CSS, or the DOM of a view converted to React
+export async function shot(page, name) {
+  const dir = process.env.E2E_DOM, frame = dir && page.frames().find(f => f.url().includes('app/index.html'));
+  if (frame) {
+    fs.mkdirSync(dir, { recursive: true });
+    const dom = await frame.evaluate(() => ({ html: `<!doctype html>${document.documentElement.outerHTML}`, w: innerWidth, h: innerHeight,
+      dark: matchMedia('(prefers-color-scheme: dark)').matches }));
+    fs.writeFileSync(path.join(dir, `${name}.json`), JSON.stringify(dom));
+  }
+  return page.screenshot({ path: path.join(OUT, `${name}.png`) });
+}
