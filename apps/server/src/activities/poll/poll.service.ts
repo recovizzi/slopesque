@@ -28,8 +28,8 @@ export class PollActivity implements Activity {
 
   init(rt: RoomRt) {
     const ps = (rt.room.rules.poll ?? {}) as { seconds?: number; secret?: boolean; round?: number };
-    rt.slots.poll = { phase: 'writing', round: ps.round ?? 1, seconds: ps.seconds ?? 300, secret: ps.secret ?? false, poll: null, answers: {}, host: null,
-      deadline: null, timer: null };
+    rt.slots.poll = { phase: 'writing', round: ps.round ?? 1, seconds: ps.seconds ?? 300, secret: ps.secret ?? false,
+      poll: null, answers: {}, host: null, deadline: null, timer: null };
     this.chatPolls.init(rt);
   }
 
@@ -48,8 +48,8 @@ export class PollActivity implements Activity {
     const p = rt.slots.poll;
     if (p.phase !== 'open' || to.activity === 'poll') return null;
     if (p.timer) clearTimeout(p.timer);
-    const cp = { poll: p.poll!, round: p.round, host: p.host, secret: p.secret, seconds: p.seconds, deadline: p.deadline ?? Date.now(), answers: { ...p.answers },
-      closed: false, outcome: null };
+    const cp = { poll: p.poll!, round: p.round, host: p.host, secret: p.secret, seconds: p.seconds, deadline: p.deadline ?? Date.now(),
+      answers: { ...p.answers }, closed: false, outcome: null };
     await this.chatPolls.open(rt, cp);
     rt.slots.poll = { ...p, phase: 'writing', round: p.round + 1, poll: null, answers: {}, host: null, deadline: null, timer: null };
     await this.save(rt);
@@ -97,7 +97,10 @@ export class PollActivity implements Activity {
       const p = v.pics[i];
       let pic: PollPicView | null = null;
       if (p?.gif) pic = { kind: 'gif', src: p.gif.url, w: p.gif.w, h: p.gif.h };   // a link to its provider, as in the chat
-      else if (p?.mediaId) { const m = await this.media.picture(p.mediaId, 'poll'); pic = { kind: 'image', src: this.media.url(m.id), w: m.width, h: m.height }; }
+      else if (p?.mediaId) {
+        const m = await this.media.picture(p.mediaId, 'poll');
+        pic = { kind: 'image', src: this.media.url(m.id), w: m.width, h: m.height };
+      }
       else if (p?.stickerId) {
         const st = await this.library.sticker(rt, p.stickerId);
         if (st) pic = { kind: 'sticker', ...st };
@@ -105,13 +108,17 @@ export class PollActivity implements Activity {
       pics.push(pic);
     }
     const draft = { kind: v.kind, question: v.question, choices, pics };
-    if (!Poll.ready(draft as Poll.PollDraft) || (v.kind !== 'free' && (choices.length < Poll.MIN_CHOICES))) throw new UserError('Il manque la question ou un choix.');
+    if (!Poll.ready(draft as Poll.PollDraft) || (v.kind !== 'free' && (choices.length < Poll.MIN_CHOICES))) {
+      throw new UserError('Il manque la question ou un choix.');
+    }
     await this.rooms.enter(rt, { activity: 'poll' });
     const seconds = rt.slots.poll.seconds;
-    rt.slots.poll = { ...rt.slots.poll, phase: 'open', poll: draft, answers: {}, host: rt.room.hostId, deadline: Date.now() + seconds * 1000, timer: null };
+    rt.slots.poll = { ...rt.slots.poll, phase: 'open', poll: draft, answers: {}, host: rt.room.hostId,
+      deadline: Date.now() + seconds * 1000, timer: null };
     rt.slots.poll.timer = setTimeout(() => void this.close(rt), seconds * 1000);
     await this.rooms.setLive(rt, 'poll', v.question);
-    await this.media.keepFor(v.pics.flatMap(x => (x?.mediaId ? [x.mediaId] : [])), rt.slots.poll.seconds * 1000);   // not swept before the poll's end
+    const pictures = v.pics.flatMap(x => (x?.mediaId ? [x.mediaId] : []));
+    await this.media.keepFor(pictures, rt.slots.poll.seconds * 1000);   // not swept before the poll's end
     await this.rooms.say(rt, `Sondage ${rt.slots.poll.round} : « ${v.question} »`);
     await this.emit(rt);
   }

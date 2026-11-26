@@ -33,8 +33,8 @@ export class ChatPolls {
 
   /** The poll's message (in its host's name), answered from now on in the chat. */
   async open(rt: RoomRt, cp: StoredChatPoll) {
-    const [row] = await this.db.insert(messages).values({ roomId: rt.room.id, authorId: cp.host, kind: 'poll', text: cp.poll.question, data: { chatPoll: cp } })
-      .returning();
+    const [row] = await this.db.insert(messages)
+      .values({ roomId: rt.room.id, authorId: cp.host, kind: 'poll', text: cp.poll.question, data: { chatPoll: cp } }).returning();
     this.arm(rt, row!.id, cp);
     this.rooms.emit(rt, { type: 'message', message: this.chat.view(row!) });
   }
@@ -80,6 +80,7 @@ export class ChatPolls {
     e.cp.outcome = Poll.outcome({ ...e.cp.poll, answers: e.cp.answers } as Poll.Poll, e.cp.host ?? '');
     await this.save(rt, id, e.cp);
     const n = Object.keys(e.cp.answers).length;
-    await this.rooms.say(rt, `Sondage « ${e.cp.poll.question} » terminé : ${n} réponse${n > 1 ? 's' : ''}, les résultats sont dans le chat.`, true);
+    await this.rooms.say(rt,
+      `Sondage « ${e.cp.poll.question} » terminé : ${n} réponse${n > 1 ? 's' : ''}, les résultats sont dans le chat.`, true);
   }
 }

@@ -36,9 +36,13 @@ export class RoomLibrary {
     const [same] = await this.db.select().from(stickers).where(and(eq(stickers.roomId, rt.room.id), eq(stickers.mediaId, pic.id)));
     if (same) await this.db.update(stickers).set({ usedAt: new Date() }).where(eq(stickers.id, same.id));
     else await this.db.insert(stickers).values({ roomId: rt.room.id, mediaId: pic.id, addedBy: me });
-    const extra = (await this.db.select({ id: stickers.id, mediaId: stickers.mediaId }).from(stickers).where(eq(stickers.roomId, rt.room.id))
-      .orderBy(desc(stickers.usedAt))).slice(60);
-    if (extra.length) { await this.db.delete(stickers).where(inArray(stickers.id, extra.map(x => x.id))); await this.media.sweep(extra.map(x => x.mediaId)); }
+    const all = await this.db.select({ id: stickers.id, mediaId: stickers.mediaId }).from(stickers).where(eq(stickers.roomId, rt.room.id))
+      .orderBy(desc(stickers.usedAt));
+    const extra = all.slice(60);
+    if (extra.length) {
+      await this.db.delete(stickers).where(inArray(stickers.id, extra.map(x => x.id)));
+      await this.media.sweep(extra.map(x => x.mediaId));
+    }
     const lib = await this.stickers(rt);
     this.rooms.emit(rt, { type: 'stickers', stickers: lib });
     if (send) await this.chat.sendPicture(rt, me, 'sticker', pic);
@@ -67,7 +71,8 @@ export class RoomLibrary {
   }
 
   async addEmoji(rt: RoomRt, me: Account, name: string, pic: MediaRow) {
-    const [row] = await this.db.insert(customEmoji).values({ roomId: rt.room.id, name, mediaId: pic.id, addedBy: me.id }).onConflictDoNothing().returning();
+    const [row] = await this.db.insert(customEmoji).values({ roomId: rt.room.id, name, mediaId: pic.id, addedBy: me.id })
+      .onConflictDoNothing().returning();
     if (!row) throw new UserError(`:${name}: existe déjà dans le salon.`);
     this.rooms.emit(rt, { type: 'emoji', emoji: await this.emoji(rt) });
     await this.rooms.say(rt, `${me.name} a ajouté l'emoji :${name}: pour tout le salon.`, true);

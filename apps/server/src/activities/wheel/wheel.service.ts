@@ -8,11 +8,15 @@ import type { Activity } from '../../rooms/activity.js';
 import { RoomRegistry } from '../../rooms/room-registry.js';
 import type { RoomRt } from '../../rooms/room-rt.js';
 
-interface WheelRt { phase: WheelView['phase']; items: WheelView['items']; spin: WheelView['spin']; needle: number; round: number; timer: NodeJS.Timeout | null }
+interface WheelRt {
+  phase: WheelView['phase']; items: WheelView['items']; spin: WheelView['spin']; needle: number; round: number;
+  timer: NodeJS.Timeout | null;
+}
 declare module '../../rooms/room-rt.js' { interface RoomSlots { wheel: WheelRt } }
 
-const PROBLEMS = { over: 'Le total des poids dépasse 100.', invalid: 'Un poids n\'est pas un nombre.', empty: 'Il faut au moins 2 propositions, toutes écrites.',
-  zero: 'Tous les poids sont à 0.' };
+/** Why a wheel can't be spun (Wheel.problem), in words. */
+const PROBLEMS = { over: 'Le total des poids dépasse 100.', invalid: 'Un poids n\'est pas un nombre.',
+  empty: 'Il faut au moins 2 propositions, toutes écrites.', zero: 'Tous les poids sont à 0.' };
 
 @Injectable()
 export class WheelActivity implements Activity {
@@ -22,8 +26,8 @@ export class WheelActivity implements Activity {
 
   init(rt: RoomRt) {
     const ws = (rt.room.rules.wheel ?? {}) as { items?: WheelView['items']; needle?: number; round?: number };
-    rt.slots.wheel = { phase: 'writing', items: ws.items ?? [{ label: '', weight: '' }, { label: '', weight: '' }], spin: null, needle: ws.needle ?? 0,
-      round: ws.round ?? 1, timer: null };
+    const items = ws.items ?? [{ label: '', weight: '' }, { label: '', weight: '' }];
+    rt.slots.wheel = { phase: 'writing', items, spin: null, needle: ws.needle ?? 0, round: ws.round ?? 1, timer: null };
   }
 
   view(rt: RoomRt) { return { wheel: this.wheelView(rt) }; }
@@ -38,7 +42,10 @@ export class WheelActivity implements Activity {
     return 'le tirage';
   }
 
-  private wheelView(rt: RoomRt): WheelView { const w = rt.slots.wheel; return { phase: w.phase, items: w.items, spin: w.spin, needle: w.needle, round: w.round }; }
+  private wheelView(rt: RoomRt): WheelView {
+    const w = rt.slots.wheel;
+    return { phase: w.phase, items: w.items, spin: w.spin, needle: w.needle, round: w.round };
+  }
   private emit(rt: RoomRt) { this.rooms.emit(rt, { type: 'wheel', wheel: this.wheelView(rt) }); }
 
   /** The host builds the wheel: everyone sees it as it is typed. */

@@ -12,12 +12,14 @@ import { RoomHub } from '../rooms/room-hub.service.js';
 import { RoomRegistry } from '../rooms/room-registry.js';
 import type { SocketData } from '../rooms/room-rt.js';
 
-const ipOf = (s: Socket, trust: boolean) => (trust && String(s.handshake.headers['x-forwarded-for'] ?? '').split(',')[0]?.trim()) || s.handshake.address;
+const ipOf = (s: Socket, trust: boolean) =>
+  (trust && String(s.handshake.headers['x-forwarded-for'] ?? '').split(',')[0]?.trim()) || s.handshake.address;
 
 /** This server's package.json (read once): its version, and the oldest extension it accepts (pnpm release --min-extension). */
 const PKG = (() => {
-  try { return JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { version: string; slopesque?: { minExtension?: string } }; }
-  catch { return { version: '?' }; }
+  type Pkg = { version: string; slopesque?: { minExtension?: string } };
+  try { return JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as Pkg; }
+  catch { return { version: '?' } as Pkg; }
 })();
 const SERVER_VERSION = PKG.version;
 
@@ -30,7 +32,8 @@ export class ConnectionGateway implements OnGatewayInit, OnGatewayConnection, On
 
   /** The server's version (its package), the oldest extension it accepts, where to get the latest. */
   versions(): ServerVersions {
-    return { version: SERVER_VERSION, minExtension: this.env.MIN_EXTENSION_VERSION ?? PKG.slopesque?.minExtension ?? '0.1.0', download: this.env.EXTENSION_DOWNLOAD_URL };
+    return { version: SERVER_VERSION, minExtension: this.env.MIN_EXTENSION_VERSION ?? PKG.slopesque?.minExtension ?? '0.1.0',
+      download: this.env.EXTENSION_DOWNLOAD_URL };
   }
 
   afterInit(io: Server) {
@@ -41,7 +44,9 @@ export class ConnectionGateway implements OnGatewayInit, OnGatewayConnection, On
       if (!h.success) return fail('code');
       const versions = this.versions();
       // an extension older than the server accepts (or one that says no version: before versioning) is sent to update
-      if (!h.data.version || versionBelow(h.data.version, versions.minExtension)) return fail('outdated', { ...versions, yours: h.data.version ?? null });
+      if (!h.data.version || versionBelow(h.data.version, versions.minExtension)) {
+        return fail('outdated', { ...versions, yours: h.data.version ?? null });
+      }
       if (h.data.protocol !== PROTOCOL_VERSION) return fail('protocol', versions);
       const ip = ipOf(socket, this.env.TRUST_PROXY);
       try {

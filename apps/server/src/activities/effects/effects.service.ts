@@ -26,7 +26,8 @@ export class Effects {
     if (photo && !target) throw new UserError(`/effet ${v.kind} vise un joueur : par exemple /effet ${v.kind} Léa.`);
     const running = (fx[group] ?? []).filter(end => end > now), max = EFFECT_PARALLEL[v.kind] ?? 1;
     if (running.length >= max) {
-      throw new UserError(photo ? 'Un effet est déjà en cours sur une photo : attends sa fin.' : v.kind === 'screamer' ? 'Un screamer est déjà affiché : attends sa fin.'
+      throw new UserError(photo ? 'Un effet est déjà en cours sur une photo : attends sa fin.'
+        : v.kind === 'screamer' ? 'Un screamer est déjà affiché : attends sa fin.'
         : `${max} ${v.kind === 'firework' ? 'feux d\'artifice' : 'salves de confettis'} sont déjà en cours : attends un instant.`);
     }
     const pic = v.kind === 'screamer' ? await this.screamer(rt, v.pic) : null;
@@ -39,7 +40,9 @@ export class Effects {
   private async screamer(rt: RoomRt, p: EffectPic | undefined): Promise<EffectView['pic']> {
     if (!p) throw new UserError('Choisis une image, un sticker, un GIF ou un emoji.');
     if (p.kind === 'image') {
-      if (!/^data:image\/(webp|png|jpeg|gif);base64,[A-Za-z0-9+/=]+$/.test(p.value) || p.value.length > 700_000) throw new UserError('Image refusée : trop lourde ou d\'un format inconnu.');
+      if (!/^data:image\/(webp|png|jpeg|gif);base64,[A-Za-z0-9+/=]+$/.test(p.value) || p.value.length > 700_000) {
+        throw new UserError('Image refusée : trop lourde ou d\'un format inconnu.');
+      }
       return { kind: 'image', src: p.value };
     }
     if (p.kind === 'sticker') {

@@ -18,7 +18,9 @@ export class WebActivity implements Activity {
   async set(rt: RoomRt, me: string, integration: string, url: string) {
     this.rooms.hostOnly(rt, me);
     const u = new URL(url), local = u.hostname === 'localhost' || u.hostname === '127.0.0.1';
-    if (u.protocol !== 'https:' && !(u.protocol === 'http:' && local)) throw new UserError('L\'adresse doit commencer par https:// (http:// seulement pour localhost).');
+    if (u.protocol !== 'https:' && !(u.protocol === 'http:' && local)) {
+      throw new UserError('L\'adresse doit commencer par https:// (http:// seulement pour localhost).');
+    }
     const web = { ...((rt.room.rules.web as Record<string, string> | undefined) ?? {}), [integration]: u.href };
     await this.rooms.saveRules(rt, 'web', web);
     this.rooms.emit(rt, { type: 'web', web });

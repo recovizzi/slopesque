@@ -9,6 +9,6 @@ export class WebGateway {
 
   @SubscribeMessage('web:set')
   set(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {
-    return this.intents.inRoom(s, 'web:set', b, async (v, rt, me) => { await this.web.set(rt, me.id, v.integration, v.url); return null; });
+    return this.intents.inRoom(s, 'web:set', b, (v, rt, me) => this.web.set(rt, me.id, v.integration, v.url));
   }
 }

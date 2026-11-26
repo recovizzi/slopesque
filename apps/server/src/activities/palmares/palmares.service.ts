@@ -18,12 +18,13 @@ export class Palmares {
 
   /** The room's results (the last 5 000), with each player's current name and colour. */
   async list(rt: RoomRt): Promise<PalmaresEvent[]> {
-    const rows = await this.db.execute<{ at: string; game: string; data: Record<string, unknown>; name: string | null; hue: number | null }>(sql`
+    type Row = { at: string; game: string; data: Record<string, unknown>; name: string | null; hue: number | null };
+    const rows = await this.db.execute<Row>(sql`
       select p.at, p.game, p.data, a.name, m.hue from palmares p
       left join accounts a on a.id = (p.data->>'account')::uuid
       left join room_members m on m.room_id = p.room_id and m.account_id = (p.data->>'account')::uuid
       where p.room_id = ${rt.room.id} order by p.at desc limit 5000`);
-    return rows.map(r => ({ ...(r.data as object), at: new Date(r.at).getTime(), game: r.game, id: String(r.data.account), name: r.name ?? '?',
-      hue: r.hue ?? 0, won: !!r.data.won })) as PalmaresEvent[];
+    return rows.map(r => ({ ...(r.data as object), at: new Date(r.at).getTime(), game: r.game, id: String(r.data.account),
+      name: r.name ?? '?', hue: r.hue ?? 0, won: !!r.data.won })) as PalmaresEvent[];
   }
 }

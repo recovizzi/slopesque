@@ -44,17 +44,20 @@ export class RoomRegistry {
   connected(rt: RoomRt) { return [...rt.members].filter(([, m]) => m.sockets.size > 0 || m.grace !== null).map(([id]) => id); }
 
   async members(rt: RoomRt, only?: string): Promise<MemberView[]> {
-    const rows = await this.db.select({ m: roomMembers, a: accounts }).from(roomMembers).innerJoin(accounts, eq(accounts.id, roomMembers.accountId))
+    const rows = await this.db.select({ m: roomMembers, a: accounts }).from(roomMembers)
+      .innerJoin(accounts, eq(accounts.id, roomMembers.accountId))
       .where(only ? and(eq(roomMembers.roomId, rt.room.id), eq(roomMembers.accountId, only)) : eq(roomMembers.roomId, rt.room.id))
       .orderBy(roomMembers.joinedAt);
     const photoIds = rows.map(r => r.m.photoId).filter((x): x is string => !!x);
-    const known = new Set(photoIds.length ? (await this.db.select({ id: media.id }).from(media).where(inArray(media.id, photoIds))).map(x => x.id) : []);
+    const found = photoIds.length ? await this.db.select({ id: media.id }).from(media).where(inArray(media.id, photoIds)) : [];
+    const known = new Set(found.map(x => x.id));
     return rows.map(({ m, a }) => {
       const live = rt.members.get(a.id), here = !!live && (live.sockets.size > 0 || live.grace !== null);
       const awaySince = here ? null : live?.awaySince ?? m.lastSeenAt.getTime();
       const presence = here ? 'here' : Date.now() - awaySince! >= PRESENCE.goneMs ? 'gone' : 'away';
-      return { id: a.id, name: a.name, hue: m.hue, photo: m.photoId && known.has(m.photoId) ? this.media.url(m.photoId) : null, presence, awaySince,
-        playing: m.playing, scores: m.scores, credit: m.credit, joinedAt: m.joinedAt.getTime() };
+      const photo = m.photoId && known.has(m.photoId) ? this.media.url(m.photoId) : null;
+      return { id: a.id, name: a.name, hue: m.hue, photo, presence, awaySince, playing: m.playing, scores: m.scores, credit: m.credit,
+        joinedAt: m.joinedAt.getTime() };
     });
   }
 
@@ -69,7 +72,9 @@ export class RoomRegistry {
   /** Each player gets the event as he may see it (the host's answer hidden until the reveal, his own hand…). */
   async emitEach(rt: RoomRt, event: (me: string) => RoomEvent) {
     rt.seq++;
-    for (const s of await this.io.in(`room:${rt.room.id}`).fetchSockets()) s.emit('event', { ...event((s.data as SocketData).account.id), seq: rt.seq });
+    for (const s of await this.io.in(`room:${rt.room.id}`).fetchSockets()) {
+      s.emit('event', { ...event((s.data as SocketData).account.id), seq: rt.seq });
+    }
   }
   async emitMember(rt: RoomRt, id: string) {
     const [member] = await this.members(rt, id);
@@ -118,7 +123,8 @@ export class RoomRegistry {
 
   /** The players who joined (« Participer », or seated at a card table). */
   async playingIds(rt: RoomRt) {
-    const rows = await this.db.select({ id: roomMembers.accountId }).from(roomMembers).where(and(eq(roomMembers.roomId, rt.room.id), eq(roomMembers.playing, true)));
+    const rows = await this.db.select({ id: roomMembers.accountId }).from(roomMembers)
+      .where(and(eq(roomMembers.roomId, rt.room.id), eq(roomMembers.playing, true)));
     return new Set(rows.map(r => r.id));
   }
   async setPlaying(rt: RoomRt, user: string, playing: boolean) {
@@ -128,7 +134,8 @@ export class RoomRegistry {
 
   /** A player's points in one game's ranking (disk, tdc, tarot, holdem, coinche). */
   async addScore(rt: RoomRt, user: string, game: string, pts: number) {
-    await this.db.update(roomMembers).set({ scores: sql`jsonb_set(${roomMembers.scores}, ${`{${game}}`}::text[], to_jsonb(coalesce((${roomMembers.scores}->>${game})::int, 0) + ${pts}::int))` })
+    const total = sql`to_jsonb(coalesce((${roomMembers.scores}->>${game})::int, 0) + ${pts}::int)`;
+    await this.db.update(roomMembers).set({ scores: sql`jsonb_set(${roomMembers.scores}, ${`{${game}}`}::text[], ${total})` })
       .where(and(eq(roomMembers.roomId, rt.room.id), eq(roomMembers.accountId, user)));
   }
 

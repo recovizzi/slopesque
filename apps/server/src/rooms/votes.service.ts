@@ -57,9 +57,11 @@ export class Votes {
 
   /** At start: the votes left open by a restart are cancelled, and it is said. */
   async cancelOpen() {
-    const open = await this.db.select().from(messages).where(sql`${messages.kind} = 'vote' and ${messages.data}->'vote'->>'result' is null`);
+    const open = await this.db.select().from(messages)
+      .where(sql`${messages.kind} = 'vote' and ${messages.data}->'vote'->>'result' is null`);
     for (const m of open) {
-      await this.db.update(messages).set({ data: { vote: { ...(m.data as { vote: Vote }).vote, result: 'cancelled' } } }).where(eq(messages.id, m.id));
+      const vote: Vote = { ...(m.data as { vote: Vote }).vote, result: 'cancelled' };
+      await this.db.update(messages).set({ data: { vote } }).where(eq(messages.id, m.id));
       await this.chat.send(m.roomId, null, 'Le serveur a redémarré : vote annulé.', null, 'system');
     }
   }

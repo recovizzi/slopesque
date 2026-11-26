@@ -9,16 +9,16 @@ export class WheelGateway {
 
   @SubscribeMessage('wheel:set')
   set(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {
-    return this.intents.inRoom(s, 'wheel:set', b, async (v, rt, me) => { await this.wheel.set(rt, me.id, v.items); return null; });
+    return this.intents.inRoom(s, 'wheel:set', b, (v, rt, me) => this.wheel.set(rt, me.id, v.items));
   }
 
   @SubscribeMessage('wheel:spin')
   spin(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {
-    return this.intents.inRoom(s, 'wheel:spin', b, async (_v, rt, me) => { await this.wheel.spin(rt, me.id); return null; });
+    return this.intents.inRoom(s, 'wheel:spin', b, (_v, rt, me) => this.wheel.spin(rt, me.id));
   }
 
   @SubscribeMessage('wheel:edit')
   edit(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {
-    return this.intents.inRoom(s, 'wheel:edit', b, async (_v, rt, me) => { await this.wheel.edit(rt, me.id); return null; });
+    return this.intents.inRoom(s, 'wheel:edit', b, (_v, rt, me) => this.wheel.edit(rt, me.id));
   }
 }

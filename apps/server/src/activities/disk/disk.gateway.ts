@@ -8,25 +8,27 @@ export class DiskGateway {
   constructor(private readonly intents: IntentRunner, private readonly disk: DiskActivity) {}
 
   @SubscribeMessage('disk:rules')
-  rules(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.inRoom(s, 'disk:rules', b, (v, rt, me) => this.disk.rules(rt, me.id, v)); }
+  rules(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {
+    return this.intents.inRoom(s, 'disk:rules', b, (v, rt, me) => this.disk.rules(rt, me.id, v));
+  }
 
   @SubscribeMessage('disk:join')
   join(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {
-    return this.intents.inRoom(s, 'disk:join', b, async (_v, rt, me) => { await this.disk.join(rt, me); return null; });
+    return this.intents.inRoom(s, 'disk:join', b, (_v, rt, me) => this.disk.join(rt, me));
   }
 
   @SubscribeMessage('disk:start')
   start(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {
-    return this.intents.inRoom(s, 'disk:start', b, async (v, rt, me) => { await this.disk.start(rt, me.id, v.word, v.target); return null; });
+    return this.intents.inRoom(s, 'disk:start', b, (v, rt, me) => this.disk.start(rt, me.id, v.word, v.target));
   }
 
   @SubscribeMessage('disk:guess')
   guess(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {
-    return this.intents.inRoom(s, 'disk:guess', b, async (v, rt, me) => { await this.disk.guess(rt, me.id, v.value); return null; });
+    return this.intents.inRoom(s, 'disk:guess', b, (v, rt, me) => this.disk.guess(rt, me.id, v.value));
   }
 
   @SubscribeMessage('disk:next')
   next(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {
-    return this.intents.inRoom(s, 'disk:next', b, async (_v, rt, me) => { await this.disk.next(rt, me.id); return null; });
+    return this.intents.inRoom(s, 'disk:next', b, (_v, rt, me) => this.disk.next(rt, me.id));
   }
 }

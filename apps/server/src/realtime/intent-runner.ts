@@ -10,9 +10,12 @@ import type { Account } from '../accounts/accounts.service.js';
 import { RoomRegistry } from '../rooms/room-registry.js';
 import type { RoomRt, SocketData } from '../rooms/room-rt.js';
 
+/** What a handler answers: the intent's result, or nothing for an intent answered null. */
+type Answer<N extends IntentName> = IntentResults[N] | (null extends IntentResults[N] ? void : never);
 type Limit = 'messages' | 'reactions' | 'effects' | 'joins' | 'gifs';
 const SLOW_DOWN: Record<Limit, string> = { messages: 'Doucement : trop de messages.', reactions: 'Doucement : trop de réactions.',
-  effects: 'Doucement : trop d\'effets.', joins: 'Trop de salons essayés : attends une minute.', gifs: 'Doucement : trop de recherches de GIF.' };
+  effects: 'Doucement : trop d\'effets.', joins: 'Trop de salons essayés : attends une minute.',
+  gifs: 'Doucement : trop de recherches de GIF.' };
 
 @Injectable()
 export class IntentRunner {
@@ -20,11 +23,12 @@ export class IntentRunner {
 
   constructor(private readonly cache: CacheService, private readonly rooms: RoomRegistry) {}
 
-  /** Validates an intent, runs it, answers { ok, value } or { ok: false, error } (an unexpected error is logged). */
-  async run<N extends IntentName>(name: N, body: unknown, fn: (v: Intent<N>) => Promise<IntentResults[N]>): Promise<Ack<IntentResults[N]>> {
+  /** Validates an intent, runs it, answers { ok, value } (null when it answers nothing) or { ok: false, error } (an
+   *  unexpected error is logged). */
+  async run<N extends IntentName>(name: N, body: unknown, fn: (v: Intent<N>) => Promise<Answer<N>>): Promise<Ack<IntentResults[N]>> {
     const v = intents[name].safeParse(body ?? {});
     if (!v.success) return { ok: false, error: 'Demande invalide.' };
-    try { return { ok: true, value: await fn(v.data as Intent<N>) }; } catch (e) {
+    try { return { ok: true, value: (await fn(v.data as Intent<N>) ?? null) as IntentResults[N] }; } catch (e) {
       if (e instanceof UserError) return { ok: false, error: e.message };
       this.log.error(`${name} : ${(e as Error).stack ?? e}`);
       return { ok: false, error: 'Erreur du serveur : réessaie.' };
@@ -32,7 +36,7 @@ export class IntentRunner {
   }
 
   /** The same, for a player in a room (« Tu n'es dans aucun salon. » otherwise): his room and his account. */
-  inRoom<N extends IntentName>(s: Socket, name: N, body: unknown, fn: (v: Intent<N>, rt: RoomRt, me: Account) => Promise<IntentResults[N]>) {
+  inRoom<N extends IntentName>(s: Socket, name: N, body: unknown, fn: (v: Intent<N>, rt: RoomRt, me: Account) => Promise<Answer<N>>) {
     return this.run(name, body, v => fn(v, this.rooms.roomOf(s), this.me(s)));
   }
 

@@ -42,7 +42,9 @@ export class ChatGateway {
 
   // ---------------------------------------------------------------- pictures, stickers, emoji, photo
   @SubscribeMessage('media:ticket')
-  ticket(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('media:ticket', b, v => this.media.ticket(this.intents.me(s).id, v.usage)); }
+  ticket(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {
+    return this.intents.run('media:ticket', b, v => this.media.ticket(this.intents.me(s).id, v.usage));
+  }
 
   @SubscribeMessage('chat:media')
   chatMedia(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {
@@ -82,7 +84,7 @@ export class ChatGateway {
 
   @SubscribeMessage('sticker:remove')
   stickerRemove(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {
-    return this.intents.inRoom(s, 'sticker:remove', b, async (v, rt) => { await this.library.removeSticker(rt, v.id); return null; });
+    return this.intents.inRoom(s, 'sticker:remove', b, (v, rt) => this.library.removeSticker(rt, v.id));
   }
 
   @SubscribeMessage('emoji:add')
@@ -106,16 +108,22 @@ export class ChatGateway {
   // ---------------------------------------------------------------- GIF
   @SubscribeMessage('gif:search')
   gifSearch(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {
-    return this.intents.run('gif:search', b, async v => { await this.intents.limit(s, 'gifs'); return this.gifs.page(v.q, v.page, v.provider); });
+    return this.intents.run('gif:search', b, async v => {
+      await this.intents.limit(s, 'gifs');
+      return this.gifs.page(v.q, v.page, v.provider);
+    });
   }
 
   @SubscribeMessage('gif:trending')
   gifTrending(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {
-    return this.intents.run('gif:trending', b, async v => { await this.intents.limit(s, 'gifs'); return this.gifs.page(null, v.page, v.provider); });
+    return this.intents.run('gif:trending', b, async v => {
+      await this.intents.limit(s, 'gifs');
+      return this.gifs.page(null, v.page, v.provider);
+    });
   }
 
   @SubscribeMessage('gif:favorites')
   gifFavorites(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {
-    return this.intents.run('gif:favorites', b, async v => { await this.accounts.saveGifFavorites(this.intents.me(s).id, v.favorites); return null; });
+    return this.intents.run('gif:favorites', b, v => this.accounts.saveGifFavorites(this.intents.me(s).id, v.favorites));
   }
 }

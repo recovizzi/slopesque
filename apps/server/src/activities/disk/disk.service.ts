@@ -15,7 +15,9 @@ interface DiskRt { state: D.DiskState; timer: NodeJS.Timeout | null }
 declare module '../../rooms/room-rt.js' { interface RoomSlots { disk: DiskRt } }
 
 /** The engine's refusal, said to the player. */
-const said = <T>(f: () => T): T => { try { return f(); } catch (e) { if (e instanceof D.DiskError) throw new UserError(e.message); throw e; } };
+const said = <T>(f: () => T): T => {
+  try { return f(); } catch (e) { if (e instanceof D.DiskError) throw new UserError(e.message); throw e; }
+};
 
 @Injectable()
 export class DiskActivity implements Activity {
@@ -26,7 +28,8 @@ export class DiskActivity implements Activity {
   init(rt: RoomRt) {
     const saved = (rt.room.rules.disk ?? {}) as { rules?: D.DiskRules; round?: number };
     const round = saved.round ?? 1;
-    rt.slots.disk = { state: { ...D.newDisk({ ...D.DEFAULT_RULES, ...saved.rules }), round, phase: round > 1 ? 'writing' : 'lobby' }, timer: null };
+    const state: D.DiskState = { ...D.newDisk({ ...D.DEFAULT_RULES, ...saved.rules }), round, phase: round > 1 ? 'writing' : 'lobby' };
+    rt.slots.disk = { state, timer: null };
   }
 
   /** A round was running: it starts again from the writing (its rules saved without it). */
@@ -72,7 +75,9 @@ export class DiskActivity implements Activity {
     await this.rooms.saveRules(rt, 'disk', { rules: { ...s.rules, ...s.pending }, round: s.round, guessing: s.phase === 'guessing' });
   }
   /** The candidates of a round: the players who joined (« Participer »), connected, except the host. */
-  private candidates(rt: RoomRt, playing: Set<string>) { return this.rooms.connected(rt).filter(id => playing.has(id) && id !== rt.slots.disk.state.host); }
+  private candidates(rt: RoomRt, playing: Set<string>) {
+    return this.rooms.connected(rt).filter(id => playing.has(id) && id !== rt.slots.disk.state.host);
+  }
 
   async rules(rt: RoomRt, me: string, changes: Partial<D.DiskRules>) {
     this.rooms.hostOnly(rt, me);
@@ -92,7 +97,8 @@ export class DiskActivity implements Activity {
   async start(rt: RoomRt, me: string, word: string, target: number) {
     this.rooms.hostOnly(rt, me);
     const d = rt.slots.disk;
-    d.state = said(() => D.startRound(d.state.phase === 'reveal' || d.state.phase === 'lobby' ? D.nextRound(d.state) : d.state, rt.room.hostId!, word, target));
+    const from = d.state.phase === 'reveal' || d.state.phase === 'lobby' ? D.nextRound(d.state) : d.state;
+    d.state = said(() => D.startRound(from, rt.room.hostId!, word, target));
     await this.rooms.enter(rt, { activity: 'disk', mode: d.state.mode });
     await this.save(rt);
     await this.rooms.say(rt, `Tour ${d.state.round} : « ${d.state.word} »`);
@@ -126,7 +132,8 @@ export class DiskActivity implements Activity {
     await this.save(rt);
     await this.emit(rt);
     for (const id of Object.keys(r.points)) await this.rooms.emitMember(rt, id);
-    if (r.best) await this.rooms.say(rt, `${await this.rooms.nameOf(rt, r.best[0])} gagne le tour (+${r.best[1].points}${r.best[1].perfect ? ', perfect !' : ''})`);
+    if (r.best) await this.rooms.say(rt,
+      `${await this.rooms.nameOf(rt, r.best[0])} gagne le tour (+${r.best[1].points}${r.best[1].perfect ? ', perfect !' : ''})`);
   }
 
   async next(rt: RoomRt, me: string) {
