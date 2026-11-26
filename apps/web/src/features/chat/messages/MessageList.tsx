@@ -20,8 +20,11 @@ import { useChatScroll } from './useChatScroll';
 const NONE: never[] = [];
 
 export function MessageList({ custom, onReply }: { custom: CustomEmoji[]; onReply: (m: MessageView) => void }) {
-  const room = useStore(s => s.room)!,
-    account = useStore(s => s.account)!,
+  // the room's parts the lines show (not the whole room: a game's moves don't draw the chat again)
+  const messages = useStore(s => s.room!.chat.messages),
+    scope = useStore(s => s.room!.scope),
+    roomMembers = useStore(s => s.room!.members);
+  const account = useStore(s => s.account)!,
     recentUsed = useStore(s => s.device.recent);
   const favorites = account.gifFavorites ?? NONE;
   const listRef = useRef<HTMLUListElement>(null);
@@ -29,7 +32,7 @@ export function MessageList({ custom, onReply }: { custom: CustomEmoji[]; onRepl
   const [playing, setPlaying] = useState<number | null>(null); // the message whose link's video plays
   const [reacting, setReacting] = useState<{ id: number; anchor: Element } | null>(null); // the picker, for a message
   const [quote, setQuote] = useState<{ id: number; at: DOMRect } | null>(null);
-  const members = new Map(room.members.map(m => [m.id, m])),
+  const members = new Map(roomMembers.map(m => [m.id, m])),
     me = account.id;
   const recent = recentUsed.length ? recentUsed : DEFAULT_REACTIONS;
 
@@ -109,7 +112,7 @@ export function MessageList({ custom, onReply }: { custom: CustomEmoji[]; onRepl
             </li>
           )
         )}
-        {room.chat.messages.filter(m => inScope(m, room.scope)).map(line)}
+        {messages.filter(m => inScope(m, scope)).map(line)}
       </ul>
       {scroll.away && (
         <div className="to-bottom-anchor">

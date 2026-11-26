@@ -6,7 +6,12 @@ import { CreditModal } from '../credit/CreditModal';
 import { chooseActivity } from './actions';
 import type { ChatModal } from './composer/useSend';
 
-export function ChatModals({ modal, onModal }: { modal: ChatModal; onModal: (m: ChatModal) => void }) {
+type Props = { modal: ChatModal; onModal: (m: ChatModal) => void };
+
+/** Nothing (and no reading of the room) while no window is asked. */
+export const ChatModals = (p: Props) => (p.modal ? <Modals {...p} /> : null);
+
+function Modals({ modal, onModal }: Props) {
   const room = useStore(s => s.room)!,
     me = useStore(s => s.account)!.id;
   const close = () => onModal(null);

@@ -26,7 +26,7 @@ export interface ComposerProps {
 }
 
 export function Composer({ inputRef, files, replyTo, setReplyTo, custom, onModal }: ComposerProps) {
-  const room = useStore(s => s.room)!,
+  const roomMembers = useStore(s => s.room!.members),
     me = useStore(s => s.account)!.id;
   const [draft, setDraft] = useState(''),
     [menu, setMenu] = useState(false);
@@ -66,7 +66,7 @@ export function Composer({ inputRef, files, replyTo, setReplyTo, custom, onModal
     st.setDevice({ gifRecent: pushRecentGif(st.device.gifRecent, g) });
     files.attachIt({ kind: 'gif', gif: g });
   };
-  const members = new Map(room.members.map(m => [m.id, m]));
+  const members = new Map(roomMembers.map(m => [m.id, m]));
 
   return (
     <>
