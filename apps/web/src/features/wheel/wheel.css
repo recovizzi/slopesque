@@ -1,0 +1,46 @@
+/* The Roulette (wheel.ts): the wheel, its editor and legend. */
+.wheel-box { display: none; }
+.activity-wheel .disk-box { display: none; }
+.activity-wheel .wheel-box { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; height: 100%; min-height: 0; }
+.wheel-holder { flex: 1 1 0; min-height: 110px; width: 100%; container-type: size; display: grid; place-items: center; }
+.wheel { display: block; width: min(100cqw, 100cqh); height: min(100cqw, 100cqh); overflow: visible; }
+.wheel-side { flex: 0 1 auto; width: min(100%, 440px); max-height: 60%; min-height: 0; overflow: auto; padding: 2px; }
+@container (min-width: 400px) {   /* width only: the layout must not change between the phases (the actions' height does) */
+  .activity-wheel .wheel-box { flex-direction: row; justify-content: center; gap: 16px; }
+  .wheel-holder { height: 100%; min-height: 0; min-width: 120px; }
+  .wheel-side { flex: none; width: clamp(250px, 50%, 340px); max-height: 100%; }
+}
+.wheel-bg { fill: var(--disk-fill); }
+.wheel-rim { fill: none; stroke: var(--text); stroke-width: 2.2; pointer-events: none; }
+.sector path, .sector circle { fill: var(--c); stroke: var(--disk-fill); stroke-width: 1.2; stroke-linejoin: round; }
+.sector { transition: opacity .4s; }
+.sector-label, .sector-pct { fill: #1c1b19; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+.sector-label { font-size: 9px; font-weight: 700; }
+.sector-pct { font-size: 7.5px; opacity: .7; }
+.wheel.has-winner .sector:not(.is-winner) { opacity: .3; }
+.sector.is-winner path, .sector.is-winner circle { stroke: var(--text); stroke-width: 2; }
+.wheel-needle line { stroke: var(--text); stroke-width: 4; stroke-linecap: round; }
+.wheel-needle .needle-tip { fill: var(--text); }
+.wheel-needle .hub { fill: var(--text); stroke: var(--surface); stroke-width: 2; }
+.swatch { width: 12px; height: 12px; border-radius: 3px; background: var(--c); }
+.wheel-edit { display: flex; flex-direction: column; gap: 6px; }
+.wheel-head, .wheel-items li { display: grid; grid-template-columns: 12px minmax(0, 1fr) 50px 40px 22px; gap: 5px; align-items: center; }
+.wheel-head { font-size: 11px; font-weight: 600; color: var(--muted); }
+.wheel-head span:first-child { grid-column: 2; }
+.wheel-head span:last-child { text-align: right; }
+.wheel-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.wheel-items input { min-width: 0; padding: 6px 7px; }
+.wheel-items .icon-btn.sm { width: 22px; }
+.wheel-items .weight { text-align: right; }
+.wheel-items .weight.is-bad { border-color: var(--danger); }
+.share { font-size: 12px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.wheel-alert { margin: 0; padding: 6px 10px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+  background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); font-size: 12px; font-weight: 600; }
+.wheel-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.wheel-legend li { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 4px 8px; border-radius: 8px; }
+.wheel-legend li.win { background: color-mix(in srgb, var(--c) 32%, transparent); }
+.legend-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.legend-label.is-empty { color: var(--muted); font-style: italic; font-weight: 400; }
+.legend-label .crown svg { width: 13px; height: 13px; margin-right: 4px; vertical-align: -1px; }
+.wheel-legend small { color: var(--muted); font-size: 11px; }
+.wheel-legend b { font-variant-numeric: tabular-nums; font-size: 13px; text-align: right; min-width: 38px; }

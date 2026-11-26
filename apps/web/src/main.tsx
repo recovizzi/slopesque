@@ -3,8 +3,7 @@
 import { wireTip } from './features/chat/hover';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import './style.css';
-import './app.css';
+import './app/styles';
 import { App } from './app/App';
 import { loadDevice } from './lib/device';
 import { connect, disconnect } from './app/net';

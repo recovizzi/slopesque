@@ -1,0 +1,30 @@
+/* Simple first design, to evolve. Colours are tokens; the dark theme follows the system unless forced in the
+   settings (html[data-theme]). */
+:root {
+  color-scheme: light;
+  --bg: #f5f4f0;
+  --surface: #ffffff;
+  --surface-2: #efede7;
+  --text: #1c1b19;
+  --muted: #6b6860;
+  --border: #dedbd2;
+  --accent: #5b5bd6;
+  --accent-text: #ffffff;
+  --danger: #d93d42;
+  --disk-fill: #fbfaf7;
+  --shadow: 0 8px 30px rgb(0 0 0 / .14);
+  --radius: 12px;
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #141518; --surface: #1c1d21; --surface-2: #26272c; --text: #ececee; --muted: #9a9aa3; --border: #33343a;
+    --accent: #8b8bf0; --accent-text: #111; --disk-fill: #1a1b1f; --shadow: 0 8px 30px rgb(0 0 0 / .5);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #141518; --surface: #1c1d21; --surface-2: #26272c; --text: #ececee; --muted: #9a9aa3; --border: #33343a;
+  --accent: #8b8bf0; --accent-text: #111; --disk-fill: #1a1b1f; --shadow: 0 8px 30px rgb(0 0 0 / .5);
+}

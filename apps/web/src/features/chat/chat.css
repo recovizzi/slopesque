@@ -1,0 +1,149 @@
+/* The chat (Chat.tsx): messages, reactions, replies, pictures, panels (upload, stickers), the + menu, the players'
+   list. */
+.chat { list-style: none; margin: 0; padding: 10px 12px; flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
+.msg { overflow-wrap: anywhere; }
+.msg.sys { color: var(--muted); font-size: 12px; font-style: italic; }
+.chat-form { display: flex; flex-direction: row; align-items: center; gap: 4px; padding: 8px; border-top: 1px solid var(--border); }
+.chat-form input { flex: 1; min-width: 0; }
+/* the chat (chat.ts): in the left drawer, or filling the stage in the Chat activity */
+.chat-box { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.msg.has-media .msg-body { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+/* a message: hovering its text (only) darkens it and shows the reaction bar just below the text, floating (nothing
+   moves: no jump in the chat), where the pointer entered the message (app.ts sets its left); it touches the text, so
+   the pointer reaches it, and stays while hovered or while the picker is open for the message (is-reacting). Hidden,
+   it is invisible to the pointer. The chat keeps room at its bottom for the last message's bar. */
+.chat-box .chat { padding-bottom: 40px; }
+.msg:not(.sys) { position: relative; margin: 0 -6px; }
+.msg-body { padding: 2px 6px; border-radius: 8px; }
+.msg-body:hover, .msg:has(.react-bar:hover) .msg-body, .msg.is-reacting .msg-body { background: var(--surface-2); }
+.react-bar { position: absolute; z-index: 5; right: 8px; width: fit-content; margin-top: -3px; display: flex; align-items: center; gap: 1px; padding: 3px;
+  visibility: hidden; opacity: 0; transition: opacity .1s;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 99px; box-shadow: 0 3px 12px rgb(0 0 0 / .16); }
+.msg-body:hover + .react-bar, .react-bar:hover, .msg.is-reacting .react-bar { visibility: visible; opacity: 1; }
+.react-bar button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer;
+  font-size: 18px; line-height: 1; transition: transform .12s; }
+.react-bar button:hover, .react-bar button:focus-visible { background: var(--surface-2); transform: scale(1.18); outline: none; }
+.react-bar .react-more { color: var(--muted); }
+.react-bar .react-more svg { width: 16px; height: 16px; }
+.react-bar .emoji-custom { width: 20px; height: 20px; vertical-align: 0; }
+.reactions { display: flex; flex-wrap: wrap; gap: 4px; margin: 3px 6px 0; }
+.reaction { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border: 1px solid var(--border); border-radius: 99px; background: var(--surface);
+  cursor: pointer; font-size: 14px; line-height: 1.5; }
+.reaction:hover { border-color: var(--muted); }
+.reaction.mine { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
+.reaction b { font-size: 12px; font-variant-numeric: tabular-nums; }
+.emoji-custom { display: inline-block; width: 1.5em; height: 1.5em; object-fit: contain; vertical-align: -.4em; }
+.emoji-name { gap: 8px; }
+.emoji-name .row { justify-content: flex-end; }
+.upload-preview.is-emoji img { max-height: 64px; }
+/* a picture's size is known before it loads (no jump): the largest that fits --maxw × --maxh and the column, its
+   proportions kept, never above its own size */
+.msg-sticker, .msg-image, .msg-gif { display: block; height: auto; aspect-ratio: var(--w) / var(--h);
+  width: min(100%, var(--maxw), calc(var(--maxh) * var(--w) / var(--h)), calc(var(--w) * 1px)); }
+.msg-sticker { --maxw: 96px; --maxh: 96px; }
+.msg-image { --maxw: 300px; --maxh: 220px; border-radius: 10px; border: 1px solid var(--border); }
+/* a GIF: its box takes the size (so the badge and the star sit on the picture), the picture fills it */
+.msg-gif-box { --maxw: 240px; --maxh: 200px; position: relative; display: block;
+  width: min(100%, var(--maxw), calc(var(--maxh) * var(--w) / var(--h)), calc(var(--w) * 1px)); }
+.msg-gif-box .msg-gif { width: 100%; border-radius: 10px; }
+.msg-gif-fav { opacity: 0; } /* the window's .gif-fav look; shown on hover, or lit when a favourite */
+.msg-gif-box:hover .msg-gif-fav, .msg-gif-fav:focus-visible, .msg-gif-fav.on { opacity: 1; }
+.chat-note { margin: 0 10px 6px; font-size: 12px; color: var(--muted); }
+.chat-panel { margin: 0 8px 6px; padding: 8px; display: flex; flex-direction: column; gap: 8px; max-height: 60%; overflow: auto; flex: none;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.panel-head { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.panel-head b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panel-head small { color: var(--muted); white-space: nowrap; }
+.upload-preview { display: grid; place-items: center; padding: 6px; border-radius: 8px;
+  background: repeating-conic-gradient(var(--surface) 0 25%, var(--bg) 0 50%) 0 0 / 16px 16px; }
+.upload-preview img { display: block; max-width: 100%; max-height: 150px; }
+.upload-choice { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 6px; }
+.sticker-grid { list-style: none; margin: 0; padding: 4px 4px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 8px; }
+.sticker-grid li { position: relative; }
+.sticker-item { width: 100%; aspect-ratio: 1; display: grid; place-items: center; padding: 4px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); cursor: pointer; }
+.sticker-item:hover, .sticker-item:focus-visible { border-color: var(--accent); outline: none; }
+.sticker-item img { display: block; width: auto; height: auto; max-width: 100%; max-height: 100%; }
+.sticker-del { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; background: var(--text); color: var(--bg);
+  display: none; place-items: center; cursor: pointer; }
+.sticker-grid li:hover .sticker-del, .sticker-del:focus-visible { display: grid; }
+.sticker-del svg { width: 10px; height: 10px; }
+.plus-wrap { position: relative; }
+.plus-menu { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 6; min-width: 150px; padding: 4px; display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); }
+.plus-menu button { display: flex; align-items: center; gap: 9px; padding: 7px 10px; border: 0; border-radius: 7px; background: none; cursor: pointer; text-align: left; font-weight: 600; }
+.plus-menu button:hover, .plus-menu button:focus-visible { background: var(--surface-2); outline: none; }
+.plus-menu svg { width: 16px; height: 16px; color: var(--muted); }
+.drop-hint { position: absolute; inset: 6px; z-index: 5; display: none; place-items: center; align-content: center; gap: 6px; pointer-events: none;
+  border: 2px dashed var(--accent); border-radius: 12px; background: color-mix(in srgb, var(--accent) 12%, var(--surface)); color: var(--accent); font-weight: 700; }
+.chat-box.is-drop .drop-hint { display: grid; }
+/* the Chat activity: the chat instead of the game, as wide as the stage allows (it follows the left drawer) */
+.chat-stage { display: none; }
+.activity-chat .stage-grid { display: none; }
+.activity-chat .chat-stage { display: flex; justify-content: center; height: 100%; padding: 12px 16px 14px; }
+.chat-stage .chat-box { width: min(100%, 860px); border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
+.chat-stage .chat { padding: 14px 18px; gap: 8px; font-size: 15px; }
+.chat-stage .msg-sticker { --maxw: 128px; --maxh: 128px; }
+.chat-stage .msg-image { --maxw: 480px; --maxh: 340px; }
+.chat-stage .msg-gif-box { --maxw: 320px; --maxh: 260px; }
+.chat-stage .chat-form { padding: 10px; }
+/* the players (activities without points, and the Chat activity) */
+.people { list-style: none; margin: 0; padding: 8px; overflow: auto; display: flex; flex-direction: column; gap: 2px; }
+.person { display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 8px; min-height: 40px; }
+.person.is-me { background: var(--surface-2); }
+.person-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.person-name i { color: var(--muted); font-weight: 400; font-size: 12px; }
+.role { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--muted); }
+.role .crown svg { width: 12px; height: 12px; }
+.people-note { padding: 4px 14px 12px; }
+/* reply: in the reaction bar; above a reply, the quote (one line, cut), a click goes to it, hovering shows it whole */
+.react-bar .react-reply { color: var(--muted); }
+.react-bar .react-reply svg { width: 16px; height: 16px; }
+.reply-ref { display: flex; align-items: center; gap: 5px; max-width: calc(100% - 20px); margin: 2px 6px 0 14px; padding: 0; border: 0; background: none;
+  color: var(--muted); font-size: 11.5px; text-align: left; cursor: pointer; }
+.reply-ref svg { flex: none; width: 13px; height: 13px; transform: scaleY(-1); }
+.reply-ref:hover .reply-quote { color: var(--text); text-decoration: underline; }
+.reply-who { flex: none; }
+.reply-who b { font-weight: 700; }
+.reply-quote { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reply-quote .emoji-custom { width: 14px; height: 14px; }
+.msg.is-flash .msg-body { animation: msg-flash 1.6s ease; }
+@keyframes msg-flash { 0%, 40% { background: color-mix(in srgb, var(--accent) 28%, transparent); } 100% { background: transparent; } }
+.quote-pop { position: fixed; z-index: 56; max-width: 280px; padding: 4px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border);
+  box-shadow: var(--shadow); pointer-events: none; font-size: 13px; overflow-wrap: anywhere; }
+.quote-pop[hidden] { display: none; }
+.quote-pop .msg-body { padding: 4px 8px; }
+.quote-pop img { max-width: 100%; height: auto; border-radius: 8px; display: block; margin-top: 3px; }
+/* the message being answered, above the field (✕: no longer a reply) */
+.reply-bar { display: flex; align-items: center; gap: 6px; margin: 0 8px; padding: 4px 4px 4px 10px; border-left: 3px solid var(--accent);
+  border-radius: 6px; background: var(--surface-2); font-size: 12px; color: var(--muted); }
+.reply-bar > svg { flex: none; width: 14px; height: 14px; }
+.reply-bar .reply-quote { flex: 1; }
+.reply-bar + .chat-form { border-top: 0; }
+/* away: the window or the extension closed (a moon); 5 min or more (the moon and its z) */
+.presence { display: inline-flex; vertical-align: -2px; color: var(--muted); }
+.presence svg { width: 14px; height: 14px; }
+.presence.gone { color: #d97706; }
+.msg-expired { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px dashed var(--border); border-radius: 10px; color: var(--muted); font-size: 13px; }
+.msg-expired svg { flex: none; }
+.msg-expired span { display: flex; flex-direction: column; }
+.msg-expired small { font-size: 11px; }
+.chat-start { text-align: center; opacity: .8; }
+.reply-ref.is-gone { cursor: default; }
+/* the chat: back to its bottom — a tab in the bottom-left corner of the messages, against their left edge and the
+   writing part, only its top-right corner rounded */
+.to-bottom-anchor { position: relative; height: 0; }
+.to-bottom { position: absolute; left: 0; bottom: 0; z-index: 6; display: inline-flex; align-items: center; gap: 4px; height: 32px; min-width: 36px;
+  padding: 0 10px 0 9px; border: 1px solid var(--border); border-left: 0; border-bottom: 0; border-radius: 0 12px 0 0; background: var(--surface);
+  color: var(--muted); cursor: pointer; box-shadow: 2px -2px 8px rgb(0 0 0 / .08); }
+.to-bottom:hover, .to-bottom:focus-visible { color: var(--text); background: var(--surface-2); outline: none; }
+.to-bottom.has-new { color: var(--accent); }
+.to-bottom b { font-size: 12px; }
+/* a picture waiting above the field (sent with a text, or alone, or as a screamer) */
+.attach-bar { display: flex; align-items: center; gap: 10px; margin: 0 8px; padding: 6px 8px; border: 1px solid var(--border); border-bottom: 0;
+  border-radius: 10px 10px 0 0; background: var(--surface-2); }
+.attach-bar.is-sending { opacity: .6; }
+.attach-thumb { flex: none; width: 44px; height: 44px; border-radius: 8px; overflow: hidden; background: var(--surface); display: grid; place-items: center; }
+.attach-thumb img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+.attach-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; font-size: 13px; }
+.attach-text small { color: var(--muted); font-size: 11.5px; line-height: 1.3; }
+.msg-caption { display: block; margin-top: 2px; }

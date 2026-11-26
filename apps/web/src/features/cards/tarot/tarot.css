@@ -1,0 +1,55 @@
+/* The Tarot (tarot-view.ts, TrumpArt.tsx): trumps, the King called, the bonuses, the tricks seen again. */
+/* the Tarot (tarot-view.ts): a trump — white card and inner border, golden edge, its picture, the number on a white
+   corner box flowing into the border; the cards that can't be played greyed; the chien's cards just taken glow */
+.tbg { fill: #fff; stroke: #b8932f; stroke-width: 1.6; }
+.card-svg.excuse .tbg { stroke: #7a4fb8; }
+.tline { fill: none; stroke: #0000002e; stroke-width: .6; }
+.tbox { fill: #fff; }
+.tv { font: 800 10.5px system-ui, sans-serif; fill: #1c1b19; dominant-baseline: middle; }
+.card-svg.excuse .tv { fill: #7a4fb8; }
+.temoji { font-size: 30px; dominant-baseline: middle; }
+.tarot-results { max-width: min(94%, 380px); }
+.tarot-results .note { text-align: center; }
+.trump-count { background: linear-gradient(90deg, #ffe9a3, #f3c1a8); color: #5a4300; }
+.cards-game.tarot .cg-actions { flex-wrap: wrap; justify-content: center; row-gap: 4px; }
+.btn.sm-bid { padding: 6px 9px; font-size: 12px; }
+.trump-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(34px, 1fr)); gap: 6px; }
+.trump-slot { position: relative; }
+.art-actions { flex-wrap: wrap; }
+.art-actions .btn.sm { margin: 0; }
+.trump-slot > button:first-child { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: pointer; }
+.trump-slot > button:first-child .card-svg { display: block; width: 100%; height: auto; }
+.trump-slot > button:first-child:hover .tbg, .trump-slot > button:first-child:focus-visible .tbg { stroke: var(--accent); stroke-width: 3; }
+.art-del { position: absolute; top: -5px; right: -5px; display: grid; place-items: center; width: 16px; height: 16px; padding: 0; border: 0; border-radius: 50%;
+  background: var(--text); color: var(--bg); cursor: pointer; }
+.art-del svg { width: 9px; height: 9px; }
+/* the King called at 5 (Tarot) */
+.call-card { padding: 0; border: 0; background: none; cursor: pointer; }
+.call-card .card-svg.small { width: 40px; height: 56px; }
+.call-card:hover .cbg, .call-card:focus-visible .cbg { stroke: var(--accent); stroke-width: 3; }
+/* Tarot: the called card in the header (letter + suit), the announcements, the won tricks */
+.mini-card { display: inline-flex; align-items: center; gap: 1px; padding: 0 5px; border-radius: 4px; background: #fffdf8; border: 1px solid #00000038;
+  color: #1c1b19; font-weight: 800; font-size: 12px; line-height: 18px; vertical-align: 1px; box-shadow: 0 1px 2px rgb(0 0 0 / .15); }
+.mini-card.red { color: #c62828; }
+.mini-card.trump { background: linear-gradient(135deg, #ffe9a3, #f3c1a8); }
+.announce-box.call { animation-duration: 2.8s; font-size: 18px; }
+.announce-box.call .mini-card { font-size: 15px; line-height: 22px; }
+/* the won tricks of a player, over the darkened table while hovering: each trick a small fan, in a grid */
+.tricks-view { position: absolute; inset: 0; z-index: 4; display: flex; flex-direction: column; gap: 8px; padding: 54px 14px 62px; overflow: hidden;
+  border-radius: 16px; background: rgb(6 18 12 / .8); pointer-events: none; animation: tv-in .18s ease; }
+@keyframes tv-in { from { opacity: 0; } to { opacity: 1; } }
+.tv-head { margin: 0; color: #fff; font-weight: 800; font-size: 13px; text-align: center; }
+.tv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 12px 8px; align-content: start; }
+.tv-trick { display: flex; justify-content: center; padding-top: 4px; }
+.tv-card { width: 30px; height: 42px; transform-origin: 50% 120%; transform: rotate(calc((var(--k) - var(--m)) * 9deg)); }
+.tv-card + .tv-card { margin-left: -16px; }
+.tv-card .card-svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 1px 2px rgb(0 0 0 / .4)); }
+@container stage (max-width: 480px) { .tv-grid { grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); } .tv-card { width: 24px; height: 34px; } .tv-card + .tv-card { margin-left: -13px; } }
+.trump-view .card-svg { display: block; width: 100%; height: auto; }
+/* the Tarot's bonuses: a poignée shown, a chelem announced */
+.role-handful { background: #c7f0d8; color: #0d4a2a; }
+.role-chelem { background: #ffd0d6; color: #7a0019; }
+.announce-box.handful { max-width: 92%; }
+.handful-cards { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; margin: 6px 0 2px; }
+.handful-cards .pcard { width: 30px; }
+.handful-cards .card-svg { width: 100%; height: auto; display: block; }

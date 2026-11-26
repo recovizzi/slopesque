@@ -1,0 +1,5 @@
+/* Timer: the time left of a round (.timer). */
+.timer { position: relative; width: min(100%, 520px); height: 22px; border-radius: 99px; background: var(--surface-2); overflow: hidden; margin-top: 4px; }
+.timer-fill { position: absolute; inset: 0; transform-origin: left; transform: scaleX(var(--p, 1)); background: var(--accent); opacity: .85; transition: transform .2s linear; }
+.timer.urgent .timer-fill { background: var(--danger); }
+.timer-text { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; font-weight: 700; color: var(--text); }

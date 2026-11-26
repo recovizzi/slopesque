@@ -1,0 +1,4 @@
+/* Choice: a big choice among a few (.choice). */
+.choice { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); cursor: pointer; text-align: left; }
+.choice:hover, .choice:focus-visible { border-color: var(--accent); outline: none; }
+.choice small { color: var(--muted); font-size: 11px; }

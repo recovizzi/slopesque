@@ -1,0 +1,4 @@
+/* Chip (.chip, in .chips) and Dot (.dot): a player's pill and colour mark. */
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--c); flex: none; vertical-align: 0; margin-right: 4px; }
+.chip { padding: 3px 10px; border-radius: 99px; border: 1px dashed var(--border); color: var(--muted); font-size: 12px; }
+.chip.done { border-style: solid; border-color: var(--c); color: var(--text); background: color-mix(in srgb, var(--c) 12%, transparent); }

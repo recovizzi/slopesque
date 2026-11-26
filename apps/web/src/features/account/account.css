@@ -1,0 +1,28 @@
+/* The user code (Account.tsx): the first launch, Profil → Compte, the window to change it. */
+.code-box { display: flex; align-items: center; gap: 6px; padding: 6px 6px 6px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); max-width: 100%; }
+.code-box .btn.sm { margin-top: 0; align-self: center; }
+.code-text { flex: 1; min-width: 0; font: 600 15px/1.3 ui-monospace, monospace; letter-spacing: .04em; color: var(--text); overflow-wrap: anywhere; text-align: left; user-select: all; }
+.code-text.is-hidden { color: var(--muted); letter-spacing: .12em; user-select: none; }
+.welcome .code-box { padding: 8px 8px 8px 14px; }
+.welcome .code-text { font-size: 18px; }
+.code-box.is-old { background: var(--surface); }
+.welcome-points { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; text-align: left; font-size: 13px; }
+.welcome-points li { display: flex; gap: 8px; align-items: flex-start; }
+.welcome-points svg { flex: none; width: 16px; height: 16px; margin-top: 1px; color: var(--accent); }
+.welcome-other { flex-wrap: wrap; justify-content: center; }
+.account { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--border); }
+.account h3 { margin: 0; font-size: 14px; }
+.btn.code-change-btn { align-self: stretch; }
+.modal.code-modal { width: min(440px, calc(100vw - 32px)); gap: 10px; }
+.code-choices { display: flex; flex-direction: column; gap: 6px; }
+.code-choices .choice b { font-size: 14px; }
+.code-meter { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.code-meter span { height: 5px; border-radius: 3px; background: var(--surface-2); }
+.code-meter.lv-1 span:nth-child(1) { background: var(--danger); }
+.code-meter.lv-2 span:nth-child(-n+2) { background: #d88a00; }
+.code-meter.lv-3 span { background: #1f9d55; }
+.code-warn { display: flex; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+  background: color-mix(in srgb, var(--danger) 9%, transparent); font-size: 13px; }
+.code-warn > svg { flex: none; color: var(--danger); }
+.code-warn > div { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.code-warn p { margin: 0; }

@@ -1,0 +1,22 @@
+/* The /activity window (ActivityPicker.tsx). */
+/* the /activity window: the kinds with a picture, then a kind's formats */
+.modal.act-picker { width: min(560px, calc(100vw - 32px)); gap: 10px; }
+.act-how { margin: 0; display: flex; gap: 6px; align-items: flex-start; }
+.act-how svg { flex: none; width: 15px; height: 15px; color: var(--accent); }
+.act-how.is-busy { color: var(--danger); }
+.act-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.act-tile { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 10px 8px;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); cursor: pointer; text-align: center; }
+.act-tile:hover:not(:disabled), .act-format:hover:not(:disabled) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.act-tile:disabled, .act-format:disabled { opacity: .5; cursor: not-allowed; }
+.act-tile.is-current { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
+.act-tile small, .act-format small { color: var(--muted); font-size: 12px; }
+.act-art { width: 80px; height: 52px; }
+.act-now { position: absolute; top: 6px; right: 6px; padding: 0 6px; border-radius: 99px; background: var(--accent); color: var(--accent-text); font-size: 10.5px; font-weight: 700; }
+.act-back { align-self: flex-start; margin: 0; }
+.act-kind-head { display: flex; align-items: center; gap: 10px; }
+.act-kind-head div { display: flex; flex-direction: column; }
+.act-kind-head small { color: var(--muted); }
+.act-formats { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.act-format { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 12px; border: 1px solid var(--border);
+  border-radius: 10px; background: var(--surface); color: var(--text); cursor: pointer; text-align: left; }

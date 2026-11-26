@@ -7,7 +7,6 @@ import { firework } from './firework';
 import { FxLayer, reduced, type Who } from './layer';
 import { screamer, still } from './screamer';
 import { hammer, hit, tomato } from './strike';
-import './fx.css';
 
 let layer: FxLayer | null = null;
 

@@ -1,0 +1,30 @@
+/* Rooms (Rooms.tsx): the key badge, my list, the server field. */
+.key-badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 99px; background: var(--surface-2); color: var(--muted); font: 12px ui-monospace, monospace; }
+.key-badge svg { width: 13px; height: 13px; }
+button.key-badge { border: 0; cursor: pointer; min-width: 104px; justify-content: center; }
+button.key-badge:hover { color: var(--text); }
+.key-badge.is-ok { color: var(--accent); font-weight: 700; }
+.key-badge.is-fail { color: var(--danger); }
+.key-badge.big { padding: 6px 14px; font-size: 16px; gap: 8px; min-width: 150px; align-self: center; }
+.key-badge.big svg { width: 16px; height: 16px; }
+.rooms { display: flex; flex-direction: column; gap: 8px; }
+.rooms-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.rooms-head .btn.sm, .room-actions .btn.sm { margin: 0; align-self: center; }
+.room-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.room-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; }
+.room-row + .room-row { border-top: 1px solid var(--border); }
+.room-row.is-current { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.room-row input[type="checkbox"] { width: 16px; height: 16px; margin: 0; flex: none; accent-color: var(--accent); }
+.room-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.room-main b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-main code, .modal code, .modal-list code { font: 11px ui-monospace, monospace; color: var(--muted); }
+.room-row .btn.sm { margin: 0; padding: 4px 9px; align-self: center; }
+.room-actions { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.room-actions span { flex: 1; }
+.room-note { font-weight: 600; color: var(--text) !important; }
+.room-card.welcome { width: min(100%, 460px); gap: 14px; }
+.room-card.welcome h1 { color: var(--accent); }
+.server-field { width: 100%; text-align: left; }
+.server-field .row input { flex: 1; min-width: 0; }
+.server-field .btn.sm { margin-top: 0; }
+.room-card .server-field { max-width: 380px; }

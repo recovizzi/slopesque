@@ -1,0 +1,5 @@
+/* Segmented: a choice among a few, side by side (.seg-group of .seg). */
+.seg-group { display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+.seg { border: 0; background: var(--surface); padding: 3px 8px; cursor: pointer; color: var(--muted); }
+.seg + .seg { border-left: 1px solid var(--border); }
+.seg.on { background: var(--accent); color: var(--accent-text); }

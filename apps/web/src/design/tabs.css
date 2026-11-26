@@ -1,0 +1,7 @@
+/* Tabs: a row of tabs (.tabs of .tab). */
+.tabs { display: flex; align-items: center; gap: 2px; padding: 6px; border-bottom: 1px solid var(--border); }
+.tab { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; font-weight: 600; }
+.tab svg { width: 15px; height: 15px; }
+.tab:hover { color: var(--text); }
+.tab.on { background: var(--surface-2); color: var(--text); }
+.tabs .icon-btn { margin-left: auto; }

@@ -1,0 +1,13 @@
+/* The Palmarès (Palmares.tsx, stats.ts): filters, then one row per player (the measure in big, its context in
+   small). */
+.palmares { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 8px; padding: 10px; }
+.pal-filters { display: flex; flex-direction: column; gap: 6px; }
+.pal-filters select { padding: 6px 8px; font-size: 12px; }
+.pal-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.pal-row { display: grid; grid-template-columns: 18px 10px minmax(0, 1fr) auto; align-items: center; gap: 6px; padding: 6px; border-radius: 8px; }
+.pal-row.is-me { background: var(--surface-2); }
+.pal-who { min-width: 0; display: flex; flex-direction: column; }
+.pal-who b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pal-who i { color: var(--muted); font-weight: 400; font-size: 11px; }
+.pal-who small { color: var(--muted); font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pal-main { font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; }

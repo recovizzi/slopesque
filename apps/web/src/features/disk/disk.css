@@ -1,0 +1,60 @@
+/* The Demi-disque (DiskStage, disk.ts, amphi.ts): the disk, the Amphithéâtre, the results, the ranking. */
+.podium { display: flex; align-items: flex-end; justify-content: center; gap: 6px; padding: 16px 12px 0; }
+.step { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 72px; }
+.step-name { font-weight: 600; font-size: 12px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.step-score { font-size: 11px; color: var(--muted); }
+.step-block { width: 100%; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 18px; border-radius: 8px 8px 0 0;
+  background: color-mix(in srgb, var(--c) 85%, transparent); }
+.step-1 .step-block { height: 64px; } .step-2 .step-block { height: 44px; } .step-3 .step-block { height: 30px; }
+.ranking { list-style: none; margin: 0; padding: 8px; overflow: auto; border-top: 1px solid var(--border); }
+.rank-row { display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 8px; min-height: 36px; }
+.rank-row.is-me { background: var(--surface-2); }
+.rank-n { width: 18px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rank-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank-name i { color: var(--muted); font-size: 12px; }
+.rank-score { font-weight: 700; font-variant-numeric: tabular-nums; }
+/* the semicircular disk (disk.ts) */
+.board { display: block; width: 100%; height: auto; overflow: visible; outline: none; touch-action: manipulation; }
+.board[hidden] { display: none; }
+.disk-fill { fill: var(--disk-fill); }
+.disk-outline { fill: none; stroke: var(--text); stroke-width: 2.2; stroke-linejoin: round; pointer-events: none; }
+.disk-ticks line { stroke: var(--border); stroke-width: 1.2; }
+.disk-hub { fill: var(--text); }
+.disk.is-interactive { cursor: crosshair; }
+.disk.is-interactive:focus-visible .disk-outline { stroke: var(--accent); stroke-width: 3; }
+.disk.is-interactive .disk-fill { fill: color-mix(in srgb, var(--accent) 4%, var(--disk-fill)); }
+.disk-ghost line { stroke: var(--muted); stroke-width: 2; stroke-dasharray: 4 4; stroke-linecap: round; pointer-events: none; }
+.ray { pointer-events: none; }
+.ray line { stroke: var(--c); stroke-width: 3; stroke-linecap: round; }
+.ray circle { fill: var(--c); stroke: var(--surface); stroke-width: 1.5; }
+.ray-player { opacity: .9; }
+.ray-mine line { stroke-width: 4; }
+.ray-target path { fill: color-mix(in srgb, var(--c) 28%, transparent); stroke: var(--c); stroke-width: 1; }
+.ray-target line { stroke-width: 2; stroke-dasharray: 3 3; }
+/* the Amphithéâtre mode (amphi.ts): seats in the player's colour; the host's column filled while choosing, then
+   drawn as a band with solid ends outside the seats, readable under the candidates' seats */
+.amphi .tribune { fill: none; stroke: var(--border); stroke-width: .6; stroke-dasharray: 2 2; }
+.seat { fill: var(--disk-fill); stroke: color-mix(in srgb, var(--text) 55%, transparent); stroke-width: .5; stroke-linejoin: round; }
+.amphi.is-interactive { cursor: pointer; }
+.amphi.is-interactive:focus-visible .seat.is-hover { stroke-width: 1; }
+.seat.is-hover { fill: color-mix(in srgb, var(--accent) 16%, var(--disk-fill)); stroke: var(--accent); stroke-width: .8; }
+.seat.is-col { fill: color-mix(in srgb, var(--hc) 34%, var(--disk-fill)); stroke: var(--hc); stroke-width: .8; }
+.seat.col-band { fill: color-mix(in srgb, var(--hc) 14%, var(--disk-fill)); }
+.seat.is-player, .seat.is-mine { fill: color-mix(in srgb, var(--c) 82%, var(--disk-fill)); stroke: var(--c); stroke-width: .7; }
+.seat.is-mine { stroke: var(--text); stroke-width: 1; }
+.seat.is-pending { fill: color-mix(in srgb, var(--c) 45%, var(--disk-fill)); stroke: var(--c); stroke-width: 1; stroke-dasharray: 1.6 .8; }
+.seat.col-band.is-player, .seat.col-band.is-mine { stroke: var(--hc); stroke-width: 1.2; }
+.amphi[data-pick="seat"] .seat.is-taken { cursor: not-allowed; }
+.col-band { pointer-events: none; }
+.col-band .band { fill: color-mix(in srgb, var(--hc) 22%, transparent); }
+.col-band .cap { fill: var(--hc); }
+.ends { display: flex; justify-content: space-between; gap: 8px; height: 26px; align-items: center; font-weight: 600; color: var(--muted); }
+.ends span { max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ends span:last-child { text-align: right; }
+.results { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 4px 6px; width: 100%; max-height: 26cqh; overflow: auto; }
+.result { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 8px; background: color-mix(in srgb, var(--c) 10%, var(--surface)); }
+.result span:nth-child(2) { flex: 1; }
+.result small { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.result-host { grid-column: 1 / -1; background: none; border: 1px dashed color-mix(in srgb, var(--c) 50%, var(--border)); }
+.result-host .crown svg { width: 12px; height: 12px; vertical-align: -1px; color: var(--muted); }
+.perfect { font-size: 11px; font-weight: 800; letter-spacing: .5px; color: #fff; background: var(--c); padding: 1px 6px; border-radius: 4px; }

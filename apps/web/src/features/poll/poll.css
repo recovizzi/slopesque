@@ -1,0 +1,82 @@
+/* The Sondage (PollWheel.tsx, poll.ts) and a poll continued in the chat (PollCard.tsx). */
+.poll-box { display: none; }
+.activity-poll .disk-box { display: none; }
+.activity-poll .poll-box { display: flex; flex-direction: column; justify-content: safe center; gap: 10px; width: min(100%, 560px);
+  max-height: 100cqh; overflow: auto; padding: 4px 2px 22px; }
+.poll-wait { margin: auto; padding: 28px 20px; border: 1px dashed var(--border); border-radius: 12px; color: var(--muted); text-align: center; }
+.poll-compose { display: flex; flex-direction: column; gap: 12px; }
+.poll-compose .seg-group { display: flex; }
+.poll-compose .seg { flex: 1; padding: 7px 10px; font-weight: 600; }
+.poll-inputs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.poll-inputs li { display: flex; gap: 4px; align-items: center; }
+/* Choix définis: a picture per choice (optional), its "+" menu (opening downwards), an image dropped on the row */
+.choice-row { position: relative; border-radius: 10px; }
+.choice-row .drop-hint { inset: -3px; font-size: 13px; }
+.choice-row.is-drop .drop-hint { display: grid; }
+.choice-thumb { position: relative; flex: none; width: 40px; height: 40px; border-radius: 8px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--border); }
+.choice-thumb.empty { display: grid; place-items: center; padding: 0; border-style: dashed; background: none; color: var(--muted); cursor: pointer; opacity: .55; }
+.choice-thumb.empty svg { width: 16px; height: 16px; }
+.choice-thumb.empty:hover, .choice-thumb.empty:focus-visible { opacity: 1; border-color: var(--accent); color: var(--accent); outline: none; }
+.choice-thumb .choice-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.choice-thumb .pic-sticker { object-fit: contain; }
+.thumb-del { position: absolute; inset: 0; display: grid; place-items: center; border: 0; padding: 0; background: rgb(0 0 0 / .5); color: #fff; cursor: pointer; opacity: 0; }
+.thumb-del svg { width: 16px; height: 16px; }
+.choice-thumb:hover .thumb-del, .thumb-del:focus-visible { opacity: 1; }
+.choice-plus { flex: none; }
+.choice-menu { top: calc(100% + 4px); bottom: auto; }
+.choice-stickers { flex-direction: column; align-items: stretch !important; gap: 6px !important; padding: 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.choice-stickers .btn.sm { align-self: flex-end; margin: 0; }
+.poll-inputs input { flex: 1; min-width: 0; }
+.poll-preview { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.gradient { display: block; width: 100%; overflow: visible; outline: none; }
+.g2 { max-height: 58cqh; }
+.poll-preview .g2 { max-height: 180px; }
+.gradient.is-pick { cursor: crosshair; }
+.gradient.is-pick:focus-visible .g-outline, .gradient.is-pick:focus-visible .g-track { stroke: var(--accent); }
+.g-track { fill: var(--surface-2); stroke: var(--border); stroke-width: 1; }
+.g-mid { stroke: var(--border); stroke-width: 1; }
+.g-shape { fill: var(--disk-fill); }
+.g-outline { fill: none; stroke: var(--text); stroke-width: 1.4; stroke-linejoin: round; }
+.g-spoke { stroke: var(--border); stroke-width: .8; stroke-dasharray: 2 2; }
+.g-corner { fill: var(--text); }
+.g-label { font-size: 10px; font-weight: 600; fill: var(--muted); }
+.g-dot { fill: var(--c); stroke: var(--surface); stroke-width: 1.5; }
+.g-dot.is-pending { fill: color-mix(in srgb, var(--c) 50%, transparent); stroke: var(--c); stroke-dasharray: 2 1.5; }
+.g-dot.is-mine { stroke: var(--text); stroke-width: 1.8; }
+.poll-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.poll-option { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface); cursor: pointer; text-align: left; font-weight: 600; }
+.poll-option:hover:not(:disabled) { border-color: var(--accent); }
+.poll-option:disabled { cursor: default; }
+.poll-option.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.radio { flex: none; width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--muted); }
+.poll-option.has-pic { flex-direction: column; align-items: stretch; gap: 8px; padding: 8px; }
+.option-pic { display: grid; place-items: center; height: 110px; border-radius: 8px; overflow: hidden; background: var(--surface-2); }
+.option-pic .choice-img { max-width: 100%; max-height: 100%; width: auto; height: auto; }
+.option-text { display: flex; align-items: center; gap: 10px; }
+.poll-option.on .radio { border-color: var(--accent); background: radial-gradient(var(--accent) 45%, transparent 50%); }
+.poll-free { width: 100%; font-size: 16px !important; padding: 12px 14px; }
+.poll-mine { margin: 0; text-align: center; font-weight: 700; font-size: 18px; }
+.poll-results { display: flex; flex-direction: column; gap: 10px; }
+.poll-results .crown svg { width: 13px; height: 13px; margin-right: 4px; vertical-align: -1px; }
+.poll-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.win .bar-fill { background: var(--accent); }
+.poll-cards { list-style: none; margin: 0; padding: 8px 0 0; display: flex; flex-wrap: wrap; gap: 12px 10px; justify-content: center; }
+.answer-card { position: relative; padding: 8px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); font-weight: 600; }
+.answer-card.win { border-color: var(--accent); }
+.mult { position: absolute; top: -9px; right: -9px; min-width: 22px; padding: 1px 6px; border-radius: 99px; background: var(--accent); color: var(--accent-text);
+  font-size: 11px; font-weight: 800; text-align: center; box-shadow: 0 0 0 2px var(--bg); }
+.poll-temps { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.temp { display: flex; align-items: center; gap: 6px; padding: 3px 10px 3px 3px; border-radius: 99px; border: 1px solid var(--border); background: var(--surface); font-weight: 600; font-size: 13px; }
+.temp.win { border-color: var(--accent); }
+.temp-badge { padding: 2px 7px; border-radius: 99px; background: var(--t); color: #fff; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.host-edge { position: absolute; left: 0; bottom: 0; margin: 0; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--accent);
+  background: var(--surface); color: var(--accent); font-size: 12px; font-weight: 700; }
+/* a poll continued in the chat (ui/PollCard.tsx): the Sondage's views, smaller */
+.chat-poll .vote-q small { color: var(--muted); font-weight: 400; }
+.chat-poll-body { min-width: min(100%, 320px); }
+.chat-poll-body .poll-box { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.chat-poll-body svg[data-gradient] { max-width: 100%; height: auto; max-height: 220px; }
+.chat-poll-body .poll-answer, .chat-poll-body .poll-results { margin: 0; padding: 0; }
+.chat-poll-done { margin: 0; color: var(--muted); font-size: 12.5px; }
+.msg.chat-poll .vote-actions { display: flex; gap: 6px; flex-wrap: wrap; }
