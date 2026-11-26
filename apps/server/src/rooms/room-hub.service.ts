@@ -2,18 +2,18 @@
 // activity, the host, the social credit, the console's notices. The rooms in memory are the RoomRegistry's.
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { Socket } from 'socket.io';
 import type postgres from 'postgres';
 import { creditWord, defaultHue, tierOf } from '@slopesque/engines';
 import { Coinche, CoincheAI, Holdem, HoldemAI, Poll, Table, Tarot, TarotAI, Tdc, Wheel, KICK_AFTER_MS } from '@slopesque/engines';
-import { CARD_PLAYERS, cardGameOf, type CardGameKey, type HoldemRules, EFFECT_MS, EFFECT_PARALLEL, ON_PHOTO, PRESENCE, SCORE_NAMES, scoreKey, type EffectKind, type EffectView, READY_ACTIVITIES, READY_CARD_GAMES, type CardsView, type PollAnswer, type PollView, type WheelView, type PollPicView, type ActivityChoice, type EmojiView, type GifRef, type RoomState, type StickerView } from '@slopesque/shared';
+import { CARD_PLAYERS, cardGameOf, type CardGameKey, type HoldemRules, EFFECT_MS, EFFECT_PARALLEL, ON_PHOTO, PRESENCE, SCORE_NAMES, scoreKey, type EffectKind, type EffectView, READY_ACTIVITIES, READY_CARD_GAMES, type CardsView, type PollAnswer, type PollView, type WheelView, type PollPicView, type ActivityChoice, type GifRef, type RoomState } from '@slopesque/shared';
 import { DB, SQL, type Db } from '../db/db.module.js';
 import { ENV, type Env } from '../config/config.module.js';
-import { customEmoji, media, messages, palmares, roomMembers, rooms, stickers, trumpArt } from '../db/schema.js';
+import { messages, palmares, roomMembers, rooms, trumpArt } from '../db/schema.js';
 import { sql } from 'drizzle-orm';
-import { MediaService, type MediaRow } from '../media/media.service.js';
-import { PreviewService } from '../external/preview.service.js';
+import { MediaService } from '../media/media.service.js';
+import { RoomLibrary } from '../chat/library.service.js';
 import { ChatService, type StoredChatPoll } from '../chat/chat.service.js';
 import { UserError } from '../errors.js';
 import { ADMIN_CHANNEL, RoomsService, type AdminNotice, type Room } from './rooms.service.js';
@@ -38,7 +38,7 @@ export class RoomHub implements OnModuleInit {
   private readonly log = new Logger('Salons');
 
   constructor(@Inject(ENV) private readonly env: Env, @Inject(DB) private readonly db: Db, @Inject(SQL) private readonly sql: postgres.Sql,
-    private readonly roomStore: RoomsService, readonly chat: ChatService, private readonly media: MediaService, private readonly previews: PreviewService,
+    private readonly roomStore: RoomsService, readonly chat: ChatService, private readonly media: MediaService, private readonly library: RoomLibrary,
     readonly rooms: RoomRegistry, private readonly votes: Votes, @Inject(ACTIVITIES) private readonly activities: Activity[]) {}
 
   async onModuleInit() {
@@ -166,109 +166,9 @@ export class RoomHub implements OnModuleInit {
   async state(rt: RoomRt, me: string, after?: number): Promise<RoomState> {
     return { seq: rt.seq, room: { key: rt.room.key, name: rt.room.name, createdAt: rt.room.createdAt.getTime() }, me, hostId: rt.room.hostId,
       members: await this.rooms.members(rt), chat: after ? await this.chat.since(rt.room.id, rt.room.createdAt, after) : await this.chat.page(rt.room.id, rt.room.createdAt), serverTime: Date.now(),
-      stickers: await this.stickerViews(rt), emoji: await this.emojiViews(rt), activity: this.rooms.activity(rt), scope: this.rooms.scope(rt),
+      stickers: await this.library.stickers(rt), emoji: await this.library.emoji(rt), activity: this.rooms.activity(rt), scope: this.rooms.scope(rt),
       notice: rt.notice && Date.now() - rt.notice.at < 30 * 60_000 ? { id: rt.notice.id, title: rt.notice.title, text: rt.notice.text } : null,
       ...Object.assign({}, ...this.activities.map(a => a.view(rt, me))), poll: this.pollView(rt, me), wheel: this.wheelView(rt), cards: this.cardsView(rt, me), web: (rt.room.rules.web as Record<string, string> | undefined) ?? {} } as RoomState;
-  }
-
-  // ---------------------------------------------------------------- events
-  /** A player's message (its link's preview after it). */
-  async post(rt: RoomRt, from: string, text: string, replyTo: number | null = null) {
-    const message = await this.chat.send(rt.room.id, from, text, replyTo, 'text', null);
-    this.rooms.emit(rt, { type: 'message', message });
-    this.preview(rt, message.id, text);
-    return message;
-  }
-
-  /** The first link's preview of a player's text, when its site gives one (it arrives after the message). */
-  private preview(rt: RoomRt, id: number, text: string) {
-    if (!text) return;
-    void this.previews.forText(text).then(async p => {
-      if (!p) return;
-      const updated = await this.chat.setPreview(id, p);
-      if (updated && this.rooms.isLive(rt)) this.rooms.emit(rt, { type: 'message-updated', message: updated });
-    });
-  }
-
-  // ---------------------------------------------------------------- pictures
-  /** A picture just uploaded, for this usage (an upload is only good for the usage of its ticket). */
-  async picture(id: string, usage: string): Promise<MediaRow> {
-    const row = await this.media.get(id);
-    if (!row || row.usage !== usage) throw new UserError('Image introuvable : envoie-la de nouveau.');
-    return row;
-  }
-
-  /** A picture in the chat, with what was written with it (and the message it answers). */
-  async sendPicture(socket: Socket, kind: 'image' | 'sticker', pic: MediaRow, replyTo: number | null = null, text = '') {
-    const rt = this.rooms.roomOf(socket);
-    const message = await this.chat.sendMedia(rt.room.id, (socket.data as SocketData).account.id, kind, pic, replyTo, text);
-    this.rooms.emit(rt, { type: 'message', message });
-    this.preview(rt, message.id, text);
-  }
-
-  async sendGif(socket: Socket, gif: GifRef, replyTo: number | null = null, text = '') {
-    const rt = this.rooms.roomOf(socket);
-    const message = await this.chat.sendGif(rt.room.id, (socket.data as SocketData).account.id, gif, replyTo, text);
-    this.rooms.emit(rt, { type: 'message', message });
-    this.preview(rt, message.id, text);
-  }
-
-  private async stickerViews(rt: RoomRt): Promise<StickerView[]> {
-    const rows = await this.db.select({ s: stickers, m: media }).from(stickers).innerJoin(media, eq(media.id, stickers.mediaId))
-      .where(eq(stickers.roomId, rt.room.id)).orderBy(desc(stickers.usedAt)).limit(60);
-    return rows.map(({ s, m }) => ({ id: s.id, src: this.media.url(m.id), w: m.width, h: m.height }));
-  }
-  private async emojiViews(rt: RoomRt): Promise<EmojiView[]> {
-    const rows = await this.db.select().from(customEmoji).where(eq(customEmoji.roomId, rt.room.id)).orderBy(customEmoji.createdAt);
-    return rows.map(e => ({ name: e.name, url: this.media.url(e.mediaId), by: e.addedBy }));
-  }
-
-  /** The room's sticker library: a new one first (the same picture once), 60 at most (the oldest go). */
-  async addSticker(socket: Socket, pic: MediaRow, send: boolean) {
-    const rt = this.rooms.roomOf(socket), me = (socket.data as SocketData).account.id;
-    const [same] = await this.db.select().from(stickers).where(and(eq(stickers.roomId, rt.room.id), eq(stickers.mediaId, pic.id)));
-    if (same) await this.db.update(stickers).set({ usedAt: new Date() }).where(eq(stickers.id, same.id));
-    else await this.db.insert(stickers).values({ roomId: rt.room.id, mediaId: pic.id, addedBy: me });
-    const extra = (await this.db.select({ id: stickers.id, mediaId: stickers.mediaId }).from(stickers).where(eq(stickers.roomId, rt.room.id)).orderBy(desc(stickers.usedAt))).slice(60);
-    if (extra.length) { await this.db.delete(stickers).where(inArray(stickers.id, extra.map(x => x.id))); await this.media.sweep(extra.map(x => x.mediaId)); }
-    const lib = await this.stickerViews(rt);
-    this.rooms.emit(rt, { type: 'stickers', stickers: lib });
-    if (send) await this.sendPicture(socket, 'sticker', pic);
-    return lib.find(x => x.src === this.media.url(pic.id)) ?? lib[0]!;
-  }
-
-  async sendSticker(socket: Socket, id: string, replyTo: number | null = null, text = '') {
-    const rt = this.rooms.roomOf(socket);
-    const [s] = await this.db.select().from(stickers).where(and(eq(stickers.id, id), eq(stickers.roomId, rt.room.id)));
-    if (!s) throw new UserError('Ce sticker n\'existe plus.');
-    await this.db.update(stickers).set({ usedAt: new Date() }).where(eq(stickers.id, id));
-    this.rooms.emit(rt, { type: 'stickers', stickers: await this.stickerViews(rt) });
-    await this.sendPicture(socket, 'sticker', (await this.media.get(s.mediaId))!, replyTo, text);
-  }
-
-  /** Removed from the library: deleted (and its picture, if no other room uses it). */
-  async removeSticker(socket: Socket, id: string) {
-    const rt = this.rooms.roomOf(socket);
-    const [s] = await this.db.delete(stickers).where(and(eq(stickers.id, id), eq(stickers.roomId, rt.room.id))).returning();
-    if (s) await this.media.sweep([s.mediaId]);
-    this.rooms.emit(rt, { type: 'stickers', stickers: await this.stickerViews(rt) });
-  }
-
-  async addEmoji(socket: Socket, name: string, pic: MediaRow) {
-    const rt = this.rooms.roomOf(socket), a = (socket.data as SocketData).account;
-    const [row] = await this.db.insert(customEmoji).values({ roomId: rt.room.id, name, mediaId: pic.id, addedBy: a.id }).onConflictDoNothing().returning();
-    if (!row) throw new UserError(`:${name}: existe déjà dans le salon.`);
-    this.rooms.emit(rt, { type: 'emoji', emoji: await this.emojiViews(rt) });
-    await this.rooms.say(rt, `${a.name} a ajouté l'emoji :${name}: pour tout le salon.`, true);
-  }
-
-  /** My photo in this room (null: removed); the old one is deleted at once. */
-  async setPhoto(socket: Socket, pic: MediaRow | null) {
-    const rt = this.rooms.roomOf(socket), me = (socket.data as SocketData).account.id;
-    const [before] = await this.db.select({ p: roomMembers.photoId }).from(roomMembers).where(and(eq(roomMembers.roomId, rt.room.id), eq(roomMembers.accountId, me)));
-    await this.db.update(roomMembers).set({ photoId: pic?.id ?? null }).where(and(eq(roomMembers.roomId, rt.room.id), eq(roomMembers.accountId, me)));
-    if (before?.p && before.p !== pic?.id) await this.media.sweep([before.p]);
-    await this.rooms.emitMember(rt, me);
   }
 
   async giveHost(socket: Socket, to: string) {
@@ -400,10 +300,10 @@ export class RoomHub implements OnModuleInit {
       const p = v.pics[i];
       let pic: PollPicView | null = null;
       if (p?.gif) pic = { kind: 'gif', src: p.gif.url, w: p.gif.w, h: p.gif.h };   // a link to its provider, as in the chat
-      else if (p?.mediaId) { const m = await this.picture(p.mediaId, 'poll'); pic = { kind: 'image', src: this.media.url(m.id), w: m.width, h: m.height }; }
+      else if (p?.mediaId) { const m = await this.media.picture(p.mediaId, 'poll'); pic = { kind: 'image', src: this.media.url(m.id), w: m.width, h: m.height }; }
       else if (p?.stickerId) {
-        const [st] = await this.db.select({ m: media }).from(stickers).innerJoin(media, eq(media.id, stickers.mediaId)).where(and(eq(stickers.id, p.stickerId), eq(stickers.roomId, rt.room.id)));
-        if (st) pic = { kind: 'sticker', src: this.media.url(st.m.id), w: st.m.width, h: st.m.height };
+        const st = await this.library.sticker(rt, p.stickerId);
+        if (st) pic = { kind: 'sticker', ...st };
       }
       pics.push(pic);
     }
@@ -1155,7 +1055,7 @@ export class RoomHub implements OnModuleInit {
         if (!/^data:image\/(webp|png|jpeg|gif);base64,[A-Za-z0-9+/=]+$/.test(p.value) || p.value.length > 700_000) throw new UserError('Image refusée : trop lourde ou d\'un format inconnu.');
         pic = { kind: 'image', src: p.value };   // relayed once, never stored
       } else if (p.kind === 'sticker') {
-        const lib = await this.stickerViews(rt), st = lib.find(x => x.id === p.value);
+        const lib = await this.library.stickers(rt), st = lib.find(x => x.id === p.value);
         if (!st) throw new UserError('Ce sticker n\'est plus dans le salon.');
         pic = { kind: 'image', src: st.src };
       } else if (p.kind === 'gif') {
@@ -1164,7 +1064,7 @@ export class RoomHub implements OnModuleInit {
         if (!/(^|\.)(klipy\.com|giphy\.com)$/.test(host)) throw new UserError('GIF refusé : il doit venir de KLIPY ou GIPHY.');
         pic = { kind: 'image', src: p.value };
       } else if (p.value.startsWith(':')) {
-        const e = (await this.emojiViews(rt)).find(x => `:${x.name}:` === p.value);
+        const e = (await this.library.emoji(rt)).find(x => `:${x.name}:` === p.value);
         if (!e) throw new UserError('Cet emoji n\'existe pas dans le salon.');
         pic = { kind: 'image', src: e.url };
       } else {
@@ -1183,7 +1083,7 @@ export class RoomHub implements OnModuleInit {
     this.rooms.hostOnly(rt, (socket.data as SocketData).account.id);
     const key = String(card), old = rt.slots.cards.art[key];
     if (mediaId) {
-      const m = await this.picture(mediaId, 'trump');
+      const m = await this.media.picture(mediaId, 'trump');
       await this.db.insert(trumpArt).values({ roomId: rt.room.id, card: key, mediaId: m.id }).onConflictDoUpdate({ target: [trumpArt.roomId, trumpArt.card], set: { mediaId: m.id } });
       rt.slots.cards.art[key] = m.id;
     } else {

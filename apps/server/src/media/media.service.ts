@@ -109,6 +109,13 @@ export class MediaService implements OnModuleInit, OnModuleDestroy {
 
   async get(id: string) { return /^[0-9a-f-]{36}$/.test(id) ? (await this.db.query.media.findFirst({ where: eq(media.id, id) })) ?? null : null; }
 
+  /** A picture just uploaded, for this usage (an upload is only good for the usage of its ticket). */
+  async picture(id: string, usage: string): Promise<MediaRow> {
+    const row = await this.get(id);
+    if (!row || row.usage !== usage) throw new UserError('Image introuvable : envoie-la de nouveau.');
+    return row;
+  }
+
   async stream(row: MediaRow) {
     const r = await this.storage.s3!.send(new GetObjectCommand({ Bucket: row.bucket, Key: row.objectKey }));
     return r.Body as NodeJS.ReadableStream;

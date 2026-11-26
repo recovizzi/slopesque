@@ -4,7 +4,7 @@ import { createHmac } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import { canonicalCode, codeStrength, CODE_MIN_LEN } from '@slopesque/engines';
-import { KEY_ALPHABET, LIMITS, type AccountView, type FatalReason, type SavedRoom } from '@slopesque/shared';
+import { KEY_ALPHABET, LIMITS, type AccountView, type FatalReason, type GifRef, type SavedRoom } from '@slopesque/shared';
 import { ENV, type Env } from '../config/config.module.js';
 import { DB, type Db } from '../db/db.module.js';
 import { accountNames, accounts, adminLog, retiredCodes, roomMembers } from '../db/schema.js';
@@ -121,6 +121,7 @@ export class AccountsService {
   }
 
   async saveRooms(id: string, rooms: SavedRoom[]) { await this.db.update(accounts).set({ rooms }).where(eq(accounts.id, id)); }
+  async saveGifFavorites(id: string, gifFavorites: GifRef[]) { await this.db.update(accounts).set({ gifFavorites }).where(eq(accounts.id, id)); }
 
   /** Admin: accounts by pseudo (current or past), room, last connection; never a code. */
   async search(o: { name?: string; roomKey?: string; seenAfter?: Date }) {

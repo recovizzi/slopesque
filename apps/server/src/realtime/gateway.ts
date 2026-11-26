@@ -1,7 +1,6 @@
 // The intents of packages/shared/protocol.ts not yet in their own module's gateway (transitional), run by the
 // IntentRunner (validated, acknowledged { ok, value | error }).
 import type { Coinche } from '@slopesque/engines';
-import { Inject } from '@nestjs/common';
 import { ConnectedSocket, MessageBody, SubscribeMessage, WebSocketGateway } from '@nestjs/websockets';
 import type { Socket } from 'socket.io';
 import { AccountsService } from '../accounts/accounts.service.js';
@@ -9,19 +8,12 @@ import { RoomHub, type SocketData } from '../rooms/room-hub.service.js';
 import { RoomsService } from '../rooms/rooms.service.js';
 import { RoomRegistry } from '../rooms/room-registry.js';
 import { Votes } from '../rooms/votes.service.js';
-import { MediaService } from '../media/media.service.js';
-import { GifService } from '../external/gif.service.js';
-import { DB, type Db } from '../db/db.module.js';
-import { accounts } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
-import { UserError } from '../errors.js';
 import { IntentRunner } from './intent-runner.js';
 
 @WebSocketGateway()
 export class Gateway {
   constructor(private readonly intents: IntentRunner, private readonly accounts: AccountsService, private readonly hub: RoomHub,
-    private readonly rooms: RoomRegistry, private readonly votes: Votes, private readonly roomStore: RoomsService,
-    private readonly media: MediaService, private readonly gifs: GifService, @Inject(DB) private readonly db: Db) {}
+    private readonly rooms: RoomRegistry, private readonly votes: Votes, private readonly roomStore: RoomsService) {}
 
   @SubscribeMessage('room:check')
   check(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('room:check', b, async v => { await this.intents.limit(s, 'joins'); return (await this.roomStore.byKey(v.key)) ? 'ok' : 'unknown'; }); }
@@ -31,33 +23,6 @@ export class Gateway {
 
   @SubscribeMessage('room:leave')
   leave(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('room:leave', b, async () => { this.hub.leave(s); return null; }); }
-
-  @SubscribeMessage('chat:history')
-  history(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {
-    return this.intents.run('chat:history', b, async v => { const rt = this.rooms.roomOf(s); return this.hub.chat.page(rt.room.id, rt.room.createdAt, v.before); });
-  }
-
-  @SubscribeMessage('chat:send')
-  send(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {
-    return this.intents.run('chat:send', b, async v => {
-      const rt = this.rooms.roomOf(s);
-      await this.intents.limit(s, 'messages');
-      await this.hub.post(rt, this.intents.me(s).id, v.text, v.replyTo ?? null);
-      return null;
-    });
-  }
-
-  @SubscribeMessage('chat:react')
-  react(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {
-    return this.intents.run('chat:react', b, async v => {
-      const rt = this.rooms.roomOf(s);
-      await this.intents.limit(s, 'reactions');
-      const r = await this.hub.chat.react(rt.room.id, v.id, this.intents.me(s).id, v.emoji);
-      if (!r) throw new UserError('Ce message n\'existe plus.');
-      this.rooms.emit(rt, { type: 'reactions', id: v.id, reactions: r });
-      return null;
-    });
-  }
 
   @SubscribeMessage('profile:update')
   profile(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {
@@ -88,43 +53,6 @@ export class Gateway {
   giveHost(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('host:give', b, async v => { await this.hub.giveHost(s, v.to); return null; }); }
 
   // ---------------------------------------------------------------- pictures, stickers, emoji, GIF
-  @SubscribeMessage('media:ticket')
-  ticket(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('media:ticket', b, v => this.media.ticket(this.intents.me(s).id, v.usage)); }
-
-  @SubscribeMessage('chat:media')
-  chatMedia(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {
-    return this.intents.run('chat:media', b, async v => { await this.intents.limit(s, 'messages'); await this.hub.sendPicture(s, 'image', await this.hub.picture(v.mediaId, 'chat'), v.replyTo ?? null, v.text ?? ''); return null; });
-  }
-
-  @SubscribeMessage('chat:gif')
-  chatGif(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('chat:gif', b, async v => { await this.intents.limit(s, 'messages'); await this.hub.sendGif(s, v.gif, v.replyTo ?? null, v.text ?? ''); return null; }); }
-
-  @SubscribeMessage('sticker:add')
-  stickerAdd(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('sticker:add', b, async v => { return this.hub.addSticker(s, await this.hub.picture(v.mediaId, 'sticker'), v.send); }); }
-
-  @SubscribeMessage('sticker:send')
-  stickerSend(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('sticker:send', b, async v => { await this.intents.limit(s, 'messages'); await this.hub.sendSticker(s, v.id, v.replyTo ?? null, v.text ?? ''); return null; }); }
-
-  @SubscribeMessage('sticker:remove')
-  stickerRemove(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('sticker:remove', b, async v => { await this.hub.removeSticker(s, v.id); return null; }); }
-
-  @SubscribeMessage('emoji:add')
-  emojiAdd(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('emoji:add', b, async v => { await this.hub.addEmoji(s, v.name, await this.hub.picture(v.mediaId, 'emoji')); return null; }); }
-
-  @SubscribeMessage('photo:set')
-  photo(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('photo:set', b, async v => { await this.hub.setPhoto(s, v.mediaId ? await this.hub.picture(v.mediaId, 'photo') : null); return null; }); }
-
-  @SubscribeMessage('gif:search')
-  gifSearch(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('gif:search', b, async v => { await this.intents.limit(s, 'gifs'); return this.gifs.page(v.q, v.page, v.provider); }); }
-
-  @SubscribeMessage('gif:trending')
-  gifTrending(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('gif:trending', b, async v => { await this.intents.limit(s, 'gifs'); return this.gifs.page(null, v.page, v.provider); }); }
-
-  @SubscribeMessage('gif:favorites')
-  gifFavorites(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) {
-    return this.intents.run('gif:favorites', b, async v => { await this.db.update(accounts).set({ gifFavorites: v.favorites }).where(eq(accounts.id, this.intents.me(s).id)); return null; });
-  }
-
   // ---------------------------------------------------------------- commands, votes, social credit
   @SubscribeMessage('vote:cast')
   castVote(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('vote:cast', b, async v => { await this.votes.cast(this.rooms.roomOf(s), this.intents.me(s).id, v.id, v.yes); return null; }); }
