@@ -20,7 +20,20 @@ export interface AvatarProps {
 export function Avatar({ name, hue, photo, size = 'sm', onClick, title, label }: AvatarProps) {
   const style = { '--c': colorOf(hue) } as CSSProperties;
   const face = photo ? <img src={photo} alt="" draggable={false} /> : name.slice(0, 1).toUpperCase();
-  return onClick
-    ? <button className={`avatar${size ? ` ${size}` : ''}${photo ? ' has-photo' : ''}`} type="button" onClick={onClick} style={style} title={title} aria-label={label}>{face}</button>
-    : <span className={`avatar ${size}${photo ? ' has-photo' : ''}`} style={style} title={title}>{face}</span>;
+  return onClick ? (
+    <button
+      className={`avatar${size ? ` ${size}` : ''}${photo ? ' has-photo' : ''}`}
+      type="button"
+      onClick={onClick}
+      style={style}
+      title={title}
+      aria-label={label}
+    >
+      {face}
+    </button>
+  ) : (
+    <span className={`avatar ${size}${photo ? ' has-photo' : ''}`} style={style} title={title}>
+      {face}
+    </span>
+  );
 }

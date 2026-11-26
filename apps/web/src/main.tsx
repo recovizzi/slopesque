@@ -1,5 +1,5 @@
 // The panel's app. Inside the extension (or with ?preview, or in `pnpm dev`) the game; opened as a plain web page,
-// « Installer l'extension ».
+// « Installer l'extension »; in `pnpm dev` with ?kit, the component library (design/kit).
 import { wireTip } from './features/chat/hover';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -16,7 +16,9 @@ const params = new URLSearchParams(location.search);
 const inExtension = /^(chrome|moz)-extension:$/.test(location.protocol);
 
 if (inExtension && !params.has('embed')) document.body.classList.add('popup');
-if (inExtension || import.meta.env.DEV || params.has('preview')) {
+if (import.meta.env.DEV && params.has('kit')) {   // dev only: left out of the build
+  (await import('./design/kit/Kit')).mountKit(root, params.get('kit') ?? '');
+} else if (inExtension || import.meta.env.DEV || params.has('preview')) {
   useStore.getState().set({ device: await loadDevice() });
   if (useStore.getState().device.code) connect();
   // several tabs with the panel: only the visible one stays connected (a hidden one lets go after 30 s, panel-persistence)

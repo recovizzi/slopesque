@@ -6,7 +6,12 @@ import { useEffect, type RefObject } from 'react';
 export function useEscape(onClose: () => void, on = true) {
   useEffect(() => {
     if (!on) return;
-    const k = (e: KeyboardEvent) => { if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); onClose(); } };
+    const k = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !e.defaultPrevented) {
+        e.preventDefault();
+        onClose();
+      }
+    };
     addEventListener('keydown', k);
     return () => removeEventListener('keydown', k);
   }, [onClose, on]);
@@ -17,7 +22,9 @@ export function useDismiss(ref: RefObject<Element | null>, onClose: () => void, 
   useEscape(onClose, on);
   useEffect(() => {
     if (!on) return;
-    const down = (e: PointerEvent) => { if (ref.current && !e.composedPath().includes(ref.current)) onClose(); };
+    const down = (e: PointerEvent) => {
+      if (ref.current && !e.composedPath().includes(ref.current)) onClose();
+    };
     addEventListener('pointerdown', down);
     return () => removeEventListener('pointerdown', down);
   }, [ref, onClose, on]);

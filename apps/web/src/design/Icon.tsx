@@ -13,9 +13,26 @@ export interface IconProps {
 }
 
 export function Icon({ name, size, className }: IconProps) {
-  const solid = SOLID[name], s = size ?? solid ?? 18;
-  return solid
-    ? <svg className={className} viewBox="0 0 24 24" width={s} height={s} aria-hidden="true">{ICONS[name]}</svg>
-    : <svg className={className} viewBox="0 0 24 24" width={s} height={s} fill="none" stroke="currentColor" strokeWidth="2"
-      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{ICONS[name]}</svg>;
+  const solid = SOLID[name],
+    s = size ?? solid ?? 18;
+  return solid ? (
+    <svg className={className} viewBox="0 0 24 24" width={s} height={s} aria-hidden="true">
+      {ICONS[name]}
+    </svg>
+  ) : (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      width={s}
+      height={s}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {ICONS[name]}
+    </svg>
+  );
 }

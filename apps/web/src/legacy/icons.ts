@@ -10,7 +10,9 @@ function markup(n: ReactNode): string {
   if (!isValidElement(n)) return '';
   const { children, ...attrs } = n.props as Record<string, unknown>;
   if (n.type === Fragment) return markup(children as ReactNode);
-  return `<${String(n.type)}${Object.entries(attrs).map(([k, v]) => ` ${kebab(k)}="${String(v)}"`).join('')}/>`;
+  return `<${String(n.type)}${Object.entries(attrs)
+    .map(([k, v]) => ` ${kebab(k)}="${String(v)}"`)
+    .join('')}/>`;
 }
 const svg = (name: IconName) => {
   const solid = SOLID[name];
@@ -20,4 +22,7 @@ const svg = (name: IconName) => {
 };
 
 /** @deprecated SVG strings for the HTML-string views only; React code uses <Icon name> (design). Deleted in task 4.1. */
-export const icon = Object.fromEntries((Object.keys(ICONS) as IconName[]).map(n => [n, svg(n)])) as Record<IconName, string>;
+export const icon = Object.fromEntries((Object.keys(ICONS) as IconName[]).map(n => [n, svg(n)])) as Record<
+  IconName,
+  string
+>;
