@@ -142,16 +142,6 @@ export class Gateway {
   kick(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('kick:ask', b, v => this.hub.askKick(s, v.name)); }
 
   // ---------------------------------------------------------------- Demi-disque
-  @SubscribeMessage('disk:rules')
-  diskRules(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('disk:rules', b, v => this.hub.diskRules(s, v)); }
-  @SubscribeMessage('disk:join')
-  diskJoin(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('disk:join', b, async () => { await this.hub.diskJoin(s); return null; }); }
-  @SubscribeMessage('disk:start')
-  diskStart(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('disk:start', b, async v => { await this.hub.diskStart(s, v.word, v.target); return null; }); }
-  @SubscribeMessage('disk:guess')
-  diskGuess(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('disk:guess', b, async v => { await this.hub.diskGuess(s, v.value); return null; }); }
-  @SubscribeMessage('disk:next')
-  diskNext(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('disk:next', b, async () => { await this.hub.diskNext(s); return null; }); }
   @SubscribeMessage('game:reset')
   gameReset(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('game:reset', b, async () => { await this.hub.gameReset(s); return null; }); }
 
@@ -176,8 +166,6 @@ export class Gateway {
   // ---------------------------------------------------------------- Cartes
   @SubscribeMessage('web:set')
   setWeb(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('web:set', b, async v => { await this.hub.setWeb(s, v.integration, v.url); return null; }); }
-  @SubscribeMessage('palmares:get')
-  palmares(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('palmares:get', b, () => this.hub.palmares(s)); }
   @SubscribeMessage('cards:deal')
   cardsDeal(@ConnectedSocket() s: Socket, @MessageBody() b: unknown) { return this.intents.run('cards:deal', b, async () => { await this.hub.cardsDeal(s); return null; }); }
   @SubscribeMessage('cards:play')

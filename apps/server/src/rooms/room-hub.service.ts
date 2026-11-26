@@ -6,7 +6,6 @@ import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { Socket } from 'socket.io';
 import type postgres from 'postgres';
 import { creditWord, defaultHue, tierOf } from '@slopesque/engines';
-import * as D from '@slopesque/engines';
 import { Coinche, CoincheAI, Holdem, HoldemAI, Poll, Table, Tarot, TarotAI, Tdc, Wheel, KICK_AFTER_MS } from '@slopesque/engines';
 import { CARD_PLAYERS, cardGameOf, type CardGameKey, type HoldemRules, EFFECT_MS, EFFECT_PARALLEL, ON_PHOTO, PRESENCE, SCORE_NAMES, scoreKey, type EffectKind, type EffectView, READY_ACTIVITIES, READY_CARD_GAMES, type CardsView, type PollAnswer, type PollView, type WheelView, type PollPicView, type ActivityChoice, type EmojiView, type GifRef, type RoomState, type StickerView } from '@slopesque/shared';
 import { DB, SQL, type Db } from '../db/db.module.js';
@@ -21,12 +20,14 @@ import { ADMIN_CHANNEL, RoomsService, type AdminNotice, type Room } from './room
 import { RoomRegistry } from './room-registry.js';
 import type { RoomRt, SocketData } from './room-rt.js';
 import { Votes } from './votes.service.js';
+import { ACTIVITIES, type Activity } from './activity.js';
+import type { RoomSlots } from './room-rt.js';
 
 interface PollRt { phase: PollView['phase']; round: number; seconds: number; secret: boolean; poll: PollView['poll']; answers: Record<string, PollAnswer>; host: string | null; deadline: number | null; timer: NodeJS.Timeout | null }
 interface WheelRt { phase: WheelView['phase']; items: WheelView['items']; spin: WheelView['spin']; needle: number; round: number; timer: NodeJS.Timeout | null }
 interface CardsRt { game: CardGameKey; players: number; settings: { tdc: number; tarot: number; holdem: number; coinche: number; bots?: TarotAI.Level; holdemRules?: HoldemRules; coincheTarget?: number; dealMode?: 'random' | 'classic' }; showTricks: boolean; tarot: Tarot.Tarot | null; holdem: Holdem.Holdem | null; coinche: Coinche.Coinche | null; next: { at: number; ready: string[] } | null; handDone: number; shownAt: { hand: number; street: string }; settled: boolean; seats: Table.CardSeat[]; tdc: Tdc.Tdc | null; paid: Record<string, string | null>; turnSince: number; robot: NodeJS.Timeout | null; late: NodeJS.Timeout | null; art: Record<string, string> }
 declare module './room-rt.js' {
-  interface RoomSlots { chatPolls: Map<number, { cp: StoredChatPoll; timer: NodeJS.Timeout | null }>; cards: CardsRt; disk: D.DiskState; diskTimer: NodeJS.Timeout | null; poll: PollRt; wheel: WheelRt; fx: Record<string, number[]> }
+  interface RoomSlots { chatPolls: Map<number, { cp: StoredChatPoll; timer: NodeJS.Timeout | null }>; cards: CardsRt; poll: PollRt; wheel: WheelRt; fx: Record<string, number[]> }
 }
 const GAME_ROUND: Record<CardGameKey, string> = { tdc: 'la manche du Trou du cul', tarot: 'la donne de Tarot', holdem: 'la partie de Texas Hold\'em', coinche: 'la partie de Coinche' };
 const GAME_NAME: Record<CardGameKey, string> = { tdc: 'Trou du cul', tarot: 'Tarot', holdem: 'Texas Hold\'em', coinche: 'Coinche' };
@@ -38,7 +39,7 @@ export class RoomHub implements OnModuleInit {
 
   constructor(@Inject(ENV) private readonly env: Env, @Inject(DB) private readonly db: Db, @Inject(SQL) private readonly sql: postgres.Sql,
     private readonly roomStore: RoomsService, readonly chat: ChatService, private readonly media: MediaService, private readonly previews: PreviewService,
-    readonly rooms: RoomRegistry, private readonly votes: Votes) {}
+    readonly rooms: RoomRegistry, private readonly votes: Votes, @Inject(ACTIVITIES) private readonly activities: Activity[]) {}
 
   async onModuleInit() {
     this.rooms.useSwitch((rt, choice) => this.setActivity(rt, choice));
@@ -62,13 +63,12 @@ export class RoomHub implements OnModuleInit {
   /** A room starts being played (first player since the server started): its Demi-disque from the saved rules; a round
    *  that was running when the server stopped is cancelled, and it is said. */
   private async load(room: Room): Promise<RoomRt> {
-    const saved = (room.rules.disk ?? {}) as { rules?: D.DiskRules; round?: number; guessing?: boolean };
-    const disk = { ...D.newDisk({ ...D.DEFAULT_RULES, ...saved.rules }), round: saved.round ?? 1, phase: (saved.round ?? 1) > 1 ? 'writing' as const : 'lobby' as const };
     const ps = (room.rules.poll ?? {}) as { seconds?: number; secret?: boolean; round?: number };
     const ws = (room.rules.wheel ?? {}) as { items?: WheelView['items']; needle?: number; round?: number };
-    const rt: RoomRt = { room, seq: 0, members: new Map(), vote: null, notice: null, slots: { chatPolls: new Map(), cards: { game: 'tdc', players: 4, settings: { tdc: 4, tarot: 4, holdem: 6, coinche: 4, ...((room.rules.cards as object | undefined) ?? {}) }, showTricks: true, tarot: null, holdem: null, coinche: null, next: null, handDone: 0, shownAt: { hand: 0, street: '' }, settled: false, seats: [], tdc: null, paid: {}, turnSince: 0, robot: null, late: null, art: {} }, disk, diskTimer: null,
+    const rt: RoomRt = { room, seq: 0, members: new Map(), vote: null, notice: null, slots: { chatPolls: new Map(), cards: { game: 'tdc', players: 4, settings: { tdc: 4, tarot: 4, holdem: 6, coinche: 4, ...((room.rules.cards as object | undefined) ?? {}) }, showTricks: true, tarot: null, holdem: null, coinche: null, next: null, handDone: 0, shownAt: { hand: 0, street: '' }, settled: false, seats: [], tdc: null, paid: {}, turnSince: 0, robot: null, late: null, art: {} },
       poll: { phase: 'writing', round: ps.round ?? 1, seconds: ps.seconds ?? 300, secret: ps.secret ?? false, poll: null, answers: {}, host: null, deadline: null, timer: null },
-      wheel: { phase: 'writing', items: ws.items ?? [{ label: '', weight: '' }, { label: '', weight: '' }], spin: null, needle: ws.needle ?? 0, round: ws.round ?? 1, timer: null }, fx: {} } };
+      wheel: { phase: 'writing', items: ws.items ?? [{ label: '', weight: '' }, { label: '', weight: '' }], spin: null, needle: ws.needle ?? 0, round: ws.round ?? 1, timer: null }, fx: {} } as Partial<RoomSlots> as RoomSlots };
+    for (const a of this.activities) a.init?.(rt);
     for (const a of await this.db.select().from(trumpArt).where(eq(trumpArt.roomId, room.id))) rt.slots.cards.art[a.card] = a.mediaId;   // the trumps' pictures
     // the polls continued in the chat, still open: their clock again (closed at once if their time ran out meanwhile)
     for (const m of await this.db.select().from(messages).where(and(eq(messages.roomId, room.id), eq(messages.kind, 'poll'), sql`coalesce((${messages.data}->'chatPoll'->>'closed')::boolean, true) = false`))) {
@@ -76,8 +76,9 @@ export class RoomHub implements OnModuleInit {
     }
     // a game running when the server stopped: cancelled, back to its first step, said in the chat and in a window
     const live = (room.rules.live ?? {}) as { cards?: string; poll?: string };
-    const lost = [saved.guessing ? 'le tour du Demi-disque' : '', live.poll ? 'le sondage' : '', live.cards ? GAME_ROUND[live.cards as CardGameKey] ?? 'la partie de cartes' : ''].filter(Boolean);
-    if (saved.guessing) await this.saveDisk(rt);
+    const lost: string[] = [];
+    for (const a of this.activities) { const l = await a.restore?.(rt); if (l) lost.push(l); }
+    lost.push(...[live.poll ? 'le sondage' : '', live.cards ? GAME_ROUND[live.cards as CardGameKey] ?? 'la partie de cartes' : ''].filter(Boolean));
     if (live.cards || live.poll) await this.rooms.saveRules(rt, 'live', {});
     if (lost.length) {
       const what = lost.join(' et '), text = `Le serveur a redémarré pendant ${what} : ${lost.length > 1 ? 'ils sont annulés' : 'la partie est annulée'}. Tout reprend à son début ; l'hôte peut relancer.`;
@@ -91,12 +92,7 @@ export class RoomHub implements OnModuleInit {
    *  the chat); the activity chosen keeps its own (a round that just started switches to its activity). */
   private async cancelRunning(rt: RoomRt, to: ActivityChoice) {
     const lost: string[] = [];
-    if (rt.slots.disk.phase === 'guessing' && to.activity !== 'disk') {
-      if (rt.slots.diskTimer) { clearTimeout(rt.slots.diskTimer); rt.slots.diskTimer = null; }
-      rt.slots.disk = { ...D.newDisk({ ...rt.slots.disk.rules, ...rt.slots.disk.pending }), round: rt.slots.disk.round, phase: 'writing' };
-      await this.saveDisk(rt); await this.emitDisk(rt);
-      lost.push('le tour du Demi-disque');
-    }
+    for (const a of this.activities) { const l = await a.cancel?.(rt, to); if (l) lost.push(l); }
     if (rt.slots.poll.phase === 'open' && to.activity !== 'poll') await this.pollToChat(rt);   // not lost: it goes on in the chat
     if (rt.slots.wheel.phase === 'spinning' && to.activity !== 'wheel') {
       if (rt.slots.wheel.timer) clearTimeout(rt.slots.wheel.timer);
@@ -171,8 +167,8 @@ export class RoomHub implements OnModuleInit {
     return { seq: rt.seq, room: { key: rt.room.key, name: rt.room.name, createdAt: rt.room.createdAt.getTime() }, me, hostId: rt.room.hostId,
       members: await this.rooms.members(rt), chat: after ? await this.chat.since(rt.room.id, rt.room.createdAt, after) : await this.chat.page(rt.room.id, rt.room.createdAt), serverTime: Date.now(),
       stickers: await this.stickerViews(rt), emoji: await this.emojiViews(rt), activity: this.rooms.activity(rt), scope: this.rooms.scope(rt),
-      notice: rt.notice && Date.now() - rt.notice.at < 30 * 60_000 ? { id: rt.notice.id, title: rt.notice.title, text: rt.notice.text } : null, disk: D.diskView(rt.slots.disk, me),
-      poll: this.pollView(rt, me), wheel: this.wheelView(rt), cards: this.cardsView(rt, me), web: (rt.room.rules.web as Record<string, string> | undefined) ?? {} };
+      notice: rt.notice && Date.now() - rt.notice.at < 30 * 60_000 ? { id: rt.notice.id, title: rt.notice.title, text: rt.notice.text } : null,
+      ...Object.assign({}, ...this.activities.map(a => a.view(rt, me))), poll: this.pollView(rt, me), wheel: this.wheelView(rt), cards: this.cardsView(rt, me), web: (rt.room.rules.web as Record<string, string> | undefined) ?? {} } as RoomState;
   }
 
   // ---------------------------------------------------------------- events
@@ -293,14 +289,11 @@ export class RoomHub implements OnModuleInit {
     }
     if (choice.cardGame === 'tarot' && choice.tarotPlayers) rt.slots.cards.settings = { ...rt.slots.cards.settings, tarot: choice.tarotPlayers };
     if (choice.activity === 'cards') this.prepareTable(rt, cardGameOf(choice));
-    if (choice.activity === 'disk' && choice.mode && choice.mode !== { ...rt.slots.disk.rules, ...rt.slots.disk.pending }.mode) {   // the format chosen: its voting mode
-      rt.slots.disk = D.setRules(rt.slots.disk, { mode: choice.mode }).state;
-      await this.saveDisk(rt);
-      await this.emitDisk(rt);
-    }
+    for (const a of this.activities) await a.choose?.(rt, choice);
     rt.room = { ...rt.room, rules: { ...rt.room.rules, activity: choice, scope: ((rt.room.rules.scope as number | undefined) ?? 0) + 1 } };   // a new session
     await this.db.update(rooms).set({ rules: rt.room.rules }).where(eq(rooms.id, rt.room.id));
     this.rooms.emit(rt, { type: 'activity', activity: choice, scope: this.rooms.scope(rt) });
+    for (const a of this.activities) await a.chosen?.(rt, choice);
     if (choice.activity === 'cards') await this.emitCards(rt);
   }
 
@@ -355,83 +348,6 @@ export class RoomHub implements OnModuleInit {
     await this.rooms.emitMember(rt, to);
   }
 
-  // ---------------------------------------------------------------- Demi-disque
-  /** Each player gets the round as he may see it (the host's answer hidden from the others until the reveal). */
-  private async emitDisk(rt: RoomRt) {
-    rt.seq++;
-    for (const s of await this.rooms.io.in(`room:${rt.room.id}`).fetchSockets()) s.emit('event', { type: 'disk', disk: D.diskView(rt.slots.disk, (s.data as SocketData).account.id), seq: rt.seq });
-  }
-  private async saveDisk(rt: RoomRt) {
-    await this.rooms.saveRules(rt, 'disk', { rules: { ...rt.slots.disk.rules, ...rt.slots.disk.pending }, round: rt.slots.disk.round, guessing: rt.slots.disk.phase === 'guessing' });
-  }
-  private wrap<T>(f: () => T): T { try { return f(); } catch (e) { if (e instanceof D.DiskError) throw new UserError(e.message); throw e; } }
-  /** The candidates of a round: the players who joined (« Participer »), connected, except the host. */
-  private candidates(rt: RoomRt, playing: Set<string>) { return this.rooms.connected(rt).filter(id => playing.has(id) && id !== rt.slots.disk.host); }
-
-  async diskRules(socket: Socket, changes: Partial<D.DiskRules>) {
-    const rt = this.rooms.roomOf(socket);
-    this.rooms.hostOnly(rt, (socket.data as SocketData).account.id);
-    const r = D.setRules(rt.slots.disk, changes);
-    rt.slots.disk = r.state;
-    await this.saveDisk(rt);
-    await this.emitDisk(rt);
-    return r.now ? 'now' as const : 'pending' as const;
-  }
-
-  async diskJoin(socket: Socket) {
-    const rt = this.rooms.roomOf(socket), me = (socket.data as SocketData).account;
-    await this.db.update(roomMembers).set({ playing: true }).where(and(eq(roomMembers.roomId, rt.room.id), eq(roomMembers.accountId, me.id)));
-    await this.rooms.emitMember(rt, me.id);
-    await this.rooms.say(rt, `${me.name} rejoint la partie.`);
-  }
-
-  async diskStart(socket: Socket, word: string, target: number) {
-    const rt = this.rooms.roomOf(socket);
-    this.rooms.hostOnly(rt, (socket.data as SocketData).account.id);
-    rt.slots.disk = this.wrap(() => D.startRound(rt.slots.disk.phase === 'reveal' || rt.slots.disk.phase === 'lobby' ? D.nextRound(rt.slots.disk) : rt.slots.disk, rt.room.hostId!, word, target));
-    if (this.rooms.activity(rt).activity !== 'disk') await this.setActivity(rt, { activity: 'disk', mode: rt.slots.disk.mode });
-    await this.saveDisk(rt);
-    await this.rooms.say(rt, `Tour ${rt.slots.disk.round} : « ${rt.slots.disk.word} »`);
-    if (rt.slots.diskTimer) clearTimeout(rt.slots.diskTimer);
-    rt.slots.diskTimer = setTimeout(() => void this.diskReveal(rt), rt.slots.disk.deadline! - Date.now());
-    await this.emitDisk(rt);
-  }
-
-  async diskGuess(socket: Socket, value: number) {
-    const rt = this.rooms.roomOf(socket), me = (socket.data as SocketData).account.id;
-    const [m] = await this.db.select({ playing: roomMembers.playing }).from(roomMembers).where(and(eq(roomMembers.roomId, rt.room.id), eq(roomMembers.accountId, me)));
-    if (!m?.playing) throw new UserError('Clique d\'abord « Participer ».');
-    rt.slots.disk = this.wrap(() => D.guess(rt.slots.disk, me, value));
-    await this.emitDisk(rt);
-    const playing = new Set((await this.db.select({ id: roomMembers.accountId }).from(roomMembers).where(and(eq(roomMembers.roomId, rt.room.id), eq(roomMembers.playing, true)))).map(r => r.id));
-    if (D.allValidated(rt.slots.disk, this.candidates(rt, playing))) await this.diskReveal(rt);   // everyone validated: no need to wait
-  }
-
-  /** The end of the answer time (or everyone validated): the points, the Palmarès, the pending rules. */
-  private async diskReveal(rt: RoomRt) {
-    if (rt.slots.disk.phase !== 'guessing') return;
-    if (rt.slots.diskTimer) { clearTimeout(rt.slots.diskTimer); rt.slots.diskTimer = null; }
-    const r = D.reveal(rt.slots.disk);
-    rt.slots.disk = r.state;
-    for (const [id, pts] of Object.entries(r.points)) if (pts) await this.rooms.addScore(rt, id, 'disk', pts);
-    const top = Math.max(0, ...Object.values(r.state.results).map(x => x.points));
-    const humans = Object.keys(r.state.results).length;   // the Palmarès: a round counts for the level with 2 players or more
-    for (const [id, x] of Object.entries(r.state.results)) await this.db.insert(palmares).values({ roomId: rt.room.id, game: 'disk', data: { account: id, won: x.points === top && top > 0, pts: x.points, perfect: x.perfect, humans } });
-    await this.saveDisk(rt);
-    await this.emitDisk(rt);
-    for (const id of Object.keys(r.points)) await this.rooms.emitMember(rt, id);
-    if (r.best) { const [b] = await this.rooms.members(rt, r.best[0]); await this.rooms.say(rt, `${b?.name ?? '?'} gagne le tour (+${r.best[1].points}${r.best[1].perfect ? ', perfect !' : ''})`); }
-  }
-
-  async diskNext(socket: Socket) {
-    const rt = this.rooms.roomOf(socket);
-    this.rooms.hostOnly(rt, (socket.data as SocketData).account.id);
-    if (rt.slots.disk.phase === 'guessing') throw new UserError('Le tour n\'est pas fini.');
-    rt.slots.disk = D.nextRound(rt.slots.disk);
-    await this.saveDisk(rt);
-    await this.emitDisk(rt);
-  }
-
   /** « Réinitialiser la partie »: the ranking of the game being played back to zero (the others, and the Palmarès, kept);
    *  the Demi-disque also starts again from its first round. */
   async gameReset(socket: Socket) {
@@ -440,12 +356,7 @@ export class RoomHub implements OnModuleInit {
     const key = scoreKey(this.rooms.activity(rt));
     if (!key) throw new UserError('Cette activité n\'a pas de classement.');
     await this.db.update(roomMembers).set({ scores: sql`${roomMembers.scores} - ${key}::text` }).where(eq(roomMembers.roomId, rt.room.id));
-    if (key === 'disk') {
-      if (rt.slots.diskTimer) { clearTimeout(rt.slots.diskTimer); rt.slots.diskTimer = null; }
-      rt.slots.disk = { ...D.newDisk(rt.slots.disk.rules), round: 1 };
-      await this.saveDisk(rt);
-      await this.emitDisk(rt);
-    }
+    await this.activities.find(a => a.key === this.rooms.activity(rt).activity)?.reset?.(rt);
     for (const m of await this.rooms.members(rt)) await this.rooms.emitMember(rt, m.id);   // the absent ones too
     await this.rooms.say(rt, `Le classement ${SCORE_NAMES[key]} est remis à zéro (le palmarès est gardé).`);
   }
@@ -667,18 +578,6 @@ export class RoomHub implements OnModuleInit {
     await this.rooms.saveRules(rt, 'web', web);
     this.rooms.emit(rt, { type: 'web', web });
     await this.rooms.say(rt, `Nouvelle adresse pour Low Tide : ${u.host}`);
-  }
-
-  // ---------------------------------------------------------------- Palmarès
-  /** The room's results (the last 5 000), with each player's current name and colour. */
-  async palmares(socket: Socket) {
-    const rt = this.rooms.roomOf(socket);
-    const rows = await this.db.execute<{ at: string; game: string; data: Record<string, unknown>; name: string | null; hue: number | null }>(sql`
-      select p.at, p.game, p.data, a.name, m.hue from palmares p
-      left join accounts a on a.id = (p.data->>'account')::uuid
-      left join room_members m on m.room_id = p.room_id and m.account_id = (p.data->>'account')::uuid
-      where p.room_id = ${rt.room.id} order by p.at desc limit 5000`);
-    return rows.map(r => ({ ...(r.data as object), at: new Date(r.at).getTime(), game: r.game, id: String(r.data.account), name: r.name ?? '?', hue: r.hue ?? 0, won: !!r.data.won })) as import('@slopesque/shared').PalmaresEvent[];
   }
 
   // ---------------------------------------------------------------- Cartes: the Trou du cul
