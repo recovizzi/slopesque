@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "e2e": "node run.mjs && node cards.mjs && node holdem.mjs && node coinche.mjs"
+    "e2e": "node run.mjs && node polls.mjs && node cards.mjs && node holdem.mjs && node coinche.mjs"
   },
   "devDependencies": {
     "@slopesque/engines": "workspace:*",

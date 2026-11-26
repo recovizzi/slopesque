@@ -171,23 +171,26 @@ export function gradientSvg(choices: string[], o: { pick?: boolean; dots?: Dot[]
   const label = (i: number, x: number, y: number, anchor: string) =>
     `<text class="g-label" x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${anchor}" data-label="${i}">${esc(short(choices[i] || `Proposition ${i + 1}`))}<title>${esc(choices[i])}</title></text>`;
   const attrs = `${o.pick ? ' data-gradient tabindex="0"' : ''} role="img" aria-label="Gradient entre ${esc(choices.join(', '))}"`;
+  // the heatmap's clip, named by its shape: several gradients on a page (polls in the chat) each find theirs (an id
+  // is page-wide: a shared « g-clip » clipped a triangle's heat by the slider of a poll above it)
+  const clip = `g-clip-${n}`;
   if (n === 2) {
-    const heat = o.heat ? `<image href="${heatmap(2, o.heat)}" x="${LINE.x0}" y="${LINE.y - 7}" width="${LINE.x1 - LINE.x0}" height="14" preserveAspectRatio="none" clip-path="url(#g-clip)"/>` : '';
+    const heat = o.heat ? `<image href="${heatmap(2, o.heat)}" x="${LINE.x0}" y="${LINE.y - 7}" width="${LINE.x1 - LINE.x0}" height="14" preserveAspectRatio="none" clip-path="url(#${clip})"/>` : '';
     return `<svg class="gradient g1 ${o.pick ? 'is-pick' : ''}" viewBox="0 0 300 50"${attrs}>
-      <defs><clipPath id="g-clip"><rect x="${LINE.x0}" y="${LINE.y - 7}" width="${LINE.x1 - LINE.x0}" height="14" rx="7"/></clipPath></defs>
+      <defs><clipPath id="${clip}"><rect x="${LINE.x0}" y="${LINE.y - 7}" width="${LINE.x1 - LINE.x0}" height="14" rx="7"/></clipPath></defs>
       <rect class="g-track" x="${LINE.x0}" y="${LINE.y - 7}" width="${LINE.x1 - LINE.x0}" height="14" rx="7"/>${heat}
       <line class="g-mid" x1="150" y1="${LINE.y - 10}" x2="150" y2="${LINE.y + 10}"/>
       ${label(0, LINE.x0, 46, 'start')}${label(1, LINE.x1, 46, 'end')}${dots}</svg>`;
   }
   const pts = cs.map(p => toSvg(n, p).map(v => v.toFixed(1)).join(',')).join(' ');
-  const heat = o.heat ? `<image href="${heatmap(n, o.heat)}" x="${SHAPE.cx - SHAPE.r}" y="${SHAPE.cy - SHAPE.r}" width="${2 * SHAPE.r}" height="${2 * SHAPE.r}" preserveAspectRatio="none" clip-path="url(#g-clip)"/>` : '';
+  const heat = o.heat ? `<image href="${heatmap(n, o.heat)}" x="${SHAPE.cx - SHAPE.r}" y="${SHAPE.cy - SHAPE.r}" width="${2 * SHAPE.r}" height="${2 * SHAPE.r}" preserveAspectRatio="none" clip-path="url(#${clip})"/>` : '';
   const spokes = cs.map(p => { const [x, y] = toSvg(n, p); return `<line class="g-spoke" x1="${SHAPE.cx}" y1="${SHAPE.cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`; }).join('');
   const labels = cs.map((p, i) => {
     const [x, y] = toSvg(n, [p[0] * 1.16, p[1] * 1.16]);
     return label(i, x, y + 3 + (p[1] > 0.3 ? 5 : p[1] < -0.9 ? -2 : 0), p[0] > 0.2 ? 'start' : p[0] < -0.2 ? 'end' : 'middle');
   }).join('');
   return `<svg class="gradient g2 ${o.pick ? 'is-pick' : ''}" viewBox="0 0 300 190"${attrs}>
-    <defs><clipPath id="g-clip"><polygon points="${pts}"/></clipPath></defs>
+    <defs><clipPath id="${clip}"><polygon points="${pts}"/></clipPath></defs>
     <polygon class="g-shape" points="${pts}"/>${spokes}${heat}<polygon class="g-outline" points="${pts}"/>
     ${cs.map(p => { const [x, y] = toSvg(n, p); return `<circle class="g-corner" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.5"/>`; }).join('')}
     ${labels}${dots}</svg>`;

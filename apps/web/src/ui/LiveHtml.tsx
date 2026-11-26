@@ -1,5 +1,5 @@
 // HTML views ported from the maquette (lib/poll.ts, lib/wheel.ts: escaped strings with data-* attributes): redrawn
-// when their HTML changes, keeping the focus and the caret of the field being typed in; clicks and inputs are read by
+// when their HTML changes, keeping the focus and the caret of the field being typed in, and the pictures unchanged; clicks and inputs are read by
 // delegation (data-action, data-poll, data-wh, data-i).
 import { useLayoutEffect, useRef } from 'react';
 
@@ -19,7 +19,12 @@ export function LiveHtml({ html, className, onAction, onInput }: { html: string;
     last.current = html;
     const a = document.activeElement, key = a instanceof HTMLInputElement && box.contains(a) ? keyOf(a) : null;
     const sel = key ? [(a as HTMLInputElement).selectionStart, (a as HTMLInputElement).selectionEnd] : null;
+    // the pictures already shown are kept as they are (not rebuilt: a server picture would blink, blank while it is
+    // redrawn, at each click on a choice)
+    const kept = new Map<string, HTMLImageElement[]>();
+    for (const img of box.querySelectorAll('img')) { const k = img.outerHTML; kept.set(k, [...(kept.get(k) ?? []), img]); }
     box.innerHTML = html;
+    if (kept.size) for (const img of box.querySelectorAll('img')) { const old = kept.get(img.outerHTML)?.shift(); if (old) img.replaceWith(old); }
     const back = key ? box.querySelector<HTMLInputElement>(key) : null;
     if (back) { back.focus(); try { back.setSelectionRange(sel![0], sel![1]); } catch { /* not a text field */ } }
   });
