@@ -1,6 +1,8 @@
 // The card table's animations (as the maquette's app.ts): the server sends each step at once, the table shows them one
 // after the other — a card flies from its seat (or my hand) to the pile, a Tarot trick stays a moment then goes to its
 // winner, the take and the called card are announced. Too far behind (a hidden tab), it jumps to the last view.
+// Imperative (outside React): a flight is a copy of the card already drawn (its nodes cloned), the card itself hidden
+// at its place until it lands.
 import type { CardsView } from '@slopesque/shared';
 
 type Play = { by: string; cards: { id: string }[] };
@@ -52,6 +54,22 @@ export function diff(a: CardsView, b: CardsView): Step {
 }
 
 const centre = (r: DOMRect) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+let flights = 0;
+/** A copy of a card on the table, over the page, for a flight: its SVG cloned (the same picture, no HTML written).
+ *  The ids in it (a trump's clip and gradient) are renamed, the copy pointing to its own: the card itself is hidden
+ *  while it flies, and a clip read in a hidden element hides everything. */
+function flyer(el: HTMLElement, cls: string) {
+  const f = document.createElement('div');
+  f.className = cls;
+  f.append(...[...el.childNodes].map(n => n.cloneNode(true)));
+  const named = [...f.querySelectorAll('[id]')], k = ++flights, to = new Map(named.map(e => [e.id, `${e.id}-fly${k}`]));
+  for (const e of named) e.id = to.get(e.id)!;
+  if (named.length) for (const e of f.querySelectorAll('*')) for (const a of [...e.attributes]) {
+    const v = a.value.replace(/url\(#([^)]+)\)/g, (m, id: string) => (to.has(id) ? `url(#${to.get(id)})` : m));
+    if (v !== a.value) e.setAttribute(a.name, v);
+  }
+  return f;
+}
 
 export type From = Map<string, { x: number; y: number; w: number; h: number; a: number; hand: boolean }>;
 /** Where a play's cards come from, read before the table is redrawn: my hand (the card itself) or the player's seat. */
@@ -70,9 +88,7 @@ export function flyIn(box: HTMLElement, from: From) {
   return Promise.all([...from].map(([id, f]) => {
     const el = box.querySelector<HTMLElement>(`.on-table[data-card="${CSS.escape(id)}"]`);
     if (!el) return Promise.resolve();
-    const r = el.getBoundingClientRect(), to = centre(r), c = document.createElement('div');
-    c.className = `card-fly ${f.hand ? 'from-hand' : 'from-seat'}`;
-    c.innerHTML = el.innerHTML;
+    const r = el.getBoundingClientRect(), to = centre(r), c = flyer(el, `card-fly ${f.hand ? 'from-hand' : 'from-seat'}`);
     Object.assign(c.style, { left: `${f.x - r.width / 2}px`, top: `${f.y - r.height / 2}px`, width: `${r.width}px`, height: `${r.height}px` });
     document.body.append(c);
     el.style.visibility = 'hidden';
@@ -93,9 +109,7 @@ export function gather(box: HTMLElement, winner: string, me: boolean) {
   if (!els.length || !target || !pile) return Promise.resolve();
   const p = centre(pile), to = centre(target.getBoundingClientRect());
   return Promise.all(els.map((el, i) => {
-    const r = el.getBoundingClientRect(), f = document.createElement('div');
-    f.className = 'card-fly gather';
-    f.innerHTML = el.innerHTML;
+    const r = el.getBoundingClientRect(), f = flyer(el, 'card-fly gather');
     Object.assign(f.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
     document.body.append(f);
     el.style.visibility = 'hidden';

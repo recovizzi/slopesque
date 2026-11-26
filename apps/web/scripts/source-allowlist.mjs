@@ -9,7 +9,6 @@ export const HTML = {
   'lib/emoji.ts': [1, 'chat 3.4 — the :code: suggestions (SuggestList)'],
   'features/chat/gif.ts': [3, 'chat 3.4 — the GIF window (GifPop) as a component'],
   'features/chat/hover.ts': [1, 'chat 3.4 — the quoted message on hover'],
-  'features/cards/cards-anim.ts': [4, 'cards 3.2 — animations clone the rendered nodes'],
   'features/cards/holdem/holdem-anim.ts': [1, 'cards 3.3 — the chips that fly'],
   'features/cards/tarot/TrumpArt.tsx': [2, 'cards 3.2 — the trumps as components'],
   'features/activity-picker/ActivityPicker.tsx': [1, 'rooms/account 3.5 — the pictures of the activities as JSX'],
